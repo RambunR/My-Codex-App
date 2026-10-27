@@ -14,6 +14,8 @@ Brand PNG: [transparent AIDramio logo](public/aidramio-logo.png), also served at
 
 The same logo's coral play symbol is used for the website header, browser favicon, Apple touch icon and installed-app icons.
 
+Stripe payment testing: **[AIDramio Test](https://aidramio-sandbox.jimmy-tsoi2001.workers.dev)** uses separate accounts, balances, database and storage. Its test checkouts accept no real money, and uploads are disabled. See [Stripe setup and test instructions](docs/STRIPE_SETUP.md). The public production site accepts live payments only after matching live Stripe credentials are configured.
+
 Screenshots: [viewer on desktop](docs/screenshots/viewer.png) · [publisher on mobile](docs/screenshots/publisher-mobile.png).
 
 ## Deploy to Cloudflare
@@ -55,7 +57,7 @@ You can also register a new account, activate publishing through the HK$88 test 
 - **180-second** and **75 MiB input-file** limits per episode, checked on the server. The standalone Node server probes and converts videos to H.264/AAC MP4 with bounded resolution/bitrate, and strips input metadata. Conversion runs in a bounded queue. Covers are validated and compressed to WebP, maximum input 5 MiB. The Cloudflare target validates browser-ready H.264/AAC MP4/MOV files and JPEG/PNG/WebP covers, storing accepted originals without native transcoding.
 - Upload one video, multiple videos, or a directory. The studio sorts filenames numerically, shows individual upload/processing results, and lets a publisher edit episode titles and numbers. Publishers can edit series title, synopsis, cover, up to three genres, spoken language, production method, price, and free-episode count.
 - Episode prices start at **US$0.10**. Publishers choose the first N free episodes. Paid unlocks split **70% to the publisher / 30% to the platform**.
-- Wallet funding is **US$5–200** per checkout. This avoids card-processing minimums on tiny episode purchases. The publisher activation checkout is charged separately in HKD.
+- Wallet funding starts at **US$5** per checkout, with a custom USD amount chosen by the viewer to two decimal places. The former US$200 cap is removed; this integration supports up to US$999,999.99 per deposit within its documented API amount range. Verified payment credits the full chosen amount once. The publisher activation checkout is charged separately as HK$88 once.
 - Payout requests start at **HK$20 equivalent** using the configured indicative exchange rate. Funds are reserved on request, refunded on rejection, and paid through Stripe Connect after administrator approval in live mode.
 - Administrator console for account overview, storage approvals, payout approvals, platform revenue, and activation revenue.
 - Installable web-app manifest, local icons/fonts, mobile bottom navigation, safe-area support, and an offline information page. Paid media and private API data are not cached by the service worker.

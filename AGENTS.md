@@ -17,6 +17,8 @@ Do the authorized commit, push, and deployment without asking for confirmation a
 - Existing media bucket: `aidramio-media-887486`.
 - Live URL: `https://aidramio.jimmy-tsoi2001.workers.dev`.
 
+The approved Stripe test deployment is separate: Worker `aidramio-sandbox`, bucket `aidramio-sandbox-media-887486`, URL `https://aidramio-sandbox.jimmy-tsoi2001.workers.dev`, and config `wrangler.sandbox.jsonc`. It uses test-only Stripe credentials, an independent Durable Object namespace, no Google login, and disabled uploads. `/push` still targets the production site unless the user explicitly requests a sandbox deployment. Never copy test balances, accounts, product IDs or keys into production.
+
 ### Workflow
 
 1. Inspect Git status, staged/unstaged diffs, and new files. Fetch `origin/main`, preserve current work, and reconcile upstream changes as needed. Never reset away user work, force-push, or overwrite remote commits.

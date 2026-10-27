@@ -29,6 +29,6 @@ The deployment script builds the frontend/Worker, publishes, and checks the publ
 
 ## Remaining operator configuration
 
-Production `PAYMENTS_MODE` is `disabled`. Browsing and free viewing are available. Paid publisher activation, wallet funding, episode purchases and payouts require the real Stripe setup described in [CLOUDFLARE.md](CLOUDFLARE.md#real-payments-and-administrator-setup). Create the first administrator with that document's secret-protected bootstrap procedure; there is no default production administrator password.
+Production selects Stripe but has no live Stripe credentials yet, so real checkout is gated by `paymentsReady: false`. Browsing and free viewing are available. Paid publisher activation, wallet funding, episode purchases and payouts require matching live credentials as described in [STRIPE_SETUP.md](STRIPE_SETUP.md). An isolated payment-test deployment at https://aidramio-sandbox.jimmy-tsoi2001.workers.dev is connected to the supplied test Stripe account, has separate user data, and cannot process real money. Create the first production administrator with the secret-protected bootstrap procedure; there is no default production administrator password.
 
 The default workers.dev URL is active. Custom-domain routing, live payment-provider credentials, payout onboarding, and final business/support details have not been configured. Existing local development accounts or uploads were not migrated into production.

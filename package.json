@@ -17,7 +17,10 @@
     "dev:cloudflare": "XDG_CONFIG_HOME=/tmp/aidramio-cf-config WRANGLER_SEND_METRICS=false wrangler dev",
     "deploy:cloudflare": "node scripts/deploy-cloudflare.mjs",
     "admin:cloudflare": "node scripts/cloudflare-admin.mjs",
-    "test:cloudflare": "node scripts/smoke-cloudflare.mjs"
+    "test:cloudflare": "node scripts/smoke-cloudflare.mjs",
+    "stripe:catalog:test": "node scripts/provision-stripe-test.mjs",
+    "stripe:connect:sandbox": "node scripts/connect-stripe-sandbox.mjs",
+    "deploy:sandbox": "CLOUDFLARE_ACCOUNT_ID=95040c4f244233138195b80657887486 XDG_CONFIG_HOME=/tmp/aidramio-cf-config WRANGLER_SEND_METRICS=false wrangler deploy --config wrangler.sandbox.jsonc --keep-vars"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1000.0",

@@ -2,6 +2,7 @@ import { upload, coverUpload } from './uploads.js';
 import express, { type Request, type Response, type NextFunction } from 'express';
 import multer from 'multer';
 import crypto from 'node:crypto';
+import Stripe from 'stripe';
 import { z, ZodError } from 'zod';
 import { config } from './config.js';
 import { registerGoogleAuth,googleEnabled } from './google.js';
@@ -9,8 +10,8 @@ import { one, all, run, transaction } from './db.js';
 import { AppError, assert } from './errors.js';
 import { readSession, requireAuth, requirePublisher, requireAdmin, hashPassword, verifyPassword, createSession, destroySession, getUser, rateLimit } from './auth.js';
 import { prepareVideo, prepareCover, putObject, deleteObject, serveObject, removeTempFile } from './storage.js';
-import { createCheckout, settlePayment, unlockEpisode, requestWithdrawal, addLedger, stripe } from './finance.js';
-import { LANGUAGES, GENRES, MAX_EPISODE_BYTES, DEFAULT_QUOTA_BYTES } from '../shared/config.js';
+import { createCheckout, settlePayment, unlockEpisode, requestWithdrawal,returnWithdrawalFunds, addLedger, stripe,paymentsReady,stripeConfigured,stripeModeMatches } from './finance.js';
+import { LANGUAGES, GENRES, MAX_EPISODE_BYTES, DEFAULT_QUOTA_BYTES,MIN_WALLET_FUNDING_CENTS,MAX_WALLET_FUNDING_CENTS } from '../shared/config.js';
 
 const language = z.enum(LANGUAGES.map(x => x.code) as [string, ...string[]]);
 const id = (req: Request, field = 'id') => String(req.params[field] || '');
@@ -43,13 +44,19 @@ export function createApp() {
   if (process.env.TRUST_PROXY === 'true') app.set('trust proxy', 1);
   app.use((_req, res, next) => { res.setHeader('X-Content-Type-Options','nosniff'); res.setHeader('Referrer-Policy','strict-origin-when-cross-origin'); res.setHeader('X-Frame-Options','DENY'); next(); });
   app.post('/api/payments/webhook', express.raw({ type: 'application/json', limit: '1mb' }), async (req, res) => {
-    assert(config.payments === 'stripe' && stripe && config.stripeWebhook, 503, 'PAYMENTS_UNAVAILABLE', 'Webhook is not configured.');
+    assert(config.payments === 'stripe' && stripe && paymentsReady(), 503, 'PAYMENTS_UNAVAILABLE', 'Webhook is not configured.');
     let event;
     try { event = await stripe.webhooks.constructEventAsync(req.body, req.headers['stripe-signature'] as string, config.stripeWebhook); }
     catch { throw new AppError(400, 'INVALID_SIGNATURE', 'Invalid webhook signature.'); }
+    if(!stripeModeMatches(event.livemode)) {res.json({received:true,ignored:true});return;}
     if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
       const session = event.data.object;
-      if (session.payment_status === 'paid' && session.metadata?.paymentId) settlePayment(session.metadata.paymentId, { amount: session.amount_total!, currency: session.currency!, session: session.id });
+      if(!stripeModeMatches(session.livemode)){res.json({received:true,ignored:true});return;}
+      if (session.payment_status === 'paid' && session.metadata?.paymentId) settlePayment(session.metadata.paymentId, { amount: session.amount_total!, currency: session.currency!, session: session.id,livemode:session.livemode });
+    }
+    if(event.type==='checkout.session.expired'||event.type==='checkout.session.async_payment_failed'){
+      const session=event.data.object;
+      if(stripeModeMatches(session.livemode)&&session.metadata?.paymentId)run("UPDATE payments SET status=? WHERE id=? AND provider_session=? AND provider='stripe' AND status='pending'",event.type==='checkout.session.expired'?'expired':'failed',session.metadata.paymentId,session.id);
     }
     res.json({ received: true });
   });
@@ -65,8 +72,8 @@ export function createApp() {
   }, readSession, rateLimit('api', 1500, 60_000));
   registerGoogleAuth(app);
   app.get('/api/health', (_req,res) => res.json({ ok: true, database: !!one('SELECT 1 AS ready') }));
-  app.get('/api/config', (_req,res) => res.json({ brand: 'AIDramio', languages: LANGUAGES, genres: GENRES, paymentsMode: config.payments, usdToHkd: config.usdToHkd,
-    limits: { maxEpisodeSeconds: 180, maxEpisodeBytes: MAX_EPISODE_BYTES, quotaBytes: DEFAULT_QUOTA_BYTES, activationHkd: 88, minimumPriceUsd: 0.1, creatorShare: 0.7, minimumPayoutHkd: 20 }, demo: config.seed, runtime: (config as any).runtime || 'node', videoFormats: (config as any).videoFormats || ['mp4','mov','webm','m4v'], auth:{google:googleEnabled()} }));
+  app.get('/api/config', (_req,res) => res.json({ brand: 'AIDramio', languages: LANGUAGES, genres: GENRES, paymentsMode: config.payments,paymentsReady:paymentsReady(),paymentsConfigured:stripeConfigured(),sandbox:config.sandbox,paymentsTestMode:config.sandbox||config.payments==='demo',uploadsEnabled:!config.sandbox,usdToHkd: config.usdToHkd,
+    limits: { maxEpisodeSeconds: 180, maxEpisodeBytes: MAX_EPISODE_BYTES, quotaBytes: DEFAULT_QUOTA_BYTES, activationHkd: 88, minimumPriceUsd: 0.1, creatorShare: 0.7, minimumPayoutHkd: 20,minWalletFundingUsd:MIN_WALLET_FUNDING_CENTS/100,maxWalletFundingUsd:MAX_WALLET_FUNDING_CENTS/100 }, demo: config.seed, runtime: (config as any).runtime || 'node', videoFormats: (config as any).videoFormats || ['mp4','mov','webm','m4v'], auth:{google:googleEnabled()} }));
   app.get('/api/auth/me', (req,res) => res.json({ user: req.user || null }));
   app.post('/api/auth/register', rateLimit('register', 12, 15 * 60_000), async (req,res) => {
     const body = registration.parse(req.body);
@@ -138,8 +145,8 @@ export function createApp() {
   });
   app.get('/api/wallet', requireAuth, (req,res) => res.json({ user: getUser(req.user!.id), ledger: all('SELECT * FROM ledger WHERE user_id=? ORDER BY created_at DESC,rowid DESC LIMIT 100',req.user!.id), payments: all('SELECT id,kind,amount_cents,currency,status,created_at FROM payments WHERE user_id=? ORDER BY created_at DESC LIMIT 30',req.user!.id) }));
   app.post('/api/payments/checkout', requireAuth, rateLimit('checkout',20,60_000), async (req,res) => {
-    const body=z.object({kind:z.enum(['funding','activation']),amount_cents:z.number().int().min(500).max(20000).default(1000)}).parse(req.body);
-    res.json(await createCheckout(req.user!.id,body.kind,body.amount_cents));
+    const body=z.discriminatedUnion('kind',[z.object({kind:z.literal('activation')}),z.object({kind:z.literal('funding'),amount_cents:z.number().int().min(MIN_WALLET_FUNDING_CENTS).max(MAX_WALLET_FUNDING_CENTS)})]).parse(req.body);
+    res.json(await createCheckout(req.user!.id,body.kind,body.kind==='funding'?body.amount_cents:8800));
   });
   app.post('/api/payments/:id/demo-confirm', requireAuth, (req,res) => {
     assert(config.payments==='demo' && !config.production,404,'NOT_FOUND','Not found.');
@@ -147,10 +154,11 @@ export function createApp() {
     settlePayment(payment.id); res.json({ user:getUser(req.user!.id) });
   });
   app.post('/api/payments/reconcile', requireAuth, async (req,res) => {
-    const { session_id }=z.object({session_id:z.string().max(300)}).parse(req.body); assert(stripe && config.payments==='stripe',503,'PAYMENTS_UNAVAILABLE','Payments unavailable.');
+    const { session_id }=z.object({session_id:z.string().max(300)}).parse(req.body); assert(stripe && config.payments==='stripe'&&paymentsReady(),503,'PAYMENTS_UNAVAILABLE','Payments unavailable.');
     const payment=one('SELECT * FROM payments WHERE provider_session=? AND user_id=?',session_id,req.user!.id);assert(payment,404,'NOT_FOUND','Payment not found.');
     const session=await stripe.checkout.sessions.retrieve(session_id);
-    if(session.payment_status==='paid')settlePayment(payment.id,{amount:session.amount_total!,currency:session.currency!,session:session.id});
+    assert(stripeModeMatches(session.livemode),400,'PAYMENT_MODE_MISMATCH','Payment mode does not match this application.');
+    if(session.payment_status==='paid')settlePayment(payment.id,{amount:session.amount_total!,currency:session.currency!,session:session.id,livemode:session.livemode});
     res.json({ paid:session.payment_status==='paid',user:getUser(req.user!.id) });
   });
   app.get('/api/studio', requireAuth, (req,res) => {
@@ -167,7 +175,7 @@ export function createApp() {
     ownSeries(req);const b=seriesSchema.parse(req.body);
     run("UPDATE series SET title=?,description=?,language=?,genres=?,creation_type=?,price_cents=?,free_episodes=?,updated_at=datetime('now') WHERE id=?",b.title,b.description,b.language,JSON.stringify(b.genres),b.creation_type,b.price_cents,b.free_episodes,id(req));res.json({ok:true});
   });
-  app.post('/api/studio/series/:id/cover', requirePublisher, (req,_res,next)=>{ownSeries(req);next();}, coverUpload.single('cover'), async (req,res) => {
+  app.post('/api/studio/series/:id/cover', requirePublisher, (req,_res,next)=>{assert(!config.sandbox,403,'SANDBOX_UPLOAD_DISABLED','Uploads are disabled on the payment-test site. Use its sample episodes to test wallet purchases.');ownSeries(req);next();}, coverUpload.single('cover'), async (req,res) => {
     assert(req.file,400,'FILE_REQUIRED','Choose a cover image.'); let processed: {path:string;bytes:number}|undefined;const key=`covers/${crypto.randomUUID()}.webp`;let saved=false;
     try {
       processed=await prepareCover(req.file.path);await putObject(processed.path,key,'image/webp');saved=true;
@@ -177,7 +185,7 @@ export function createApp() {
     } catch(error) { if(saved)await deleteObject(key);throw error; }
     finally {await removeTempFile(req.file.path);if(processed)await removeTempFile(processed.path);}
   });
-  app.post('/api/studio/series/:id/episodes', requirePublisher, rateLimit('upload',60,60_000), (req,_res,next)=>{ownSeries(req);next();}, upload.single('video'), async (req,res) => {
+  app.post('/api/studio/series/:id/episodes', requirePublisher, rateLimit('upload',60,60_000), (req,_res,next)=>{assert(!config.sandbox,403,'SANDBOX_UPLOAD_DISABLED','Uploads are disabled on the payment-test site. Use its sample episodes to test wallet purchases.');ownSeries(req);next();}, upload.single('video'), async (req,res) => {
     assert(req.file,400,'FILE_REQUIRED','Choose an episode video.');let processed:{path:string;bytes:number;duration:number}|undefined;const key=`videos/${req.user!.id}/${crypto.randomUUID()}.mp4`;let saved=false;
     try {
       const body=z.object({title:z.string().trim().min(1).max(120),number:z.coerce.number().int().min(1).max(1000)}).parse(req.body);
@@ -213,14 +221,14 @@ export function createApp() {
     run('INSERT INTO storage_requests (id,user_id,requested_gb,reason) VALUES (?,?,?,?)',crypto.randomUUID(),req.user!.id,b.requested_gb,b.reason);res.status(201).json({ok:true});
   });
   app.post('/api/studio/connect', requirePublisher, async (req,res) => {
-    assert(stripe && config.payments==='stripe',503,'PAYMENTS_UNAVAILABLE','Payout onboarding is not configured yet.');
+    assert(stripe && config.payments==='stripe'&&paymentsReady(),503,'PAYMENTS_UNAVAILABLE','Payout onboarding is not configured yet.');
     let account=req.user!.stripe_account_id;
     if(!account){const created=await stripe.accounts.create({type:'express',email:req.user!.email,capabilities:{transfers:{requested:true}},metadata:{userId:req.user!.id}});account=created.id;run('UPDATE users SET stripe_account_id=? WHERE id=?',account,req.user!.id);}
     const link=await stripe.accountLinks.create({account,refresh_url:`${config.appUrl}/studio?connect=retry`,return_url:`${config.appUrl}/studio?connect=done`,type:'account_onboarding'});res.json({url:link.url});
   });
   app.post('/api/studio/withdrawals', requirePublisher, async (req,res) => {
     const b=z.object({amount_cents:z.number().int().min(1).max(10000000),note:z.string().max(500).default('')}).parse(req.body);
-    if(config.payments==='stripe') {assert(stripe && req.user!.stripe_account_id,400,'CONNECT_REQUIRED','Connect your payout account first.');const account=await stripe.accounts.retrieve(req.user!.stripe_account_id);assert(account.payouts_enabled,400,'CONNECT_REQUIRED','Complete your payout account verification first.');}
+    if(config.payments==='stripe') {assert(stripe&&paymentsReady(),503,'PAYMENTS_UNAVAILABLE','Payouts are not configured yet.');assert(req.user!.stripe_account_id,400,'CONNECT_REQUIRED','Connect your payout account first.');const account=await stripe.accounts.retrieve(req.user!.stripe_account_id);assert(account.payouts_enabled,400,'CONNECT_REQUIRED','Complete your payout account verification first.');}
     else assert(config.payments==='demo' && !config.production,503,'PAYMENTS_UNAVAILABLE','Payouts are not configured yet.');
     res.status(201).json({id:requestWithdrawal(req.user!.id,b.amount_cents,b.note),user:getUser(req.user!.id)});
   });
@@ -238,8 +246,9 @@ export function createApp() {
   app.post('/api/admin/withdrawals/:id', requireAdmin, async (req,res) => {
     const {approve}=z.object({approve:z.boolean()}).parse(req.body);
     const w=one('SELECT w.*,u.stripe_account_id FROM withdrawals w JOIN users u ON u.id=w.user_id WHERE w.id=?',id(req));assert(w,404,'NOT_FOUND','Payout not found.');
-    if(!approve){transaction(()=>{const current=one('SELECT * FROM withdrawals WHERE id=?',w.id)!;assert(current.status==='pending',409,'ALREADY_PROCESSED','This payout is already being processed.');run("UPDATE withdrawals SET status='rejected' WHERE id=?",w.id);run('UPDATE users SET earnings_micros=earnings_micros+? WHERE id=?',w.amount_micros,w.user_id);addLedger(w.user_id,'withdrawal_refund',w.amount_micros,w.id,'Payout declined · funds returned');});res.json({ok:true});return;}
+    if(!approve){transaction(()=>{const current=one('SELECT * FROM withdrawals WHERE id=?',w.id)!;assert(current.status==='pending',409,'ALREADY_PROCESSED','This payout is already being processed.');run("UPDATE withdrawals SET status='rejected' WHERE id=?",w.id);returnWithdrawalFunds(w.user_id,w.amount_micros);addLedger(w.user_id,'withdrawal_refund',w.amount_micros,w.id,'Payout declined · funds returned');});res.json({ok:true});return;}
     assert(w.status==='pending'||w.status==='processing',409,'ALREADY_PROCESSED','This payout is already processed.');
+    assert(config.payments==='demo'&&!config.production||config.payments==='stripe'&&paymentsReady(),503,'PAYMENTS_UNAVAILABLE','Payouts unavailable.');
     run("UPDATE withdrawals SET status='processing' WHERE id=? AND status='pending'",w.id);
     if(config.payments==='stripe'){
       assert(stripe && w.stripe_account_id,400,'CONNECT_REQUIRED','Publisher payout account is missing.');
@@ -256,5 +265,6 @@ export function errorHandler(error: any, _req: Request, res: Response, _next: Ne
   if(error instanceof ZodError){res.status(400).json({error:{code:'VALIDATION',message:error.issues[0]?.message || 'Check the information you entered.',fields:error.issues.map(x=>({path:x.path.join('.'),message:x.message}))}});return;}
   if(error instanceof multer.MulterError){res.status(413).json({error:{code:'FILE_TOO_LARGE',message:error.code==='LIMIT_FILE_SIZE'?'This file is too large. Episodes: 75 MB maximum. Covers: 5 MB maximum.':'Upload one file at a time.'}});return;}
   if(error instanceof AppError){res.status(error.status).json({error:{code:error.code,message:error.message}});return;}
+  if(error instanceof Stripe.errors.StripeError){res.status(502).json({error:{code:'PAYMENT_PROVIDER_ERROR',message:'The payment provider could not complete this request. Please try again shortly.'}});return;}
   console.error(error);res.status(500).json({error:{code:'INTERNAL',message:'Something went wrong. Please try again.'}});
 }

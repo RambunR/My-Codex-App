@@ -33,8 +33,8 @@ try{
   await mkdir('.cloudflare',{recursive:true});const filename=path.join(root,'.cloudflare/wrangler.deploy.json');await writeFile(filename,JSON.stringify(configuration,null,2)+'\n');
   // Keep the identity of newly created resources even if a later deployment step needs a retry.
   await writeFile('.cloudflare/deployment.json',JSON.stringify({account,project:desired,name,bucket,status:'prepared'},null,2)+'\n');
-  console.log(`Deploying new Cloudflare application: ${name}; live payments remain disabled.`);
-  await command(['deploy','--config',filename]);
+  console.log(`Deploying Cloudflare application: ${name}; configured payment provider: ${configuration.vars.PAYMENTS_MODE||'disabled'}.`);
+  await command(['deploy','--config',filename,'--keep-vars']);
   const subdomain=await cf('/workers/subdomain');const url=`https://${name}.${subdomain.subdomain}.workers.dev`;
   let verified=false;
   for(let attempt=0;attempt<12;attempt++){
@@ -42,7 +42,7 @@ try{
     await new Promise(resolve=>setTimeout(resolve,1000));
   }
   if(!verified)throw new Error('Cloudflare accepted the deployment, but the public health check did not pass. Inspect this application’s logs before claiming it is live.');
-  const response=await fetch(`${url}/api/config`,{dispatcher});const cfg=await response.json();if(cfg.runtime!=='cloudflare'||cfg.paymentsMode!=='disabled')throw new Error('Unexpected deployed runtime or payment mode.');
+  const response=await fetch(`${url}/api/config`,{dispatcher});const cfg=await response.json();if(cfg.runtime!=='cloudflare'||cfg.paymentsMode!==(configuration.vars.PAYMENTS_MODE||'disabled'))throw new Error('Unexpected deployed runtime or payment mode.');
   await writeFile('.cloudflare/deployment.json',JSON.stringify({account,project:desired,name,bucket,url,status:'verified',deployed_at:new Date().toISOString()},null,2)+'\n');
   console.log(`Verified application URL: ${url}`);
 }catch(error){console.error(sanitize(error.message));process.exitCode=1;}

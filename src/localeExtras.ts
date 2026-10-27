@@ -177,3 +177,185 @@ for(const [locale,row] of Object.entries(googleAuthRows)){
  if(values.length!==keys.length)throw new Error(`Google translations ${locale}: ${values.length}/${keys.length}`);
  googleAuthMessages[locale]=Object.fromEntries(keys.map((key,i)=>[key,values[i]])) as Record<keyof typeof googleAuthEnglish,string>;
 }
+
+export const walletFundingEnglish={
+  "walletFundingHint": "Minimum {minimum}. Choose your own amount; wallet credit pays for episode unlocks.",
+  "walletFundingInvalid": "Enter a valid USD amount with no more than 2 decimal places.",
+  "walletFundingRange": "Each deposit must be between {minimum} and {maximum}."
+} as const;
+export const walletFundingMessages:Record<string,Record<keyof typeof walletFundingEnglish,string>>={
+  "en": {
+    "walletFundingHint": "Minimum {minimum}. Choose your own amount; wallet credit pays for episode unlocks.",
+    "walletFundingInvalid": "Enter a valid USD amount with no more than 2 decimal places.",
+    "walletFundingRange": "Each deposit must be between {minimum} and {maximum}."
+  },
+  "zh-TW": {
+    "walletFundingHint": "最低儲值 {minimum}。自行輸入金額，錢包餘額可用於解鎖劇集。",
+    "walletFundingInvalid": "請輸入有效的美元金額，最多保留 2 位小數。",
+    "walletFundingRange": "每次儲值須介乎 {minimum} 及 {maximum} 之間。"
+  },
+  "zh-CN": {
+    "walletFundingHint": "最低充值 {minimum}。自行输入金额，钱包余额可用于解锁剧集。",
+    "walletFundingInvalid": "请输入有效的美元金额，最多保留 2 位小数。",
+    "walletFundingRange": "每次充值须介于 {minimum} 和 {maximum} 之间。"
+  },
+  "ja": {
+    "walletFundingHint": "最低チャージ額は {minimum} です。金額を自由に入力し、残高でエピソードを購入できます。",
+    "walletFundingInvalid": "有効な米ドル金額を小数点以下 2 桁以内で入力してください。",
+    "walletFundingRange": "1 回のチャージ額は {minimum} 以上、{maximum} 以下です。"
+  },
+  "ko": {
+    "walletFundingHint": "최소 충전 금액은 {minimum}입니다. 원하는 금액을 입력하고 잔액으로 에피소드를 구매하세요.",
+    "walletFundingInvalid": "소수점 이하 두 자리까지 유효한 미국 달러 금액을 입력하세요.",
+    "walletFundingRange": "한 번에 {minimum} 이상 {maximum} 이하로 충전할 수 있습니다."
+  },
+  "hi": {
+    "walletFundingHint": "न्यूनतम राशि {minimum} है। अपनी पसंद की राशि भरें; वॉलेट के पैसे से एपिसोड खोलें।",
+    "walletFundingInvalid": "अमेरिकी डॉलर में मान्य राशि भरें, दशमलव के बाद अधिकतम 2 अंक रखें।",
+    "walletFundingRange": "हर जमा राशि {minimum} और {maximum} के बीच होनी चाहिए।"
+  },
+  "id": {
+    "walletFundingHint": "Minimum {minimum}. Masukkan jumlah pilihan Anda; saldo dompet digunakan untuk membuka episode.",
+    "walletFundingInvalid": "Masukkan jumlah USD yang valid dengan maksimal 2 angka desimal.",
+    "walletFundingRange": "Setiap pengisian harus antara {minimum} dan {maximum}."
+  },
+  "pt-BR": {
+    "walletFundingHint": "Mínimo de {minimum}. Escolha o valor; o saldo da carteira paga pelos episódios desbloqueados.",
+    "walletFundingInvalid": "Insira um valor válido em USD com no máximo 2 casas decimais.",
+    "walletFundingRange": "Cada depósito deve ficar entre {minimum} e {maximum}."
+  },
+  "es": {
+    "walletFundingHint": "Mínimo de {minimum}. Elige el importe; el saldo de tu cartera sirve para desbloquear episodios.",
+    "walletFundingInvalid": "Introduce un importe válido en USD con un máximo de 2 decimales.",
+    "walletFundingRange": "Cada depósito debe estar entre {minimum} y {maximum}."
+  },
+  "ar": {
+    "walletFundingHint": "الحد الأدنى {minimum}. اختر المبلغ الذي تريده؛ يُستخدم رصيد المحفظة لفتح الحلقات.",
+    "walletFundingInvalid": "أدخل مبلغًا صالحًا بالدولار الأمريكي بخانتين عشريتين كحد أقصى.",
+    "walletFundingRange": "يجب أن تكون كل عملية إيداع بين {minimum} و{maximum}."
+  },
+  "bn": {
+    "walletFundingHint": "সর্বনিম্ন {minimum}। পছন্দের পরিমাণ লিখুন; ওয়ালেটের টাকা দিয়ে পর্ব আনলক করা যাবে।",
+    "walletFundingInvalid": "মার্কিন ডলারে সঠিক পরিমাণ লিখুন, দশমিকের পরে সর্বোচ্চ ২টি অঙ্ক রাখুন।",
+    "walletFundingRange": "প্রতিবার জমার পরিমাণ {minimum} থেকে {maximum}-এর মধ্যে হতে হবে।"
+  },
+  "ur": {
+    "walletFundingHint": "کم از کم رقم {minimum} ہے۔ اپنی پسند کی رقم درج کریں؛ والیٹ کا بیلنس اقساط کھولنے کے لیے استعمال ہوگا۔",
+    "walletFundingInvalid": "امریکی ڈالر میں درست رقم درج کریں، اعشاریے کے بعد زیادہ سے زیادہ 2 ہندسے رکھیں۔",
+    "walletFundingRange": "ہر جمع کی رقم {minimum} سے {maximum} کے درمیان ہونی چاہیے۔"
+  },
+  "vi": {
+    "walletFundingHint": "Tối thiểu {minimum}. Nhập số tiền bạn muốn; số dư ví dùng để mở khóa các tập phim.",
+    "walletFundingInvalid": "Nhập số tiền USD hợp lệ với tối đa 2 chữ số thập phân.",
+    "walletFundingRange": "Mỗi lần nạp phải từ {minimum} đến {maximum}."
+  },
+  "th": {
+    "walletFundingHint": "ขั้นต่ำ {minimum} เลือกจำนวนเงินที่ต้องการ ยอดเงินในกระเป๋าใช้ปลดล็อกตอน",
+    "walletFundingInvalid": "กรอกจำนวนเงินดอลลาร์สหรัฐที่ถูกต้อง โดยมีทศนิยมไม่เกิน 2 ตำแหน่ง",
+    "walletFundingRange": "การเติมเงินแต่ละครั้งต้องอยู่ระหว่าง {minimum} ถึง {maximum}"
+  },
+  "fil": {
+    "walletFundingHint": "Minimum na {minimum}. Ilagay ang gusto mong halaga; ginagamit ang wallet credit para mag-unlock ng mga episode.",
+    "walletFundingInvalid": "Maglagay ng wastong halaga sa USD na may hanggang 2 decimal place.",
+    "walletFundingRange": "Ang bawat deposito ay dapat nasa pagitan ng {minimum} at {maximum}."
+  },
+  "tr": {
+    "walletFundingHint": "En az {minimum}. İstediğiniz tutarı girin; cüzdan bakiyesi bölümlerin kilidini açmak için kullanılır.",
+    "walletFundingInvalid": "En fazla 2 ondalık basamak içeren geçerli bir USD tutarı girin.",
+    "walletFundingRange": "Her yükleme {minimum} ile {maximum} arasında olmalıdır."
+  },
+  "ru": {
+    "walletFundingHint": "Минимум {minimum}. Укажите свою сумму; баланс кошелька используется для покупки эпизодов.",
+    "walletFundingInvalid": "Введите корректную сумму в долларах США, не более 2 знаков после десятичной точки.",
+    "walletFundingRange": "Каждое пополнение должно быть от {minimum} до {maximum}."
+  },
+  "fr": {
+    "walletFundingHint": "Minimum {minimum}. Choisissez le montant ; le solde du portefeuille sert à débloquer les épisodes.",
+    "walletFundingInvalid": "Saisissez un montant valide en USD avec au maximum 2 décimales.",
+    "walletFundingRange": "Chaque dépôt doit être compris entre {minimum} et {maximum}."
+  },
+  "de": {
+    "walletFundingHint": "Mindestens {minimum}. Wähle deinen Betrag; mit dem Wallet-Guthaben schaltest du Folgen frei.",
+    "walletFundingInvalid": "Gib einen gültigen USD-Betrag mit höchstens 2 Nachkommastellen ein.",
+    "walletFundingRange": "Jede Einzahlung muss zwischen {minimum} und {maximum} liegen."
+  },
+  "ms": {
+    "walletFundingHint": "Minimum {minimum}. Masukkan jumlah pilihan anda; baki dompet digunakan untuk membuka episod.",
+    "walletFundingInvalid": "Masukkan jumlah USD yang sah dengan maksimum 2 tempat perpuluhan.",
+    "walletFundingRange": "Setiap tambah nilai mestilah antara {minimum} dan {maximum}."
+  },
+  "ta": {
+    "walletFundingHint": "குறைந்தபட்சம் {minimum}. விரும்பிய தொகையை உள்ளிடுங்கள்; பணப்பை இருப்பால் அத்தியாயங்களைத் திறக்கலாம்.",
+    "walletFundingInvalid": "அமெரிக்க டாலரில் செல்லுபடியாகும் தொகையை அதிகபட்சம் 2 தசம இடங்களுடன் உள்ளிடுங்கள்.",
+    "walletFundingRange": "ஒவ்வொரு வைப்பும் {minimum} முதல் {maximum} வரை இருக்க வேண்டும்."
+  }
+};
+
+export const sandboxEnglish={
+  "sandboxNotice": "Payment test site. No real money is charged. Uploads are disabled; use sample episodes to test wallet purchases."
+} as const;
+export const sandboxMessages:Record<string,Record<keyof typeof sandboxEnglish,string>>={
+  "en": {
+    "sandboxNotice": "Payment test site. No real money is charged. Uploads are disabled; use sample episodes to test wallet purchases."
+  },
+  "zh-TW": {
+    "sandboxNotice": "付款測試網站，不會收取真實款項。上傳功能已停用，請使用示範集數測試錢包購買。"
+  },
+  "zh-CN": {
+    "sandboxNotice": "付款测试网站，不会收取真实款项。上传功能已停用，请使用示范剧集测试钱包购买。"
+  },
+  "ja": {
+    "sandboxNotice": "決済テスト用サイトです。実際の請求は発生しません。アップロードは無効です。サンプルエピソードでウォレット購入をお試しください。"
+  },
+  "ko": {
+    "sandboxNotice": "결제 테스트 사이트입니다. 실제 금액은 청구되지 않습니다. 업로드는 비활성화되어 있습니다. 샘플 에피소드로 지갑 구매를 테스트하세요."
+  },
+  "hi": {
+    "sandboxNotice": "यह भुगतान परीक्षण साइट है। असली पैसे नहीं लिए जाते। अपलोड बंद हैं; वॉलेट से खरीदारी जाँचने के लिए नमूना एपिसोड इस्तेमाल करें।"
+  },
+  "id": {
+    "sandboxNotice": "Situs uji pembayaran. Tidak ada uang sungguhan yang ditagih. Unggahan dinonaktifkan; gunakan episode contoh untuk menguji pembelian dengan dompet."
+  },
+  "pt-BR": {
+    "sandboxNotice": "Site de teste de pagamentos. Nenhum dinheiro real é cobrado. Os envios estão desativados; use episódios de exemplo para testar compras com a carteira."
+  },
+  "es": {
+    "sandboxNotice": "Sitio de prueba de pagos. No se cobra dinero real. Las subidas están desactivadas; usa episodios de muestra para probar compras con la cartera."
+  },
+  "ar": {
+    "sandboxNotice": "موقع لاختبار الدفع. لا تُحصّل أموال حقيقية. رفع الملفات معطّل؛ استخدم الحلقات التجريبية لاختبار الشراء برصيد المحفظة."
+  },
+  "bn": {
+    "sandboxNotice": "এটি পেমেন্ট পরীক্ষার সাইট। আসল টাকা নেওয়া হয় না। আপলোড বন্ধ আছে; ওয়ালেট দিয়ে কেনাকাটা পরীক্ষা করতে নমুনা পর্ব ব্যবহার করুন।"
+  },
+  "ur": {
+    "sandboxNotice": "یہ ادائیگی کی آزمائشی سائٹ ہے۔ حقیقی رقم وصول نہیں کی جاتی۔ اپ لوڈ بند ہیں؛ والیٹ سے خریداری آزمانے کے لیے نمونہ اقساط استعمال کریں۔"
+  },
+  "vi": {
+    "sandboxNotice": "Trang thử nghiệm thanh toán. Không thu tiền thật. Tính năng tải lên đã tắt; dùng các tập mẫu để thử mua bằng ví."
+  },
+  "th": {
+    "sandboxNotice": "เว็บไซต์ทดสอบการชำระเงิน ไม่มีการเรียกเก็บเงินจริง ปิดการอัปโหลดแล้ว โปรดใช้ตอนตัวอย่างเพื่อทดสอบการซื้อด้วยกระเป๋าเงิน"
+  },
+  "fil": {
+    "sandboxNotice": "Site para sa pagsubok ng pagbabayad. Walang totoong perang sisingilin. Hindi puwedeng mag-upload; gamitin ang mga sample episode para subukan ang pagbili gamit ang wallet."
+  },
+  "tr": {
+    "sandboxNotice": "Ödeme test sitesi. Gerçek para tahsil edilmez. Yüklemeler devre dışıdır; cüzdan alışverişini denemek için örnek bölümleri kullanın."
+  },
+  "ru": {
+    "sandboxNotice": "Сайт для тестирования платежей. Настоящие деньги не списываются. Загрузка отключена; используйте образцы эпизодов для проверки покупок с кошелька."
+  },
+  "fr": {
+    "sandboxNotice": "Site de test des paiements. Aucun argent réel n’est prélevé. Les envois sont désactivés ; utilisez les épisodes de démonstration pour tester les achats avec le portefeuille."
+  },
+  "de": {
+    "sandboxNotice": "Testseite für Zahlungen. Es wird kein echtes Geld abgebucht. Uploads sind deaktiviert; teste Wallet-Käufe mit den Beispielfolgen."
+  },
+  "ms": {
+    "sandboxNotice": "Laman ujian pembayaran. Tiada wang sebenar dicaj. Muat naik dinyahdayakan; gunakan episod contoh untuk menguji pembelian dengan dompet."
+  },
+  "ta": {
+    "sandboxNotice": "கட்டணச் சோதனைத் தளம். உண்மையான பணம் வசூலிக்கப்படாது. பதிவேற்றங்கள் முடக்கப்பட்டுள்ளன; பணப்பை வாங்குதல்களைச் சோதிக்க மாதிரி அத்தியாயங்களைப் பயன்படுத்துங்கள்."
+  }
+};

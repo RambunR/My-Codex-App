@@ -1,0 +1,64 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "aidramio-sandbox",
+  "main": "cloudflare/worker.ts",
+  "account_id": "95040c4f244233138195b80657887486",
+  "compatibility_date": "2025-09-01",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "workers_dev": true,
+  "assets": {
+    "directory": "./dist/client",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": [
+      "/api/*"
+    ]
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "APP",
+        "class_name": "AIDramioApp"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "AIDramioApp"
+      ]
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "aidramio-sandbox-media-887486"
+    }
+  ],
+  "vars": {
+    "ENVIRONMENT": "sandbox",
+    "APP_URL": "https://aidramio-sandbox.jimmy-tsoi2001.workers.dev",
+    "PAYMENTS_MODE": "stripe",
+    "USD_TO_HKD": "7.8",
+    "SEED_CATALOG": "true",
+    "STRIPE_ACTIVATION_PRICE_ID": "price_1UV7jBJ6Er233b9cr0ahOada",
+    "STRIPE_WALLET_PRODUCT_ID": "prod_VWA3U1So0O5Lqv"
+  },
+  "observability": {
+    "enabled": true
+  },
+  "build": {
+    "command": "npm run build:cloudflare",
+    "cwd": ".",
+    "watch_dir": [
+      "server",
+      "shared",
+      "cloudflare",
+      "src",
+      "public"
+    ]
+  }
+}

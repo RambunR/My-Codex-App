@@ -120,7 +120,7 @@ test('Stripe webhooks reject forged signatures and settle a correctly signed pai
   try{
     const paymentId='signed-payment-test';const user=one('SELECT id,wallet_micros FROM users WHERE email=?','viewer@example.test')!;
     run('INSERT INTO payments (id,user_id,kind,amount_cents,currency,provider,provider_session) VALUES (?,?,?,?,?,?,?)',paymentId,user.id,'funding',500,'usd','stripe','cs_test_signed');
-    const payload=JSON.stringify({id:'evt_local',object:'event',type:'checkout.session.completed',data:{object:{id:'cs_test_signed',object:'checkout.session',payment_status:'paid',amount_total:500,currency:'usd',metadata:{paymentId}}}});
+    const payload=JSON.stringify({id:'evt_local',object:'event',livemode:false,type:'checkout.session.completed',data:{object:{id:'cs_test_signed',object:'checkout.session',livemode:false,payment_status:'paid',amount_total:500,currency:'usd',metadata:{paymentId}}}});
     const forged=await fetch(base+'/api/payments/webhook',{method:'POST',headers:{'Content-Type':'application/json','stripe-signature':'invalid'},body:payload});assert.equal(forged.status,400);await forged.arrayBuffer();
     const signature=stripe!.webhooks.generateTestHeaderString({payload,secret:config.stripeWebhook});
     for(let n=0;n<2;n++){const response=await fetch(base+'/api/payments/webhook',{method:'POST',headers:{'Content-Type':'application/json','stripe-signature':signature},body:payload});assert.equal(response.status,200);await response.arrayBuffer();}

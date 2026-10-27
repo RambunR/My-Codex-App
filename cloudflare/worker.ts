@@ -41,7 +41,7 @@ export class AIDramioApp {
     const creator='catalog-publisher';run("INSERT INTO users (id,email,name,password_hash,role) VALUES (?,?,?,?, 'publisher')",creator,'catalog@aidramio.invalid','Studio Afterglow',randomBytes(64).toString('hex'));
     DEMO_CATALOG.forEach((item,index)=>{
       const[sid,title,description,language,genres,image,type,featured]=item;
-      run('INSERT INTO series (id,creator_id,title,description,language,genres,creation_type,price_cents,free_episodes,cover_key,status,featured,demo,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',sid,creator,title,description,language,JSON.stringify(genres),type,30,8,`public:/images/${image}.jpg`,'published',featured,1,new Date(Date.now()-index*25*60*60*1000).toISOString());
+      run('INSERT INTO series (id,creator_id,title,description,language,genres,creation_type,price_cents,free_episodes,cover_key,status,featured,demo,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',sid,creator,title,description,language,JSON.stringify(genres),type,config.sandbox?10:30,config.sandbox&&index===0?1:8,`public:/images/${image}.jpg`,'published',featured,1,new Date(Date.now()-index*25*60*60*1000).toISOString());
       for(let n=1;n<=8;n++)run('INSERT INTO episodes (id,series_id,title,number,duration,bytes,storage_key) VALUES (?,?,?,?,?,?,?)',`${sid}-${n}`,sid,`Sample preview ${n}`,n,12,DEMO_PREVIEW_BYTES,'demo/preview.mp4');
     });
   });}
@@ -54,6 +54,7 @@ export class AIDramioApp {
 export default {
   async fetch(request:Request,env:Env){
     const url=new URL(request.url);
+    if(env.ENVIRONMENT==='sandbox'&&url.origin!==env.APP_URL)return new Response('This payment sandbox is available only on its isolated origin.',{status:403});
     if(url.pathname.startsWith('/api/'))return env.APP.get(env.APP.idFromName('platform')).fetch(request as any) as unknown as Promise<Response>;
     return env.ASSETS.fetch(request as any) as unknown as Promise<Response>;
   },

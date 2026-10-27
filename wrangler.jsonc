@@ -41,7 +41,7 @@
   "vars": {
     "ENVIRONMENT": "production",
     "APP_URL": "https://aidramio.jimmy-tsoi2001.workers.dev",
-    "PAYMENTS_MODE": "disabled",
+    "PAYMENTS_MODE": "stripe",
     "USD_TO_HKD": "7.8",
     "SEED_CATALOG": "true"
   },

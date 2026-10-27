@@ -28,6 +28,9 @@ export const DEFAULT_QUOTA_BYTES = 5 * 1024 * 1024 * 1024;
 export const USD_MICROS = 1_000_000;
 export const ACTIVATION_HKD_CENTS = 8800;
 export const MIN_PRICE_CENTS = 10;
+export const MIN_WALLET_FUNDING_CENTS = 500;
+// Documented eight-digit USD PaymentIntent amount supported by this integration.
+export const MAX_WALLET_FUNDING_CENTS = 99_999_999;
 export type Locale = typeof LANGUAGES[number]['code'];
 export interface User {
   id: string; name: string; email: string; role: 'viewer' | 'publisher' | 'admin'; publisher_active: number;
