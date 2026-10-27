@@ -14,6 +14,8 @@ Brand PNG: [transparent AIDramio logo](public/aidramio-logo.png), also served at
 
 The same logo's coral play symbol is used for the website header, browser favicon, Apple touch icon and installed-app icons.
 
+Upload test files: [download 10 numbered test episodes](https://aidramio.jimmy-tsoi2001.workers.dev/downloads/dramio-test-episodes.zip). Unzip the archive and select its `Dramio_Test_Episodes` folder in the studio folder uploader. Each MP4 is 10 seconds, 720×1280, H.264 with silent AAC audio, and shows a white episode number on black. All ten were created with FFmpeg without an AI video model; each is approximately 21 KB.
+
 Stripe payment testing uses **the same [main website](https://aidramio.jimmy-tsoi2001.workers.dev)**, Google/email accounts, studio and uploads. Wallet **Add funds** and publisher activation open Stripe-hosted **test** Checkout, with a visible test-payment notice. Test balances, activation, paid unlocks and earnings are stored separately from real financial records; no test earnings can be withdrawn. See [Stripe setup and test instructions](docs/STRIPE_SETUP.md). The earlier separate sandbox is no longer the user-facing test workflow.
 
 Screenshots: [viewer on desktop](docs/screenshots/viewer.png) · [publisher on mobile](docs/screenshots/publisher-mobile.png).
