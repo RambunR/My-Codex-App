@@ -36,6 +36,7 @@ export interface User {
   id: string; name: string; email: string; role: 'viewer' | 'publisher' | 'admin'; publisher_active: number;
   wallet_micros: number; earnings_micros: number; quota_bytes: number; used_bytes: number; language: string;
   stripe_account_id?: string; connected?: boolean;
+  dramio_pass?: {active:boolean;test:boolean;purchased_at:string|null};
 }
 export interface Series {
   id: string; title: string; description: string; language: string; genres: string[]; cover: string; creator_id: string;

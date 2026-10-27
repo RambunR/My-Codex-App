@@ -62,6 +62,7 @@ try{
   const admin=(await request('/api/auth/login',{email:'admin@example.test',password})).cookie;
   const p=await request('/api/auth/register',{email:'publisher@example.test',name:'Local Publisher',password,role:'admin',publisher_active:1},'',201);const publisher=p.cookie;
   assert.equal(p.data.user.role,'viewer');assert.equal(p.data.user.publisher_active,0);
+  assert.deepEqual(p.data.user.dramio_pass,{active:false,test:false,purchased_at:null});
   const viewer=(await request('/api/auth/register',{email:'viewer@example.test',name:'Local Viewer',password},'',201)).cookie;
   assert.deepEqual((await request('/api/account/identities',undefined,viewer)).data,{google:{linked:false},password:true});
   await request('/api/auth/login',{email:'viewer@example.test',password:'wrong'},'',401);
@@ -71,6 +72,7 @@ try{
   await request(`/api/payments/${activation.paymentId}/demo-confirm`,{},viewer,404);
   await Promise.all([0,1].map(()=>request(`/api/payments/${activation.paymentId}/demo-confirm`,{},publisher)));
   const activated=(await request('/api/auth/me',undefined,publisher)).data.user;assert.equal(activated.publisher_active,1);assert.equal(activated.quota_bytes,5*1024**3);
+  assert.equal(activated.dramio_pass.active,true);assert.equal(activated.dramio_pass.test,true);assert.match(activated.dramio_pass.purchased_at,/^\d{4}-\d{2}-\d{2}T/);
   const funding=(await request('/api/payments/checkout',{kind:'funding',amount_cents:1000},viewer)).data;
   await Promise.all([0,1].map(()=>request(`/api/payments/${funding.paymentId}/demo-confirm`,{},viewer)));
   assert.equal((await request('/api/auth/me',undefined,viewer)).data.user.wallet_micros,10_000_000);
@@ -147,6 +149,7 @@ try{
   await request('/api/auth/google/start',undefined,'',503);
   assert.equal((await request('/api/auth/me',undefined,viewer)).data.user.wallet_micros,4_990_000);
   assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.earnings_micros,507_000);
+  const retainedPass=(await request('/api/auth/me',undefined,publisher)).data.user.dramio_pass;assert.equal(retainedPass.active,true);assert.equal(retainedPass.purchased_at,activated.dramio_pass.purchased_at);
   const persisted=await fetch(base+`/api/episodes/${second.id}/stream`,{headers:{Cookie:viewer,Range:'bytes=0-31'}});assert.equal(persisted.status,206);assert.equal((await persisted.arrayBuffer()).byteLength,32);
   await request('/api/payments/checkout',{kind:'funding',amount_cents:500},viewer,503);
   await request(`/api/payments/${funding.paymentId}/demo-confirm`,{},viewer,404);

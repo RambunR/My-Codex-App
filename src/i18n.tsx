@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { LANGUAGES, type Locale } from '../shared/config';
-import { additionalMessages,googleAuthEnglish,googleAuthMessages,walletFundingEnglish,walletFundingMessages,sandboxEnglish,sandboxMessages,stripeTestingEnglish,stripeTestingMessages,analyticsEnglish,analyticsMessages } from './localeExtras';
+import { additionalMessages,googleAuthEnglish,googleAuthMessages,walletFundingEnglish,walletFundingMessages,sandboxEnglish,sandboxMessages,stripeTestingEnglish,stripeTestingMessages,analyticsEnglish,analyticsMessages,dramioPassEnglish,dramioPassMessages } from './localeExtras';
 
 const en = {
   ...googleAuthEnglish,
@@ -36,8 +36,8 @@ const en = {
   testPayment:'Test payment', testPaymentBody:'This is a development preview. No real money will be charged or paid out.', confirmTest:'Confirm test payment',
   paymentUnavailable:'Payments are not available yet.', paymentSuccess:'Payment complete. Your account has been updated.', paymentCancelled:'Payment cancelled. Your balance has not changed.',
   publisherTitle:'Every great story\nstarts with a creator.', publisherBody:'Publish your short dramas, grow a global audience, and earn from every unlocked episode. AI creators and live-action storytellers are equally welcome.',
-  activate:'Become a publisher', oneTime:'One-time activation', activationBody:'HK$88 once. No monthly publisher subscription.', storageIncluded:'5 GB included storage', limits:'3 minutes · 75 MB per episode', keepSeventy:'You keep 70% of episode sales',
-  setYourPrice:'Your series. Your price.', pricingBody:'Choose your free episodes. Set paid episodes from US$0.10.', activateAction:'Activate for HK$88',
+  activate:"Get Dramio Pass", oneTime:"One-time purchase", activationBody:"Dramio Pass: HK$88 once. No monthly publisher subscription.", storageIncluded:'5 GB included storage', limits:'3 minutes · 75 MB per episode', keepSeventy:'You keep 70% of episode sales',
+  setYourPrice:'Your series. Your price.', pricingBody:'Choose your free episodes. Set paid episodes from US$0.10.', activateAction:"Get Dramio Pass · HK$88",
   overview:'Overview', mySeries:'My series', earnings:'Earnings & payouts', storage:'Storage', newSeries:'New series', totalSales:'Episode unlocks', availableEarnings:'Available earnings', lifetimeEarnings:'Lifetime earnings',
   storageUsed:'Storage used', manage:'Manage', draft:'Draft', published:'Published', archived:'Archived', noSeries:'Your first story starts here.',
   noSeriesBody:'Create a series, add a cover, and upload a folder of episodes.', seriesDetails:'Series details', seriesTitle:'Series title', description:'Synopsis',
@@ -57,7 +57,7 @@ const en = {
   connectPayout:'Set up payout account', payoutHistory:'Payout requests', noPayouts:'No payout requests yet.',
   profile:'Profile', preferences:'Preferences', saveProfile:'Save profile', installApp:'Add to home screen', installHint:'Use your browser menu and choose “Add to Home Screen”.',
   admin:'Platform admin', users:'Members', storageRequests:'Storage requests', payoutRequests:'Payout requests', approve:'Approve', reject:'Decline', noRequests:'All caught up. No pending requests.',
-  grossSales:'Episode sales', platformRevenue:'Platform share', activationRevenue:'Activation revenue (HKD)',
+  grossSales:'Episode sales', platformRevenue:'Platform share', activationRevenue:"Dramio Pass revenue (HKD)",
   help:'Help centre', terms:'Terms of use', privacy:'Privacy policy', footer:'Independent stories. Real connections.', rights:'All rights reserved.',
   copied:'Link copied.', emptyList:'Your next favourite belongs here.', emptyHistory:'Pick a story. We’ll keep your place.', favourites:'Saved stories', history:'Watch history',
   freeAccess:'Free to start. No sign-in needed.', sampleCatalogue:'Preview catalogue', sampleVideo:'Sample preview · upload your own story in Creator Studio',
@@ -66,6 +66,7 @@ const en = {
   noEpisodes:'No episodes uploaded yet.', saveToContinue:'Save and continue', paymentProcessing:'Confirming payment…',
   showPassword:'Show password',hidePassword:'Hide password',fieldRequired:'Please complete all required fields.', termsRequired:'Please accept the terms to continue.', invalidVideo:'This video must be readable and no longer than 3 minutes.',
   fileTooLarge:'This episode exceeds the 75 MB limit.', uploadComplete:'Upload queue complete.', membersOnly:'Sign in to continue',
+  ...dramioPassEnglish,
 } as const;
 export type Key = keyof typeof en;
 type Dictionary = Partial<Record<Key,string>>;
@@ -132,6 +133,7 @@ for(const language of LANGUAGES){if(!walletFundingMessages[language.code])throw 
 for(const language of LANGUAGES){if(!sandboxMessages[language.code])throw new Error(`Sandbox translations missing: ${language.code}`);Object.assign(dictionaries[language.code],sandboxMessages[language.code]);}
 for(const language of LANGUAGES){if(!stripeTestingMessages[language.code])throw new Error(`Stripe testing translations missing: ${language.code}`);Object.assign(dictionaries[language.code],stripeTestingMessages[language.code]);}
 for(const language of LANGUAGES){if(!analyticsMessages[language.code])throw new Error(`Analytics translations missing: ${language.code}`);Object.assign(dictionaries[language.code],analyticsMessages[language.code]);}
+for(const language of LANGUAGES){if(!dramioPassMessages[language.code])throw new Error(`Dramio Pass translations missing: ${language.code}`);Object.assign(dictionaries[language.code],dramioPassMessages[language.code]);}
 // Shared scripts are deliberately kept in their chosen script; traditional and simplified Chinese are independent locales.
 const I18nContext=createContext<{locale:Locale;setLocale:(l:Locale)=>void;t:(key:Key)=>string}>({locale:'en',setLocale:()=>{},t:k=>en[k]});
 export const baseMessages=en;

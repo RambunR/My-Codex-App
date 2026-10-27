@@ -33,11 +33,11 @@ export function settlePayment(paymentId: string, expected?: { amount: number; cu
       run(`UPDATE ${accountTable()} SET wallet_micros=wallet_micros+? WHERE ${accountIdColumn()}=?`, micros, payment.user_id);
       addLedger(payment.user_id, 'funding', micros, payment.id, 'Wallet top-up');
     } else {
-      assert(payment.amount_cents===ACTIVATION_HKD_CENTS&&payment.currency==='hkd',400,'PAYMENT_MISMATCH','Publisher activation must be HK$88.');
+      assert(payment.amount_cents===ACTIVATION_HKD_CENTS&&payment.currency==='hkd',400,'PAYMENT_MISMATCH','Dramio Pass must be HK$88.');
       assert(financeAccount(payment.user_id),404,'NOT_FOUND','Account not found.');
       if(config.stripeTestMode)run('UPDATE test_accounts SET publisher_active=1 WHERE user_id=?',payment.user_id);
       else run("UPDATE users SET publisher_active=1, role=CASE WHEN role='admin' THEN 'admin' ELSE 'publisher' END WHERE id=?", payment.user_id);
-      addLedger(payment.user_id, 'activation', 0, payment.id, 'One-time publisher activation · HK$88');
+      addLedger(payment.user_id, 'activation', 0, payment.id, 'Dramio Pass · HK$88 once');
     }
     run(`UPDATE ${paymentTable()} SET status='paid' WHERE id=?`, payment.id);
     return true;
@@ -92,11 +92,11 @@ export async function createCheckout(userId: string, kind: 'funding' | 'activati
   }
   if (kind === 'activation') {
     const user = financeAccount(userId);
-    assert(!user?.publisher_active, 409, 'ALREADY_ACTIVE', 'Your publisher account is already active.');
+    assert(!user?.publisher_active, 409, 'ALREADY_ACTIVE', 'Your Dramio Pass is already active.');
     if(config.payments==='stripe'&&config.stripeActivationPriceId){
       let price:Stripe.Price;
-      try{price=await stripe!.prices.retrieve(config.stripeActivationPriceId);}catch{throw new AppError(503,'PAYMENT_CONFIG_ERROR','The publisher activation price is unavailable. Please contact support.');}
-      assert(price.active&&price.type==='one_time'&&price.currency==='hkd'&&price.unit_amount===ACTIVATION_HKD_CENTS&&stripeModeMatches(price.livemode),503,'PAYMENT_CONFIG_ERROR','The publisher activation price must be HK$88 once in the correct payment mode.');
+      try{price=await stripe!.prices.retrieve(config.stripeActivationPriceId);}catch{throw new AppError(503,'PAYMENT_CONFIG_ERROR','The Dramio Pass price is unavailable. Please contact support.');}
+      assert(price.active&&price.type==='one_time'&&price.currency==='hkd'&&price.unit_amount===ACTIVATION_HKD_CENTS&&stripeModeMatches(price.livemode),503,'PAYMENT_CONFIG_ERROR','The Dramio Pass price must be HK$88 once in the correct payment mode.');
     }
   }
   const currency=kind==='activation'?'hkd':'usd',amount=kind==='activation'?ACTIVATION_HKD_CENTS:cents;
@@ -126,7 +126,7 @@ export async function createCheckout(userId: string, kind: 'funding' | 'activati
     }
     try{
       const session=await stripe!.checkout.sessions.create({mode:'payment',payment_method_types:['card'],client_reference_id:id,metadata:{app:'aidramio',site:new URL(config.appUrl).origin,financialMode:config.stripeTestMode?'test':'default',paymentId:id,userId},
-        line_items:kind==='activation'&&config.stripeActivationPriceId?[{price:config.stripeActivationPriceId,quantity:1}]:[{price_data:{currency,unit_amount:amount,...(kind==='funding'&&config.stripeWalletProductId?{product:config.stripeWalletProductId}:{product_data:{name:kind==='activation'?'Publisher activation · one-time':'AIDramio wallet credit'}})},quantity:1}],
+        line_items:kind==='activation'&&config.stripeActivationPriceId?[{price:config.stripeActivationPriceId,quantity:1}]:[{price_data:{currency,unit_amount:amount,...(kind==='funding'&&config.stripeWalletProductId?{product:config.stripeWalletProductId}:{product_data:{name:kind==='activation'?'Dramio Pass':'AIDramio wallet credit'}})},quantity:1}],
         success_url:`${config.appUrl}/${kind==='activation'?'studio':'wallet'}?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url:`${config.appUrl}/${kind==='activation'?'studio':'wallet'}?checkout=cancelled`,
       },{idempotencyKey:`checkout:${id}`});

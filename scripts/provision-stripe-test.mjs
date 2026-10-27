@@ -1,6 +1,6 @@
 import Stripe from 'stripe';
 import {fetch,ProxyAgent} from 'undici';
-import {mkdir,rename,writeFile} from 'node:fs/promises';
+import {mkdir,readFile,rename,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createInterface} from 'node:readline';
@@ -9,7 +9,7 @@ import {parseArgs} from 'node:util';
 const root=fileURLToPath(new URL('../',import.meta.url));
 const EXPECTED_ACCOUNT='acct_1StBIYJ6Er233b9c';
 const specifications=[
-  {kind:'activation',name:'AIDramio publisher activation',description:'One-time HK$88 publisher activation. This is not a subscription.',currency:'hkd',unit_amount:8800},
+  {kind:'activation',name:'Dramio Pass',description:'One-time HK$88 publisher pass. Publish short dramas with 5 GB of storage. No monthly subscription.',currency:'hkd',unit_amount:8800},
   {kind:'funding',name:'AIDramio wallet credit',description:'Closed-loop USD credit for episode unlocks. Choose an amount of at least US$5 in AIDramio.',currency:'usd',unit_amount:500},
 ];
 const owned=(object,kind)=>object?.metadata?.app==='aidramio'&&object?.metadata?.kind===kind;
@@ -39,6 +39,14 @@ function matchesPrice(price,spec,productId){
 /** Creates test catalog objects only. It never creates Checkout, a charge, or a subscription. */
 export async function provisionTestCatalog(stripe,{outputPath=path.join(root,'stripe/catalog.test.json'),report=event=>console.log(JSON.stringify(event))}={}){
   const catalog={version:1,mode:'test',expected_account:EXPECTED_ACCOUNT,account_verified:false,status:'provisioning',products:{},updated_at:new Date().toISOString()};
+  // Catalog renames must preserve the already-connected endpoint identities.
+  try{
+    const previous=JSON.parse(await readFile(outputPath,'utf8'));
+    if(previous.mode==='test'&&previous.expected_account===EXPECTED_ACCOUNT){
+      if(previous.webhook)catalog.webhook=previous.webhook;
+      if(previous.main_webhook)catalog.main_webhook=previous.main_webhook;
+    }
+  }catch(error){if(error.code!=='ENOENT')throw error;}
   try{
     const account=await operation('verify_account',()=>stripe.accounts.retrieve());
     if(account.id!==EXPECTED_ACCOUNT)throw Object.assign(new Error('The test key belongs to a different Stripe account; no changes were made.'),{operation:'verify_account'});
@@ -63,11 +71,11 @@ export async function provisionTestCatalog(stripe,{outputPath=path.join(root,'st
       products.push(product);
       report({operation:'create_product',kind:spec.kind,product_id:product.id,mode:'test'});
     }else if(!product.active||product.name!==spec.name||product.description!==spec.description||Object.entries(metadata).some(([name,value])=>product.metadata?.[name]!==value)){
-      product=testObject(await operation('update_product_'+spec.kind,()=>stripe.products.update(product.id,{active:true,name:spec.name,description:spec.description,metadata},{idempotencyKey:'aidramio:test:catalog:v1:update-product:'+spec.kind+(spec.kind==='funding'?':fixed-usd500-v2':'')})));
+      product=testObject(await operation('update_product_'+spec.kind,()=>stripe.products.update(product.id,{active:true,name:spec.name,description:spec.description,metadata},{idempotencyKey:'aidramio:test:catalog:v1:update-product:'+spec.kind+(spec.kind==='funding'?':fixed-usd500-v2':':dramio-pass-v1')})));
       report({operation:'update_owned_product',kind:spec.kind,product_id:product.id,mode:'test'});
     }else report({operation:'reuse_product',kind:spec.kind,product_id:product.id,mode:'test'});
 
-    catalog.products[spec.kind]={product_id:product.id,price_id:null,currency:spec.currency,one_time:true,unit_amount:spec.unit_amount,...(spec.kind==='funding'?{amount_selection:'application_checkout',minimum_amount:500,preset_amount:500,maximum_amount:99_999_999}:{}),status:'product_ready_price_pending'};
+    catalog.products[spec.kind]={name:spec.name,product_id:product.id,price_id:null,currency:spec.currency,one_time:true,unit_amount:spec.unit_amount,...(spec.kind==='funding'?{amount_selection:'application_checkout',minimum_amount:500,preset_amount:500,maximum_amount:99_999_999}:{}),status:'product_ready_price_pending'};
     await save();
     const prices=await operation('list_prices_'+spec.kind,()=>listAll(params=>stripe.prices.list(params),{product:product.id}));
     let price=prices.find(p=>p.active&&matchesPrice(p,spec,product.id))||prices.find(p=>matchesPrice(p,spec,product.id));
