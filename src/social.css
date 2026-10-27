@@ -1,0 +1,24 @@
+.series-engagement{display:flex;align-items:center;flex-wrap:wrap;gap:10px 20px;color:var(--muted,#a7a4ad);font-size:12px;line-height:1.6;font-variant-numeric:tabular-nums}
+.series-engagement>span{display:inline-flex;align-items:center;gap:7px;min-width:0}
+.series-engagement svg{flex-shrink:0;opacity:.8}
+.series-engagement-compact{gap:5px 13px;font-size:10px;margin-top:10px}
+.series-engagement-compact>span{gap:5px}
+.detail-info>.series-engagement{margin-block:15px 0}
+.detail-actions{flex-wrap:wrap}
+.series-like-button{max-width:100%;white-space:normal}
+.series-like-button>svg{flex-shrink:0}
+.series-like-button>span{font-size:.9em;opacity:.8;font-variant-numeric:tabular-nums}
+.series-like-button.is-liked{border-color:#ff7055!important;color:#ff8c76!important;background:rgba(255,112,85,.08)!important}
+.episode-tile .episode-view-count{display:flex;align-items:center;gap:5px;margin-top:5px;color:var(--muted,#a7a4ad);font-variant-numeric:tabular-nums}
+.ranking-text>.series-engagement{margin-top:8px}
+@media(max-width:700px){
+  .series-engagement{font-size:10px;gap:6px 14px}
+  .series-engagement-compact{font-size:8px;gap:4px 9px;margin-top:7px}
+  .series-engagement-compact>span{gap:4px}
+  .series-engagement-compact svg{width:11px;height:11px}
+  .detail-info>.series-engagement{margin-top:11px;font-size:9px;gap:5px 12px}
+  .detail-info>.series-engagement svg{width:13px;height:13px}
+  .detail-actions>.series-like-button{gap:5px}
+  .episode-tile .episode-view-count{font-size:7px;gap:4px}
+  .episode-tile .episode-view-count svg{width:9px;height:9px}
+}

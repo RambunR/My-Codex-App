@@ -47,7 +47,8 @@ You can also register a new account, activate publishing through the HK$88 test 
 
 ## Implemented workflows
 
-- Browse, search, genre and spoken-language filters, charts based on recorded stream starts, series pages, saves, watch history, and a vertical player with next-episode navigation.
+- Browse, search, genre and spoken-language filters, rankings based on recorded views, series pages, likes, saves, watch history, and a vertical player with next-episode navigation. Public series cards/details show views and likes; episode tiles show recorded views.
+- Publisher **Statistics** for each series: 7/30/90-day, all-time and custom UTC date ranges; daily views, total and average watch time, unique paid users and paid unlocks, with a breakdown for every episode. Likes are shown as the current all-time total. Detailed playback tracking begins with this feature; earlier aggregate view counts are retained without inventing historical watch time. See [analytics definitions](docs/ANALYTICS.md).
 - **21 complete interface dictionaries**: English, Traditional/Simplified Chinese, Japanese, Korean, Hindi, Indonesian, Brazilian Portuguese, Spanish, Arabic, Bengali, Urdu, Vietnamese, Thai, Filipino, Turkish, Russian, French, German, Malay, and Tamil. Arabic and Urdu use RTL layouts. Creator-written titles, synopses, and videos retain their uploaded language. Translation does not dub videos or automatically create subtitles. Starter legal documents are in English.
 - Register, sign in/out, edit profile and language, persistent HTTP-only sessions, salted scrypt password hashes, origin checks, and rate limits.
 - Google OpenID Connect registration/sign-in with PKCE, one-use browser-bound state, verified signed ID tokens and stable Google identity IDs. Existing accounts require password-confirmed linking rather than automatic email matching. No Google access or refresh tokens are stored.

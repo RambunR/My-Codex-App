@@ -41,8 +41,9 @@ export interface Series {
   id: string; title: string; description: string; language: string; genres: string[]; cover: string; creator_id: string;
   creator_name: string; creation_type: 'human' | 'ai-assisted' | 'ai-generated'; price_cents: number; free_episodes: number;
   episode_count: number; views: number; saves: number; status: string; featured: number; created_at: string;
+  likes: number; liked: boolean;
   saved?: boolean; demo?: number; subtitle_languages?: string[]; first_episode_id?: string;
 }
-export interface Episode { id: string; series_id: string; title: string; number: number; duration: number; bytes: number; free: boolean; unlocked: boolean; cover?: string }
+export interface Episode { id: string; series_id: string; title: string; number: number; duration: number; bytes: number; free: boolean; unlocked: boolean; cover?: string; views?: number }
 export const usd = (micros: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(micros / USD_MICROS);
 export const bytes = (n: number) => n >= 1024 ** 3 ? `${(n / 1024 ** 3).toFixed(2)} GB` : `${(n / 1024 ** 2).toFixed(1)} MB`;

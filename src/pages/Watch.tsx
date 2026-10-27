@@ -6,11 +6,13 @@ import { useApp } from '../context';
 import { useI18n,languageName,type Key } from '../i18n';
 import { BackLink,Modal,Loading,ErrorState,Button,Avatar } from '../ui';
 import { type Series,type Episode,usd } from '../../shared/config';
+import {usePlaybackAnalytics} from '../usePlaybackAnalytics';
 
 export function Watch(){
   const{id,episodeId}=useParams();const{t}=useI18n();const{user,setUser,toast}=useApp();const navigate=useNavigate();const{data,loading,error,refresh}=useApi<{series:Series;episodes:Episode[]}>(`/api/series/${id}`);
   const[confirm,setConfirm]=useState(false);const[busy,setBusy]=useState(false);const[videoError,setVideoError]=useState(false);const[playRevision,setPlayRevision]=useState(0);const videoRef=useRef<HTMLVideoElement>(null);const lastSaved=useRef(0);
   const ep=data?.episodes.find(e=>e.id===episodeId);const current=data?.episodes.findIndex(e=>e.id===episodeId)??-1;const locked=ep?!ep.free&&!ep.unlocked:true;const next=data?.episodes[current+1];const previous=data?.episodes[current-1];
+  usePlaybackAnalytics(videoRef,ep?.id,!!ep&&!locked,user?.id,playRevision);
   useEffect(()=>{setConfirm(false);setVideoError(false);lastSaved.current=0;},[episodeId]);
   const saveProgress=()=>{const seconds=videoRef.current?.currentTime||0;if(!user||!ep||seconds-lastSaved.current<5)return;lastSaved.current=seconds;post(`/api/episodes/${ep.id}/progress`,{seconds:Math.min(180,seconds)}).catch(()=>{});};
   const unlock=async()=>{if(!ep)return;setBusy(true);try{const result=await post(`/api/episodes/${ep.id}/unlock`);setUser(result.user);setConfirm(false);toast(t('purchaseSuccess'));refresh();}catch(e){toast((e as Error).message,true);}finally{setBusy(false);}};

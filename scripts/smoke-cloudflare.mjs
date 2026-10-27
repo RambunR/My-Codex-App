@@ -96,6 +96,21 @@ try{
   await request(`/api/episodes/${second.id}/stream`,undefined,'',403);
   console.log('PASS: R2 covers and videos, quota accounting, publication, byte ranges, 181-second and 75 MiB rejection.');
 
+  const liked=(await request(`/api/series/${sid}/like`,{liked:true},viewer,200,'PUT')).data;assert.equal(liked.likes,1);
+  const duplicateLike=(await request(`/api/series/${sid}/like`,{liked:true},viewer,200,'PUT')).data;assert.equal(duplicateLike.likes,1);
+  const publicSeries=(await request(`/api/series/${sid}`,undefined,viewer)).data;
+  assert.equal(publicSeries.series.likes,1);assert.equal(publicSeries.series.liked,true);assert.equal(publicSeries.series.saved,false);
+  assert.equal(publicSeries.series.views,0,'Metadata and byte ranges must not count as views.');
+  const guestPlayback=await request(`/api/episodes/${first.id}/playback`,{});assert.match(guestPlayback.cookie,/^drama_viewer=/);
+  await request(`/api/studio/series/${sid}/analytics?period=7d`,undefined,viewer,403);
+  await new Promise(resolve=>setTimeout(resolve,3300));
+  const qualified=(await request(`/api/playback/${guestPlayback.data.sessionId}`,{watchedMs:3200},guestPlayback.cookie,200,'PUT')).data;
+  assert.equal(qualified.viewCounted,true);assert.equal(qualified.watchedMs,3200);
+  const analytics=(await request(`/api/studio/series/${sid}/analytics?period=7d`,undefined,publisher)).data;
+  assert.equal(analytics.totals.views,1);assert.equal(analytics.totals.avgWatchSeconds,3.2);assert.equal(analytics.totals.likes,1);assert.equal(analytics.daily.length,7);
+  assert.equal(analytics.episodes.find(episode=>episode.id===first.id).views,1);
+  console.log('PASS: durable likes, anonymous qualified playback, exact watch time, and owner-only series/episode analytics.');
+
   await Promise.all(Array.from({length:8},()=>request(`/api/episodes/${second.id}/unlock`,{},viewer)));
   assert.equal((await request('/api/auth/me',undefined,viewer)).data.user.wallet_micros,4_990_000);
   const studio=(await request('/api/studio',undefined,publisher)).data;assert.equal(studio.user.earnings_micros,3_507_000);assert.equal(studio.stats.sales,1);
@@ -126,6 +141,9 @@ try{
 
   await stop();await start(true);
   const production=(await request('/api/config')).data;assert.equal(production.paymentsMode,'disabled');assert.equal(production.runtime,'cloudflare');assert.equal(production.auth.google,false);
+  const retainedLikes=(await request(`/api/series/${sid}`,undefined,viewer)).data;assert.equal(retainedLikes.series.likes,1);assert.equal(retainedLikes.series.liked,true);
+  const resumedGuest=(await request(`/api/episodes/${first.id}/playback`,{},guestPlayback.cookie)).data;assert.equal(resumedGuest.sessionId,guestPlayback.data.sessionId);assert.equal(resumedGuest.viewCounted,true);
+  const retainedAnalytics=(await request(`/api/studio/series/${sid}/analytics?period=7d`,undefined,publisher)).data;assert.equal(retainedAnalytics.totals.views,1);assert.equal(retainedAnalytics.totals.avgWatchSeconds,3.2);assert.equal(retainedAnalytics.totals.paidViewers,1);assert.equal(retainedAnalytics.episodes.find(episode=>episode.id===second.id).paidViewers,1);
   await request('/api/auth/google/start',undefined,'',503);
   assert.equal((await request('/api/auth/me',undefined,viewer)).data.user.wallet_micros,4_990_000);
   assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.earnings_micros,507_000);

@@ -12,6 +12,7 @@ import { readSession, requireAuth, requirePublisher, requireAdmin, hashPassword,
 import { prepareVideo, prepareCover, putObject, deleteObject, serveObject, removeTempFile } from './storage.js';
 import { createCheckout, settlePayment, unlockEpisode, requestWithdrawal,returnWithdrawalFunds, addLedger, stripe,paymentsReady,stripeConfigured,stripeModeMatches,stripeTestPayments } from './finance.js';
 import { paymentTable,purchaseTable,ledgerTable,hasEpisodePurchase,usingTestPaymentState } from './payment-state.js';
+import { startPlayback,recordPlayback,readSeriesAnalytics } from './analytics.js';
 import { LANGUAGES, GENRES, MAX_EPISODE_BYTES, DEFAULT_QUOTA_BYTES,MIN_WALLET_FUNDING_CENTS,MAX_WALLET_FUNDING_CENTS } from '../shared/config.js';
 
 const language = z.enum(LANGUAGES.map(x => x.code) as [string, ...string[]]);
@@ -28,19 +29,31 @@ function ownSeries(req: Request, seriesId = id(req)) {
 const catalogSelect = `SELECT s.*,u.name AS creator_name,
  (SELECT id FROM episodes e WHERE e.series_id=s.id ORDER BY number LIMIT 1) AS first_episode_id,
  (SELECT COUNT(*) FROM episodes e WHERE e.series_id=s.id) AS episode_count,
- (SELECT COUNT(*) FROM saves sv WHERE sv.series_id=s.id) AS saves
+ (SELECT COUNT(*) FROM saves sv WHERE sv.series_id=s.id) AS saves,
+ (SELECT COUNT(*) FROM series_likes sl WHERE sl.series_id=s.id) AS likes
  FROM series s JOIN users u ON u.id=s.creator_id`;
 function serializeSeries(s: Record<string, any>, userId?: string) {
   const { cover_key, cover_bytes, ...safe } = s;
   return { ...safe, genres: JSON.parse(s.genres), cover: cover_key.startsWith('public:') ? cover_key.slice(7) : cover_key ? `/api/series/${s.id}/cover` : '/images/placeholder.svg',
+    likes:Number(s.likes??one('SELECT COUNT(*) AS n FROM series_likes WHERE series_id=?',s.id)!.n),
+    liked:!!(userId&&one('SELECT 1 FROM series_likes WHERE user_id=? AND series_id=?',userId,s.id)),
     saved: !!(userId && one('SELECT 1 FROM saves WHERE user_id=? AND series_id=?', userId, s.id)) };
 }
 function canWatch(userId: string | undefined, e: any) { return e.number <= e.free_episodes || e.creator_id === userId || !!(userId && hasEpisodePurchase(userId,e.id)); }
 function episodeRow(episodeId: string) { return one(`SELECT e.*,s.free_episodes,s.creator_id,s.status FROM episodes e JOIN series s ON s.id=e.series_id WHERE e.id=?`, episodeId); }
+function playbackViewer(req:Request,res:Response,create=false):string|undefined {
+  if(req.user)return crypto.createHash('sha256').update('user:'+req.user.id).digest('hex');
+  let token=(req.headers.cookie||'').split(';').map(value=>value.trim()).find(value=>value.startsWith('drama_viewer='))?.slice('drama_viewer='.length);
+  if(!token||!/^[a-f0-9]{48}$/.test(token)){
+    if(!create)return undefined;
+    token=crypto.randomBytes(24).toString('hex');
+    res.cookie('drama_viewer',token,{httpOnly:true,secure:config.production,sameSite:'lax',path:'/',maxAge:30*24*60*60*1000});
+  }
+  return crypto.createHash('sha256').update('guest:'+token).digest('hex');
+}
 
 export function createApp() {
   const app = express();
-  const recentViews=new Map<string,number>();
   app.disable('x-powered-by');
   if (process.env.TRUST_PROXY === 'true') app.set('trust proxy', 1);
   app.use((_req, res, next) => { res.setHeader('X-Content-Type-Options','nosniff'); res.setHeader('Referrer-Policy','strict-origin-when-cross-origin'); res.setHeader('X-Frame-Options','DENY'); next(); });
@@ -113,7 +126,7 @@ export function createApp() {
   });
   app.get('/api/series/:id', (req,res) => {
     const s = one(`${catalogSelect} WHERE s.id=?`,id(req)); assert(s && (s.status === 'published' || s.creator_id === req.user?.id),404,'NOT_FOUND','Series not found.');
-    const episodes = all('SELECT id,series_id,title,number,duration,bytes FROM episodes WHERE series_id=? ORDER BY number',id(req)).map(e => ({...e,free:e.number <= s.free_episodes,unlocked:canWatch(req.user?.id,{...e,...{free_episodes:s.free_episodes,creator_id:s.creator_id}})}));
+    const episodes = all('SELECT e.id,e.series_id,e.title,e.number,e.duration,e.bytes,(SELECT COUNT(*) FROM playback_sessions p WHERE p.episode_id=e.id AND p.counted_view=1) AS views FROM episodes e WHERE e.series_id=? ORDER BY e.number',id(req)).map(e => ({...e,free:e.number <= s.free_episodes,unlocked:canWatch(req.user?.id,{...e,...{free_episodes:s.free_episodes,creator_id:s.creator_id}})}));
     res.json({ series: serializeSeries(s,req.user?.id), episodes });
   });
   app.get('/api/series/:id/cover', async (req,res) => {
@@ -126,15 +139,33 @@ export function createApp() {
     if (saved) run('DELETE FROM saves WHERE user_id=? AND series_id=?',req.user!.id,id(req)); else run('INSERT INTO saves VALUES (?,?)',req.user!.id,id(req));
     res.json({ saved: !saved });
   });
+  app.put('/api/series/:id/like', requireAuth, rateLimit('like',120,60_000), (req,res)=>{
+    const {liked}=z.object({liked:z.boolean()}).parse(req.body);
+    const result=transaction(()=>{
+      assert(one("SELECT id FROM series WHERE id=? AND status='published'",id(req)),404,'NOT_FOUND','Series not found.');
+      if(liked)run('INSERT OR IGNORE INTO series_likes (user_id,series_id) VALUES (?,?)',req.user!.id,id(req));
+      else run('DELETE FROM series_likes WHERE user_id=? AND series_id=?',req.user!.id,id(req));
+      return{liked,likes:one('SELECT COUNT(*) AS n FROM series_likes WHERE series_id=?',id(req))!.n};
+    });
+    res.json(result);
+  });
   app.get('/api/episodes/:id/stream', async (req,res) => {
     const e = episodeRow(id(req)); assert(e && (e.status === 'published' || e.creator_id === req.user?.id),404,'NOT_FOUND','Episode not found.');
     assert(canWatch(req.user?.id,e),403,'EPISODE_LOCKED','Unlock this episode to watch.');
-    if(req.method==='GET'&&req.user?.id!==e.creator_id){
-      const key=crypto.createHash('sha256').update(`${req.user?.id||req.ip}:${e.id}`).digest('hex');const now=Date.now();
-      if((recentViews.get(key)||0)<now-15*60_000){recentViews.set(key,now);run('UPDATE series SET views=views+1 WHERE id=?',e.series_id);}
-      if(recentViews.size>10000)for(const[k,v]of recentViews)if(v<now-15*60_000)recentViews.delete(k);
-    }
     await serveObject(e.storage_key,req,res,'video/mp4');
+  });
+  app.post('/api/episodes/:id/playback', rateLimit('playback-start',90,60_000), (req,res)=>{
+    const e=episodeRow(id(req));assert(e&&(e.status==='published'||e.creator_id===req.user?.id),404,'NOT_FOUND','Episode not found.');
+    assert(canWatch(req.user?.id,e),403,'EPISODE_LOCKED','Unlock this episode to watch.');
+    if(e.creator_id===req.user?.id){res.json({excluded:true});return;}
+    res.json(startPlayback(e.id,playbackViewer(req,res,true)!));
+  });
+  app.put('/api/playback/:id', rateLimit('playback-heartbeat',180,60_000), (req,res)=>{
+    const {watchedMs}=z.object({watchedMs:z.number().int().min(0).max(180_000)}).parse(req.body);
+    const viewer=playbackViewer(req,res);assert(viewer,404,'NOT_FOUND','Playback session not found.');
+    const session=one('SELECT episode_id FROM playback_sessions WHERE id=? AND viewer_key=?',id(req),viewer);assert(session,404,'NOT_FOUND','Playback session not found.');
+    const e=episodeRow(session.episode_id);assert(e&&e.status==='published'&&canWatch(req.user?.id,e),403,'EPISODE_LOCKED','This episode is unavailable.');
+    res.json(recordPlayback(id(req),viewer,watchedMs));
   });
   app.post('/api/episodes/:id/unlock', requireAuth, (req,res) => res.json({ ...unlockEpisode(req.user!.id,id(req)), user: getUser(req.user!.id) }));
   app.post('/api/episodes/:id/progress', requireAuth, (req,res) => {
@@ -170,6 +201,10 @@ export function createApp() {
     const user=req.user!;res.json({ user:getUser(user.id),series:all(`${catalogSelect} WHERE s.creator_id=? ORDER BY s.created_at DESC`,user.id).map(s=>serializeSeries(s,user.id)),
       stats:one(`SELECT COUNT(*) AS sales,COALESCE(SUM(p.creator_micros),0) AS lifetime_micros FROM ${purchaseTable()} p JOIN episodes e ON e.id=p.episode_id JOIN series s ON s.id=e.series_id WHERE s.creator_id=?`,user.id),
       withdrawals:stripeTestPayments()?[]:all('SELECT * FROM withdrawals WHERE user_id=? ORDER BY created_at DESC',user.id), storageRequests:all('SELECT * FROM storage_requests WHERE user_id=? ORDER BY created_at DESC',user.id) });
+  });
+  app.get('/api/studio/series/:id/analytics',requirePublisher,(req,res)=>{
+    const query=z.object({period:z.enum(['7d','30d','90d','all']).optional(),start:z.string().max(10).optional(),end:z.string().max(10).optional()}).parse(req.query);
+    res.json(readSeriesAnalytics(req.user!.id,id(req),query));
   });
   app.post('/api/studio/series', requirePublisher, (req,res) => {
     const b=seriesSchema.parse(req.body);const seriesId=crypto.randomUUID();

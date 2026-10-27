@@ -83,9 +83,25 @@ CREATE TABLE IF NOT EXISTS storage_requests (
 );
 CREATE TABLE IF NOT EXISTS saves (user_id TEXT NOT NULL REFERENCES users(id), series_id TEXT NOT NULL REFERENCES series(id), PRIMARY KEY(user_id,series_id));
 CREATE TABLE IF NOT EXISTS progress (user_id TEXT NOT NULL REFERENCES users(id), episode_id TEXT NOT NULL REFERENCES episodes(id) ON DELETE CASCADE, seconds REAL NOT NULL DEFAULT 0, updated_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY(user_id,episode_id));
+CREATE TABLE IF NOT EXISTS series_likes (
+ user_id TEXT NOT NULL REFERENCES users(id), series_id TEXT NOT NULL REFERENCES series(id) ON DELETE CASCADE,
+ created_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY(user_id,series_id)
+);
+CREATE TABLE IF NOT EXISTS playback_sessions (
+ id TEXT PRIMARY KEY, episode_id TEXT NOT NULL REFERENCES episodes(id) ON DELETE CASCADE, viewer_key TEXT NOT NULL,
+ started_at_ms INTEGER NOT NULL, last_seen_ms INTEGER NOT NULL,
+ watched_ms INTEGER NOT NULL DEFAULT 0 CHECK(watched_ms >= 0 AND watched_ms <= 180000),
+ reported_ms INTEGER NOT NULL DEFAULT 0 CHECK(reported_ms >= 0 AND reported_ms <= 180000),
+ counted_view INTEGER NOT NULL DEFAULT 0 CHECK(counted_view IN (0,1)), qualified_at_ms INTEGER
+);
 CREATE INDEX IF NOT EXISTS episodes_series ON episodes(series_id,number);
 CREATE INDEX IF NOT EXISTS ledger_user ON ledger(user_id,created_at);
 CREATE INDEX IF NOT EXISTS test_ledger_user ON test_ledger(user_id,created_at);
 CREATE INDEX IF NOT EXISTS test_payments_user ON test_payments(user_id,created_at);
 CREATE INDEX IF NOT EXISTS series_catalog ON series(status,language);
+CREATE INDEX IF NOT EXISTS series_likes_series ON series_likes(series_id);
+CREATE INDEX IF NOT EXISTS playback_episode_viewer ON playback_sessions(episode_id,viewer_key,started_at_ms);
+CREATE INDEX IF NOT EXISTS playback_episode_qualified ON playback_sessions(episode_id,qualified_at_ms);
+CREATE INDEX IF NOT EXISTS purchases_episode_created ON purchases(episode_id,created_at,user_id);
+CREATE INDEX IF NOT EXISTS test_purchases_episode_created ON test_purchases(episode_id,created_at,user_id);
 `;
