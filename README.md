@@ -10,6 +10,8 @@ Agent shortcut: send **`/push`** in chat, optionally followed by a commit messag
 
 Google registration/sign-in is enabled alongside email/password, with both OAuth credentials configured securely on the Worker. Follow [the Google setup guide](docs/GOOGLE_SIGN_IN.md) for testing, credential rotation and release settings. Existing password accounts connect Google explicitly from Account settings, preserving their original wallet and purchases.
 
+Apple registration/sign-in and account linking are implemented; activation requires the operator's Apple Developer Services ID and signing key. See [Apple setup](docs/APPLE_SIGN_IN.md). Forgot password, reset, verification and resend controls are also implemented, with [Cloudflare Email Sending or Resend sender setup](docs/EMAIL_AUTH.md) required for actual delivery. Until credentials are configured, the interface clearly marks those services unavailable. The older `aidramio-sandbox` has its own separate credentials and does not inherit the main site's Google login; use the main website for current features.
+
 Brand PNG: [transparent AIDramio logo](public/aidramio-logo.png), also served at `/aidramio-logo.png`.
 
 The same logo's coral play symbol is used for the website header, browser favicon, Apple touch icon and installed-app icons.
@@ -58,6 +60,8 @@ You can also register a new account, activate publishing through the HK$88 test 
 - **21 complete interface dictionaries**: English, Traditional/Simplified Chinese, Japanese, Korean, Hindi, Indonesian, Brazilian Portuguese, Spanish, Arabic, Bengali, Urdu, Vietnamese, Thai, Filipino, Turkish, Russian, French, German, Malay, and Tamil. Arabic and Urdu use RTL layouts. Creator-written titles, synopses, and videos retain their uploaded language. Translation does not dub videos or automatically create subtitles. Starter legal documents are in English.
 - Register, sign in/out, edit profile and language, persistent HTTP-only sessions, salted scrypt password hashes, origin checks, and rate limits.
 - Google OpenID Connect registration/sign-in with PKCE, one-use browser-bound state, verified signed ID tokens and stable Google identity IDs. Existing accounts require password-confirmed linking rather than automatic email matching. No Google access or refresh tokens are stored.
+- Sign in with Apple uses signed identity verification, one-use state/nonce and a dedicated browser cookie for Apple's cross-site callback. Password accounts can explicitly connect Apple while retaining their wallet and uploads. Apple credentials are required before enabling it publicly.
+- Email verification, resend and password recovery use expiring, single-use random proofs stored as hashes. Links keep the proof in a fragment that is removed from the browser URL. Password reset revokes prior sessions and preserves account assets; sending requires a verified email provider. Existing users can continue signing in without a new verification gate.
 - Guests can watch free episodes. Paid episodes require registration, wallet funding, and an explicit unlock confirmation. Unlocks remain attached to the purchasing account when a price changes. Paid video URLs are never listed publicly.
 - Publishers purchase **Dramio Pass for HK$88 once**. The Account page displays its icon, active status and receipt date when available, with a clear label for test passes. Existing publisher activations already count as Dramio Pass; registration alone does not authorize uploads.
 - Each publisher starts with **5 GiB** including processed episode files and uploaded cover artwork. Admin-reviewed storage requests can increase the quota.
@@ -109,7 +113,7 @@ npm run admin:create
 
 The command creates a new administrator without logging the password or overwriting an existing account. Remove the bootstrap password from the running environment afterward.
 
-The included terms/privacy documents describe the application, but the operator still needs to supply their real business/support details and finalize their refund, rights-complaint, and retention policies before accepting real customers. Password recovery/email verification is not implemented in this version; sign-in and registration are fully functional.
+The included terms/privacy documents describe the application, but the operator still needs to supply their real business/support details and finalize their refund, rights-complaint, and retention policies before accepting live payments. Password recovery and email verification require the sender setup above; Google and email/password registration remain available independently.
 
 ### Object storage
 

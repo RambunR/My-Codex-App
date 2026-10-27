@@ -1,6 +1,6 @@
 # Live Cloudflare application
 
-First published and verified on **26 October 2026, Hong Kong time**. Updated on **27 October 2026** with Google registration/sign-in, the downloadable PNG logo, matching website/app icons derived from its coral play symbol, and explicit Stripe test payments on this same website.
+First published and verified on **26 October 2026, Hong Kong time**. Updated on **28 October 2026** with Apple authentication and email-recovery controls prepared for provider configuration, retaining Google registration/sign-in, the brand icons and explicit Stripe test payments on this same website.
 
 - Site: https://aidramio.jimmy-tsoi2001.workers.dev
 - Dashboard: https://dash.cloudflare.com/95040c4f244233138195b80657887486/workers/services/view/aidramio/production
@@ -14,6 +14,8 @@ First published and verified on **26 October 2026, Hong Kong time**. Updated on 
 The Worker serves the complete frontend and API. The production database starts with free, labelled sample previews and no default administrator login or development wallet credits. Existing Cloudflare applications and buckets were preserved. No account plan was upgraded.
 
 Google OAuth code is deployed, both Google credentials are configured as Worker Secrets, and the public configuration reports `auth.google: true`. The Google button is available alongside email/password; its start endpoint returns a valid Google authorization redirect. The live Google account service and the cancellation return were checked without creating a real user or entering Google passwords. Complete an interactive registration/sign-in using your own Google account to verify consent; see [GOOGLE_SIGN_IN.md](GOOGLE_SIGN_IN.md).
+
+Apple registration/sign-in/linking and email password reset/verification/resend are implemented with translated controls. Apple credentials and the email sender are not configured yet: `auth.apple` and `auth.email` stay false, with explicit unavailable notices. Follow [APPLE_SIGN_IN.md](APPLE_SIGN_IN.md) to register the Services ID and configure four Apple secrets, and [EMAIL_AUTH.md](EMAIL_AUTH.md) to onboard a Cloudflare Email Sending domain and configure its scoped token/sender, or use Resend instead. Existing accounts retain their sign-in, wallet, purchases and media; email verification is not a new access gate.
 
 ## Update this application
 

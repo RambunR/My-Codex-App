@@ -6,6 +6,8 @@ import Stripe from 'stripe';
 import { z, ZodError } from 'zod';
 import { config } from './config.js';
 import { registerGoogleAuth,googleEnabled } from './google.js';
+import {registerAppleAuth,appleEnabled} from './apple.js';
+import {registerEmailAuth,emailAuthEnabled,sendRegistrationVerification} from './email-auth.js';
 import { one, all, run, transaction } from './db.js';
 import { AppError, assert } from './errors.js';
 import { readSession, requireAuth, requirePublisher, requireAdmin, hashPassword, verifyPassword, createSession, destroySession, getUser, rateLimit } from './auth.js';
@@ -57,7 +59,7 @@ export function createApp() {
   const app = express();
   app.disable('x-powered-by');
   if (process.env.TRUST_PROXY === 'true') app.set('trust proxy', 1);
-  app.use((_req, res, next) => { res.setHeader('X-Content-Type-Options','nosniff'); res.setHeader('Referrer-Policy','strict-origin-when-cross-origin'); res.setHeader('X-Frame-Options','DENY'); next(); });
+  app.use((req, res, next) => { res.setHeader('X-Content-Type-Options','nosniff'); res.setHeader('Referrer-Policy',req.path==='/auth'||req.path.startsWith('/api/auth/')?'no-referrer':'strict-origin-when-cross-origin'); res.setHeader('X-Frame-Options','DENY'); if(req.path==='/auth')res.setHeader('Cache-Control','no-store'); next(); });
   app.post('/api/payments/webhook', express.raw({ type: 'application/json', limit: '1mb' }), async (req, res) => {
     assert(config.payments === 'stripe' && stripe && paymentsReady(), 503, 'PAYMENTS_UNAVAILABLE', 'Webhook is not configured.');
     let event;
@@ -79,9 +81,12 @@ export function createApp() {
     }
     res.json({ received: true });
   });
+  app.post('/api/auth/apple/callback',express.urlencoded({extended:false,limit:'16kb',parameterLimit:8}));
   app.use('/api', express.json({ limit: '128kb' }), (req, res, next) => {
     res.setHeader('Cache-Control','private, no-store');
-    if (!['GET','HEAD','OPTIONS'].includes(req.method)) {
+    // Apple's cross-site form_post is authenticated by its one-use state,
+    // browser binding and verified identity token in the dedicated handler.
+    if (!['GET','HEAD','OPTIONS'].includes(req.method)&&!(req.method==='POST'&&req.path==='/auth/apple/callback')) {
       const origin = req.headers.origin; const allowed = new Set([new URL(config.appUrl).origin]);
       if (!config.production && req.headers.host) allowed.add(`${req.protocol}://${req.headers.host}`);
       assert(!origin || allowed.has(origin), 403, 'INVALID_ORIGIN', 'This request origin is not allowed.');
@@ -90,9 +95,11 @@ export function createApp() {
     next();
   }, readSession, rateLimit('api', 1500, 60_000));
   registerGoogleAuth(app);
+  registerAppleAuth(app);
+  registerEmailAuth(app);
   app.get('/api/health', (_req,res) => res.json({ ok: true, database: !!one('SELECT 1 AS ready') }));
   app.get('/api/config', (_req,res) => res.json({ brand: 'AIDramio', languages: LANGUAGES, genres: GENRES, paymentsMode: config.payments,paymentsReady:paymentsReady(),paymentsConfigured:stripeConfigured(),sandbox:config.sandbox,paymentsTestMode:stripeTestPayments()||config.payments==='demo',uploadsEnabled:!config.sandbox,usdToHkd: config.usdToHkd,
-    limits: { maxEpisodeSeconds: 180, maxEpisodeBytes: MAX_EPISODE_BYTES, quotaBytes: DEFAULT_QUOTA_BYTES, activationHkd: 88, minimumPriceUsd: 0.1, creatorShare: 0.7, minimumPayoutHkd: 20,minWalletFundingUsd:MIN_WALLET_FUNDING_CENTS/100,maxWalletFundingUsd:MAX_WALLET_FUNDING_CENTS/100 }, demo: config.seed, runtime: (config as any).runtime || 'node', videoFormats: (config as any).videoFormats || ['mp4','mov','webm','m4v'], auth:{google:googleEnabled()} }));
+    limits: { maxEpisodeSeconds: 180, maxEpisodeBytes: MAX_EPISODE_BYTES, quotaBytes: DEFAULT_QUOTA_BYTES, activationHkd: 88, minimumPriceUsd: 0.1, creatorShare: 0.7, minimumPayoutHkd: 20,minWalletFundingUsd:MIN_WALLET_FUNDING_CENTS/100,maxWalletFundingUsd:MAX_WALLET_FUNDING_CENTS/100 }, demo: config.seed, runtime: (config as any).runtime || 'node', videoFormats: (config as any).videoFormats || ['mp4','mov','webm','m4v'], auth:{google:googleEnabled(),apple:appleEnabled(),email:emailAuthEnabled()} }));
   app.get('/api/auth/me', (req,res) => res.json({ user: req.user || null }));
   app.post('/api/auth/register', rateLimit('register', 12, 15 * 60_000), async (req,res) => {
     const body = registration.parse(req.body);
@@ -100,6 +107,7 @@ export function createApp() {
     const password = await hashPassword(body.password); const userId = crypto.randomUUID();
     try { run('INSERT INTO users (id,email,name,password_hash,language) VALUES (?,?,?,?,?)', userId, body.email, body.name, password, body.language); }
     catch (error) { if (one('SELECT id FROM users WHERE email=?', body.email)) throw new AppError(409,'EMAIL_EXISTS','An account with this email already exists.'); throw error; }
+    await sendRegistrationVerification(userId);
     createSession(res,userId); res.status(201).json({ user: getUser(userId) });
   });
   app.post('/api/auth/login', rateLimit('login', 30, 15 * 60_000), async (req,res) => {

@@ -56,6 +56,11 @@ export default {
     const url=new URL(request.url);
     if(env.ENVIRONMENT==='sandbox'&&url.origin!==env.APP_URL)return new Response('This payment sandbox is available only on its isolated origin.',{status:403});
     if(url.pathname.startsWith('/api/'))return env.APP.get(env.APP.idFromName('platform')).fetch(request as any) as unknown as Promise<Response>;
-    return env.ASSETS.fetch(request as any) as unknown as Promise<Response>;
+    const response=await env.ASSETS.fetch(request as any) as unknown as Response;
+    if(url.pathname==='/auth'){
+      const headers=new Headers(response.headers);headers.set('Referrer-Policy','no-referrer');headers.set('Cache-Control','no-store');
+      return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+    }
+    return response;
   },
 };

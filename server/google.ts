@@ -6,6 +6,7 @@ import {config} from './config.js';
 import {one,run,transaction} from './db.js';
 import {assert} from './errors.js';
 import {createSession,destroySession,rateLimit,requireAuth,verifyPassword} from './auth.js';
+import {markEmailVerified} from './email-auth.js';
 import {LANGUAGES} from '../shared/config.js';
 
 const COOKIE='drama_google';
@@ -111,8 +112,9 @@ function connect(attempt:Attempt,profile:{subject:string;email:string;name:strin
 export function registerGoogleAuth(app:Express){
   app.get('/api/account/identities',requireAuth,(req,res)=>{
     const identity=one('SELECT email FROM oauth_identities WHERE provider=? AND user_id=?','google',req.user!.id);
+    const apple=one('SELECT email FROM apple_identities WHERE user_id=?',req.user!.id);
     const user=one('SELECT password_hash FROM users WHERE id=?',req.user!.id)!;
-    res.json({google:identity?{linked:true,email:identity.email}:{linked:false},password:passwordEnabled(user.password_hash)});
+    res.json({google:identity?{linked:true,email:identity.email}:{linked:false},apple:apple?{linked:true,email:apple.email}:{linked:false},password:passwordEnabled(user.password_hash)});
   });
   app.get('/api/auth/google/start',rateLimit('google-start',30,15*60_000),(req,res)=>{res.redirect(302,start(req,res,'signin',req.query.next,req.query.language));});
   app.post('/api/auth/google/link',requireAuth,rateLimit('google-link',10,15*60_000),async(req,res)=>{
@@ -132,6 +134,7 @@ export function registerGoogleAuth(app:Express){
       const profile=await googleProfile(req.query.code,attempt);
       checkSession(req,attempt);
       const uid=connect(attempt,profile);
+      markEmailVerified(uid,profile.email);
       destroySession(req,res,false);createSession(res,uid);
       res.redirect(303,attempt.intent==='link'?'/account?google=linked':attempt.next_path);
     }catch(error){

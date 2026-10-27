@@ -6,6 +6,9 @@ export interface Env {
   STRIPE_ACTIVATION_PRICE_ID?:string; STRIPE_WALLET_PRODUCT_ID?:string;
   STRIPE_TEST_MODE?:string;
   GOOGLE_CLIENT_ID?:string; GOOGLE_CLIENT_SECRET?:string;
+  APPLE_CLIENT_ID?:string; APPLE_TEAM_ID?:string; APPLE_KEY_ID?:string; APPLE_PRIVATE_KEY?:string;
+  RESEND_API_KEY?:string; MAIL_FROM?:string;
+  EMAIL_PROVIDER?:string; CF_EMAIL_ACCOUNT_ID?:string; CF_EMAIL_API_TOKEN?:string;
   SEED_CATALOG?:string;
 }
 let runtime:{storage:DurableObjectStorage;env:Env;waitUntil?:(promise:Promise<unknown>)=>void}|undefined;

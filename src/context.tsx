@@ -4,7 +4,7 @@ import { api,post } from './api';
 import type { User } from '../shared/config';
 import { useI18n } from './i18n';
 import { Modal } from './ui';
-interface AppConfig {brand:string;paymentsMode:string;paymentsReady?:boolean;sandbox?:boolean;paymentsTestMode?:boolean;uploadsEnabled?:boolean;usdToHkd:number;demo:boolean;limits:Record<string,number>;runtime?:string;videoFormats?:string[];auth?:{google:boolean}}
+interface AppConfig {brand:string;paymentsMode:string;paymentsReady?:boolean;sandbox?:boolean;paymentsTestMode?:boolean;uploadsEnabled?:boolean;usdToHkd:number;demo:boolean;limits:Record<string,number>;runtime?:string;videoFormats?:string[];auth?:{google:boolean;apple?:boolean;email?:boolean}}
 interface Toast {id:number;message:string;error:boolean}
 interface Checkout {demo?:boolean;paymentId?:string;amount_cents?:number;currency?:string;url?:string;alreadyPaid?:boolean}
 const Context=createContext<{user:User|null;ready:boolean;config:AppConfig;setUser:(u:User|null)=>void;refreshUser:()=>Promise<void>;toast:(m:string,error?:boolean)=>void;checkout:(kind:'activation'|'funding',cents?:number)=>Promise<void>}>({user:null,ready:false,config:{brand:'AIDramio',paymentsMode:'disabled',usdToHkd:7.8,demo:false,limits:{}},setUser:()=>{},refreshUser:async()=>{},toast:()=>{},checkout:async()=>{}});

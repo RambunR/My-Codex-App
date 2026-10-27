@@ -1,3 +1,6 @@
+import {APPLE_AUTH_SCHEMA} from './apple-schema.js';
+import {ACCOUNT_EMAIL_SCHEMA} from './email-schema.js';
+
 export const DATABASE_SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
  id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE COLLATE NOCASE, name TEXT NOT NULL, password_hash TEXT NOT NULL,
@@ -107,4 +110,6 @@ CREATE INDEX IF NOT EXISTS playback_episode_viewer ON playback_sessions(episode_
 CREATE INDEX IF NOT EXISTS playback_episode_qualified ON playback_sessions(episode_id,qualified_at_ms);
 CREATE INDEX IF NOT EXISTS purchases_episode_created ON purchases(episode_id,created_at,user_id);
 CREATE INDEX IF NOT EXISTS test_purchases_episode_created ON test_purchases(episode_id,created_at,user_id);
+${APPLE_AUTH_SCHEMA}
+${ACCOUNT_EMAIL_SCHEMA}
 `;

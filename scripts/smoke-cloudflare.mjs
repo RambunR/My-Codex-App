@@ -46,6 +46,16 @@ async function upload(route,bytes,name,cookie,fields={},field='video',status=201
 try{
   await start();
   const cfg=(await request('/api/config')).data;assert.equal(cfg.runtime,'cloudflare');assert.equal(cfg.paymentsMode,'demo');assert.equal(cfg.auth.google,true);
+  assert.equal(cfg.auth.apple,false);assert.equal(cfg.auth.email,false);
+  const authPage=await fetch(base+'/auth?mode=forgot');assert.equal(authPage.status,200);assert.equal(authPage.headers.get('referrer-policy'),'no-referrer');assert.equal(authPage.headers.get('cache-control'),'no-store');
+  await request('/api/auth/apple/start',undefined,'',503);
+  await request('/api/auth/forgot-password',{email:'viewer@example.test'},'',503);
+  await request('/api/auth/resend-verification',{email:'viewer@example.test'},'',503);
+  await request('/api/auth/reset-password',{token:'0'.repeat(64),password:'LocalResetPassword123!'},'',400);
+  await request('/api/auth/verify-email',{token:'0'.repeat(64)},'',400);
+  const appleCallback=await fetch(base+'/api/auth/apple/callback',{method:'POST',redirect:'manual',headers:{Origin:'https://appleid.apple.com','Sec-Fetch-Site':'cross-site','Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({state:'0'.repeat(64),error:'user_cancelled_authorize'})});
+  assert.equal(appleCallback.status,303);assert.equal(new URL(appleCallback.headers.get('location'),base).pathname,'/auth');
+  console.log('PASS: honest Apple/email availability, private recovery pages, invalid token rejection and scoped Apple form_post origin handling.');
   const oauth=await fetch(base+'/api/auth/google/start?next=%2Fwallet&language=zh-TW',{redirect:'manual'});assert.equal(oauth.status,302);const authorization=new URL(oauth.headers.get('location'));assert.equal(authorization.origin,'https://accounts.google.com');assert.equal(authorization.searchParams.get('code_challenge_method'),'S256');
   const binding=oauth.headers.getSetCookie().find(c=>c.startsWith('drama_google='))?.split(';')[0];assert.ok(binding);const callback=base+'/api/auth/google/callback?'+new URLSearchParams({state:authorization.searchParams.get('state'),error:'access_denied'});
   const cancelled=await fetch(callback,{redirect:'manual',headers:{Cookie:binding}});assert.equal(cancelled.status,303);assert.equal(new URL(cancelled.headers.get('location'),base).searchParams.get('error'),'google_cancelled');
@@ -64,7 +74,7 @@ try{
   assert.equal(p.data.user.role,'viewer');assert.equal(p.data.user.publisher_active,0);
   assert.deepEqual(p.data.user.dramio_pass,{active:false,test:false,purchased_at:null});
   const viewer=(await request('/api/auth/register',{email:'viewer@example.test',name:'Local Viewer',password},'',201)).cookie;
-  assert.deepEqual((await request('/api/account/identities',undefined,viewer)).data,{google:{linked:false},password:true});
+  assert.deepEqual((await request('/api/account/identities',undefined,viewer)).data,{google:{linked:false},apple:{linked:false},password:true});
   await request('/api/auth/login',{email:'viewer@example.test',password:'wrong'},'',401);
   await request('/api/admin',undefined,publisher,403);
   await request('/api/studio/series',{},publisher,403);

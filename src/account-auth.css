@@ -1,0 +1,26 @@
+.auth-provider-options .button + .button{margin-top:12px}
+.apple-button{background:#080808;color:#fff;border:1px solid #a0a0a0;min-height:44px;font-weight:550;text-align:center;white-space:normal}
+.apple-button:hover:not(:disabled){background:#252525;border-color:#fff}
+.apple-button:disabled{opacity:.55;cursor:not-allowed}
+.auth-availability{font-size:11px;line-height:1.8;color:var(--muted);margin:10px 0 18px;overflow-wrap:anywhere}
+.auth-provider-options>.auth-availability{font-size:10px;text-align:center;margin-bottom:0}
+.auth-recovery-links{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:13px 22px;margin-top:21px;font-size:11px;line-height:1.8}
+.auth-recovery-links>a{color:#ffc1b4;text-decoration:underline;text-underline-offset:3px;overflow-wrap:anywhere}
+.auth-recovery-links>a:hover{color:#fff}
+.auth-recovery-panel>h1{overflow-wrap:anywhere}
+.auth-recovery-panel>p{margin-bottom:28px}
+.auth-recovery-panel .form-error{margin-bottom:19px;line-height:1.8}
+.auth-email-status{display:flex;align-items:flex-start;gap:10px;background:#123329;border:1px solid #3f987d66;border-radius:9px;padding:15px;margin:20px 0;color:#bcebdc;font-size:12px;line-height:1.8;overflow-wrap:anywhere}
+.auth-email-status>svg{flex:0 0 18px;margin-top:2px}
+.email-verification-panel{margin-top:20px}
+.email-verification-heading{display:flex;align-items:center;gap:11px;line-height:1.6;margin-bottom:13px}
+.email-verification-heading>h2{margin:0;flex:1}
+.email-verification-badge{display:flex;align-items:center;gap:5px;border-radius:30px;padding:4px 9px;font-size:9px;color:#f8cdb3;background:#ff8c4517;white-space:normal}
+.email-verification-panel[data-state=verified] .email-verification-badge{color:#bcebdc;background:#3f987d26}
+.email-verification-panel>p{font-size:12px;line-height:1.8;color:var(--muted);margin-bottom:17px;overflow-wrap:anywhere}
+.email-verification-panel .button{max-width:100%;white-space:normal;text-align:center}
+.email-verification-panel .auth-email-status{font-size:11px}
+.email-verification-panel .form-error{margin-top:15px}
+.account-provider-method+.account-provider-method{border-top:1px solid var(--line);padding-top:22px;margin-top:22px}
+.account-provider-method>.muted{line-height:1.8;margin-bottom:18px}
+@media(max-width:600px){.auth-recovery-links{font-size:11px;align-items:flex-start}.auth-email-status{font-size:11px}.email-verification-heading{flex-wrap:wrap}.email-verification-heading>h2{min-width:65%}.email-verification-badge{font-size:9px}.email-verification-panel .button{font-size:11px}}

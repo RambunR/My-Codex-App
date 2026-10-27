@@ -6,6 +6,7 @@ import { config } from './config.js';
 import { assert } from './errors.js';
 import type { User } from '../shared/config.js';
 import {financeAccount,usingTestPaymentState,dramioPassState} from './payment-state.js';
+import {emailVerificationState} from './email-auth.js';
 
 const scrypt = promisify(crypto.scrypt);
 export async function hashPassword(password: string) {
@@ -27,7 +28,7 @@ export function getUser(id: string) {
   if(!user)return user;
   const account=usingTestPaymentState()?financeAccount(id)!:undefined;
   const current=account?{...user,...account,role:user.role==='admin'?'admin':account.publisher_active?'publisher':user.role,stripe_account_id:undefined} as User:user;
-  return{...current,dramio_pass:dramioPassState(id,!!user.publisher_active,!!current.publisher_active)};
+  return{...current,...emailVerificationState(id),dramio_pass:dramioPassState(id,!!user.publisher_active,!!current.publisher_active)};
 }
 export function readSession(req: Request, _res: Response, next: NextFunction) {
   const token = (req.headers.cookie || '').split(';').map(x => x.trim()).find(x => x.startsWith('drama_session='))?.split('=')[1];
