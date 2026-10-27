@@ -10,7 +10,8 @@ import { one, all, run, transaction } from './db.js';
 import { AppError, assert } from './errors.js';
 import { readSession, requireAuth, requirePublisher, requireAdmin, hashPassword, verifyPassword, createSession, destroySession, getUser, rateLimit } from './auth.js';
 import { prepareVideo, prepareCover, putObject, deleteObject, serveObject, removeTempFile } from './storage.js';
-import { createCheckout, settlePayment, unlockEpisode, requestWithdrawal,returnWithdrawalFunds, addLedger, stripe,paymentsReady,stripeConfigured,stripeModeMatches } from './finance.js';
+import { createCheckout, settlePayment, unlockEpisode, requestWithdrawal,returnWithdrawalFunds, addLedger, stripe,paymentsReady,stripeConfigured,stripeModeMatches,stripeTestPayments } from './finance.js';
+import { paymentTable,purchaseTable,ledgerTable,hasEpisodePurchase,usingTestPaymentState } from './payment-state.js';
 import { LANGUAGES, GENRES, MAX_EPISODE_BYTES, DEFAULT_QUOTA_BYTES,MIN_WALLET_FUNDING_CENTS,MAX_WALLET_FUNDING_CENTS } from '../shared/config.js';
 
 const language = z.enum(LANGUAGES.map(x => x.code) as [string, ...string[]]);
@@ -34,7 +35,7 @@ function serializeSeries(s: Record<string, any>, userId?: string) {
   return { ...safe, genres: JSON.parse(s.genres), cover: cover_key.startsWith('public:') ? cover_key.slice(7) : cover_key ? `/api/series/${s.id}/cover` : '/images/placeholder.svg',
     saved: !!(userId && one('SELECT 1 FROM saves WHERE user_id=? AND series_id=?', userId, s.id)) };
 }
-function canWatch(userId: string | undefined, e: any) { return e.number <= e.free_episodes || e.creator_id === userId || !!(userId && one('SELECT 1 FROM purchases WHERE user_id=? AND episode_id=?', userId, e.id)); }
+function canWatch(userId: string | undefined, e: any) { return e.number <= e.free_episodes || e.creator_id === userId || !!(userId && hasEpisodePurchase(userId,e.id)); }
 function episodeRow(episodeId: string) { return one(`SELECT e.*,s.free_episodes,s.creator_id,s.status FROM episodes e JOIN series s ON s.id=e.series_id WHERE e.id=?`, episodeId); }
 
 export function createApp() {
@@ -52,11 +53,15 @@ export function createApp() {
     if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
       const session = event.data.object;
       if(!stripeModeMatches(session.livemode)){res.json({received:true,ignored:true});return;}
-      if (session.payment_status === 'paid' && session.metadata?.paymentId) settlePayment(session.metadata.paymentId, { amount: session.amount_total!, currency: session.currency!, session: session.id,livemode:session.livemode });
+      if(session.metadata?.site&&session.metadata.site!==new URL(config.appUrl).origin){res.json({received:true,ignored:true});return;}
+      if (session.payment_status === 'paid' && session.metadata?.paymentId) {
+        if(!one(`SELECT id FROM ${paymentTable()} WHERE id=?`,session.metadata.paymentId)){res.json({received:true,ignored:true});return;}
+        settlePayment(session.metadata.paymentId, { amount: session.amount_total!, currency: session.currency!, session: session.id,livemode:session.livemode });
+      }
     }
     if(event.type==='checkout.session.expired'||event.type==='checkout.session.async_payment_failed'){
       const session=event.data.object;
-      if(stripeModeMatches(session.livemode)&&session.metadata?.paymentId)run("UPDATE payments SET status=? WHERE id=? AND provider_session=? AND provider='stripe' AND status='pending'",event.type==='checkout.session.expired'?'expired':'failed',session.metadata.paymentId,session.id);
+      if(stripeModeMatches(session.livemode)&&session.metadata?.paymentId)run(`UPDATE ${paymentTable()} SET status=? WHERE id=? AND provider_session=? AND provider='stripe' AND status='pending'`,event.type==='checkout.session.expired'?'expired':'failed',session.metadata.paymentId,session.id);
     }
     res.json({ received: true });
   });
@@ -72,7 +77,7 @@ export function createApp() {
   }, readSession, rateLimit('api', 1500, 60_000));
   registerGoogleAuth(app);
   app.get('/api/health', (_req,res) => res.json({ ok: true, database: !!one('SELECT 1 AS ready') }));
-  app.get('/api/config', (_req,res) => res.json({ brand: 'AIDramio', languages: LANGUAGES, genres: GENRES, paymentsMode: config.payments,paymentsReady:paymentsReady(),paymentsConfigured:stripeConfigured(),sandbox:config.sandbox,paymentsTestMode:config.sandbox||config.payments==='demo',uploadsEnabled:!config.sandbox,usdToHkd: config.usdToHkd,
+  app.get('/api/config', (_req,res) => res.json({ brand: 'AIDramio', languages: LANGUAGES, genres: GENRES, paymentsMode: config.payments,paymentsReady:paymentsReady(),paymentsConfigured:stripeConfigured(),sandbox:config.sandbox,paymentsTestMode:stripeTestPayments()||config.payments==='demo',uploadsEnabled:!config.sandbox,usdToHkd: config.usdToHkd,
     limits: { maxEpisodeSeconds: 180, maxEpisodeBytes: MAX_EPISODE_BYTES, quotaBytes: DEFAULT_QUOTA_BYTES, activationHkd: 88, minimumPriceUsd: 0.1, creatorShare: 0.7, minimumPayoutHkd: 20,minWalletFundingUsd:MIN_WALLET_FUNDING_CENTS/100,maxWalletFundingUsd:MAX_WALLET_FUNDING_CENTS/100 }, demo: config.seed, runtime: (config as any).runtime || 'node', videoFormats: (config as any).videoFormats || ['mp4','mov','webm','m4v'], auth:{google:googleEnabled()} }));
   app.get('/api/auth/me', (req,res) => res.json({ user: req.user || null }));
   app.post('/api/auth/register', rateLimit('register', 12, 15 * 60_000), async (req,res) => {
@@ -143,7 +148,7 @@ export function createApp() {
       FROM progress p JOIN episodes e ON e.id=p.episode_id JOIN series s ON s.id=e.series_id JOIN users u ON u.id=s.creator_id WHERE p.user_id=? AND s.status='published' ORDER BY p.updated_at DESC LIMIT 50`,req.user!.id);
     const seen=new Set(); res.json({ history: rows.filter(s=>{if(seen.has(s.id))return false;seen.add(s.id);return true;}).map(s=>serializeSeries(s,req.user!.id)) });
   });
-  app.get('/api/wallet', requireAuth, (req,res) => res.json({ user: getUser(req.user!.id), ledger: all('SELECT * FROM ledger WHERE user_id=? ORDER BY created_at DESC,rowid DESC LIMIT 100',req.user!.id), payments: all('SELECT id,kind,amount_cents,currency,status,created_at FROM payments WHERE user_id=? ORDER BY created_at DESC LIMIT 30',req.user!.id) }));
+  app.get('/api/wallet', requireAuth, (req,res) => res.json({ user: getUser(req.user!.id), ledger: all(`SELECT * FROM ${ledgerTable()} WHERE user_id=? ORDER BY created_at DESC,rowid DESC LIMIT 100`,req.user!.id), payments: all(`SELECT id,kind,amount_cents,currency,status,created_at FROM ${paymentTable()} WHERE user_id=? ORDER BY created_at DESC LIMIT 30`,req.user!.id) }));
   app.post('/api/payments/checkout', requireAuth, rateLimit('checkout',20,60_000), async (req,res) => {
     const body=z.discriminatedUnion('kind',[z.object({kind:z.literal('activation')}),z.object({kind:z.literal('funding'),amount_cents:z.number().int().min(MIN_WALLET_FUNDING_CENTS).max(MAX_WALLET_FUNDING_CENTS)})]).parse(req.body);
     res.json(await createCheckout(req.user!.id,body.kind,body.kind==='funding'?body.amount_cents:8800));
@@ -155,7 +160,7 @@ export function createApp() {
   });
   app.post('/api/payments/reconcile', requireAuth, async (req,res) => {
     const { session_id }=z.object({session_id:z.string().max(300)}).parse(req.body); assert(stripe && config.payments==='stripe'&&paymentsReady(),503,'PAYMENTS_UNAVAILABLE','Payments unavailable.');
-    const payment=one('SELECT * FROM payments WHERE provider_session=? AND user_id=?',session_id,req.user!.id);assert(payment,404,'NOT_FOUND','Payment not found.');
+    const payment=one(`SELECT * FROM ${paymentTable()} WHERE provider_session=? AND user_id=?`,session_id,req.user!.id);assert(payment,404,'NOT_FOUND','Payment not found.');
     const session=await stripe.checkout.sessions.retrieve(session_id);
     assert(stripeModeMatches(session.livemode),400,'PAYMENT_MODE_MISMATCH','Payment mode does not match this application.');
     if(session.payment_status==='paid')settlePayment(payment.id,{amount:session.amount_total!,currency:session.currency!,session:session.id,livemode:session.livemode});
@@ -163,8 +168,8 @@ export function createApp() {
   });
   app.get('/api/studio', requireAuth, (req,res) => {
     const user=req.user!;res.json({ user:getUser(user.id),series:all(`${catalogSelect} WHERE s.creator_id=? ORDER BY s.created_at DESC`,user.id).map(s=>serializeSeries(s,user.id)),
-      stats:one('SELECT COUNT(*) AS sales,COALESCE(SUM(p.creator_micros),0) AS lifetime_micros FROM purchases p JOIN episodes e ON e.id=p.episode_id JOIN series s ON s.id=e.series_id WHERE s.creator_id=?',user.id),
-      withdrawals:all('SELECT * FROM withdrawals WHERE user_id=? ORDER BY created_at DESC',user.id), storageRequests:all('SELECT * FROM storage_requests WHERE user_id=? ORDER BY created_at DESC',user.id) });
+      stats:one(`SELECT COUNT(*) AS sales,COALESCE(SUM(p.creator_micros),0) AS lifetime_micros FROM ${purchaseTable()} p JOIN episodes e ON e.id=p.episode_id JOIN series s ON s.id=e.series_id WHERE s.creator_id=?`,user.id),
+      withdrawals:stripeTestPayments()?[]:all('SELECT * FROM withdrawals WHERE user_id=? ORDER BY created_at DESC',user.id), storageRequests:all('SELECT * FROM storage_requests WHERE user_id=? ORDER BY created_at DESC',user.id) });
   });
   app.post('/api/studio/series', requirePublisher, (req,res) => {
     const b=seriesSchema.parse(req.body);const seriesId=crypto.randomUUID();
@@ -205,13 +210,13 @@ export function createApp() {
     assert(!one('SELECT id FROM episodes WHERE series_id=? AND number=? AND id<>?',e.series_id,b.number,e.id),409,'EPISODE_EXISTS','This episode number is already in use.');run('UPDATE episodes SET title=?,number=? WHERE id=?',b.title,b.number,e.id);res.json({ok:true});
   });
   app.delete('/api/studio/episodes/:id', requirePublisher, async (req,res) => {
-    const e=transaction(()=>{const ep=episodeRow(id(req));assert(ep,404,'NOT_FOUND','Episode not found.');ownSeries(req,ep.series_id);assert(!one('SELECT id FROM purchases WHERE episode_id=?',ep.id),409,'EPISODE_PURCHASED','Purchased episodes must remain available. Archive the series to stop new sales.');run('DELETE FROM episodes WHERE id=?',ep.id);run('UPDATE users SET used_bytes=MAX(0,used_bytes-?) WHERE id=?',ep.bytes,req.user!.id);return ep;});
+    const e=transaction(()=>{const ep=episodeRow(id(req));assert(ep,404,'NOT_FOUND','Episode not found.');ownSeries(req,ep.series_id);assert(!one('SELECT id FROM purchases WHERE episode_id=? UNION ALL SELECT id FROM test_purchases WHERE episode_id=? LIMIT 1',ep.id,ep.id),409,'EPISODE_PURCHASED','Purchased episodes must remain available. Archive the series to stop new sales.');run('DELETE FROM episodes WHERE id=?',ep.id);run('UPDATE users SET used_bytes=MAX(0,used_bytes-?) WHERE id=?',ep.bytes,req.user!.id);return ep;});
     await deleteObject(e.storage_key);res.json({ok:true,user:getUser(req.user!.id)});
   });
   app.post('/api/studio/series/:id/status', requirePublisher, (req,res) => {
     const s=ownSeries(req);const {status}=z.object({status:z.enum(['draft','published','archived'])}).parse(req.body);
     if(status==='published'){assert(s.cover_key,400,'COVER_REQUIRED','Add a cover before publishing.');assert(one('SELECT id FROM episodes WHERE series_id=?',s.id),400,'EPISODES_REQUIRED','Upload at least one episode before publishing.');}
-    if(status!=='published')assert(!one('SELECT p.id FROM purchases p JOIN episodes e ON e.id=p.episode_id WHERE e.series_id=?',s.id),409,'HAS_PURCHASES','This series has paid viewers. Contact support before removing access.');
+    if(status!=='published')assert(!one('SELECT p.id FROM purchases p JOIN episodes e ON e.id=p.episode_id WHERE e.series_id=? UNION ALL SELECT p.id FROM test_purchases p JOIN episodes e ON e.id=p.episode_id WHERE e.series_id=? LIMIT 1',s.id,s.id),409,'HAS_PURCHASES','This series has paid viewers. Contact support before removing access.');
     run('UPDATE series SET status=? WHERE id=?',status,s.id);res.json({ok:true});
   });
   app.post('/api/studio/storage-requests', requirePublisher, (req,res) => {
@@ -221,29 +226,32 @@ export function createApp() {
     run('INSERT INTO storage_requests (id,user_id,requested_gb,reason) VALUES (?,?,?,?)',crypto.randomUUID(),req.user!.id,b.requested_gb,b.reason);res.status(201).json({ok:true});
   });
   app.post('/api/studio/connect', requirePublisher, async (req,res) => {
+    assert(!stripeTestPayments(),503,'TEST_PAYOUTS_DISABLED','Payouts are unavailable during Stripe test payments.');
     assert(stripe && config.payments==='stripe'&&paymentsReady(),503,'PAYMENTS_UNAVAILABLE','Payout onboarding is not configured yet.');
     let account=req.user!.stripe_account_id;
     if(!account){const created=await stripe.accounts.create({type:'express',email:req.user!.email,capabilities:{transfers:{requested:true}},metadata:{userId:req.user!.id}});account=created.id;run('UPDATE users SET stripe_account_id=? WHERE id=?',account,req.user!.id);}
     const link=await stripe.accountLinks.create({account,refresh_url:`${config.appUrl}/studio?connect=retry`,return_url:`${config.appUrl}/studio?connect=done`,type:'account_onboarding'});res.json({url:link.url});
   });
   app.post('/api/studio/withdrawals', requirePublisher, async (req,res) => {
+    assert(!stripeTestPayments(),503,'TEST_PAYOUTS_DISABLED','Payouts are unavailable during Stripe test payments.');
     const b=z.object({amount_cents:z.number().int().min(1).max(10000000),note:z.string().max(500).default('')}).parse(req.body);
     if(config.payments==='stripe') {assert(stripe&&paymentsReady(),503,'PAYMENTS_UNAVAILABLE','Payouts are not configured yet.');assert(req.user!.stripe_account_id,400,'CONNECT_REQUIRED','Connect your payout account first.');const account=await stripe.accounts.retrieve(req.user!.stripe_account_id);assert(account.payouts_enabled,400,'CONNECT_REQUIRED','Complete your payout account verification first.');}
     else assert(config.payments==='demo' && !config.production,503,'PAYMENTS_UNAVAILABLE','Payouts are not configured yet.');
     res.status(201).json({id:requestWithdrawal(req.user!.id,b.amount_cents,b.note),user:getUser(req.user!.id)});
   });
   app.get('/api/admin', requireAdmin, (_req,res) => res.json({
-    stats:{users:one('SELECT COUNT(*) AS n FROM users')!.n,publishers:one('SELECT COUNT(*) AS n FROM users WHERE publisher_active=1')!.n,
-      sales:one('SELECT COUNT(*) AS n,COALESCE(SUM(price_micros),0) AS gross_micros,COALESCE(SUM(platform_micros),0) AS platform_micros FROM purchases'),activation_hkd:one("SELECT COALESCE(SUM(amount_cents),0)/100.0 AS n FROM payments WHERE kind='activation' AND status='paid'")!.n},
+    stats:{users:one('SELECT COUNT(*) AS n FROM users')!.n,publishers:one(`SELECT COUNT(*) AS n FROM users WHERE publisher_active=1${usingTestPaymentState()?' OR EXISTS(SELECT 1 FROM test_accounts t WHERE t.user_id=users.id AND t.publisher_active=1)':''}`)!.n,
+      sales:one(`SELECT COUNT(*) AS n,COALESCE(SUM(price_micros),0) AS gross_micros,COALESCE(SUM(platform_micros),0) AS platform_micros FROM ${purchaseTable()}`),activation_hkd:one(`SELECT COALESCE(SUM(amount_cents),0)/100.0 AS n FROM ${paymentTable()} WHERE kind='activation' AND status='paid'`)!.n},
     storageRequests:all('SELECT r.*,u.name,u.email,u.quota_bytes,u.used_bytes FROM storage_requests r JOIN users u ON u.id=r.user_id ORDER BY r.created_at DESC'),
-    withdrawals:all('SELECT w.*,u.name,u.email,u.stripe_account_id FROM withdrawals w JOIN users u ON u.id=w.user_id ORDER BY w.created_at DESC'),
-    users:all('SELECT id,name,email,role,publisher_active,quota_bytes,used_bytes FROM users ORDER BY created_at DESC LIMIT 200'),
+    withdrawals:stripeTestPayments()?[]:all('SELECT w.*,u.name,u.email,u.stripe_account_id FROM withdrawals w JOIN users u ON u.id=w.user_id ORDER BY w.created_at DESC'),
+    users:all('SELECT id,name,email,role,publisher_active,quota_bytes,used_bytes FROM users ORDER BY created_at DESC LIMIT 200').map(user=>usingTestPaymentState()?{...user,role:getUser(user.id)!.role,publisher_active:getUser(user.id)!.publisher_active}:user),
   }));
   app.post('/api/admin/storage-requests/:id', requireAdmin, (req,res) => {
     const {approve}=z.object({approve:z.boolean()}).parse(req.body);
     transaction(()=>{const r=one("SELECT * FROM storage_requests WHERE id=? AND status='pending'",id(req));assert(r,404,'NOT_FOUND','Pending request not found.');if(approve)run('UPDATE users SET quota_bytes=MAX(quota_bytes,?) WHERE id=?',r.requested_gb*1024**3,r.user_id);run('UPDATE storage_requests SET status=? WHERE id=?',approve?'approved':'rejected',r.id);});res.json({ok:true});
   });
   app.post('/api/admin/withdrawals/:id', requireAdmin, async (req,res) => {
+    assert(!stripeTestPayments(),503,'TEST_PAYOUTS_DISABLED','Payouts are unavailable during Stripe test payments.');
     const {approve}=z.object({approve:z.boolean()}).parse(req.body);
     const w=one('SELECT w.*,u.stripe_account_id FROM withdrawals w JOIN users u ON u.id=w.user_id WHERE w.id=?',id(req));assert(w,404,'NOT_FOUND','Payout not found.');
     if(!approve){transaction(()=>{const current=one('SELECT * FROM withdrawals WHERE id=?',w.id)!;assert(current.status==='pending',409,'ALREADY_PROCESSED','This payout is already being processed.');run("UPDATE withdrawals SET status='rejected' WHERE id=?",w.id);returnWithdrawalFunds(w.user_id,w.amount_micros);addLedger(w.user_id,'withdrawal_refund',w.amount_micros,w.id,'Payout declined · funds returned');});res.json({ok:true});return;}

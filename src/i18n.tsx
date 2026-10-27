@@ -1,11 +1,12 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { LANGUAGES, type Locale } from '../shared/config';
-import { additionalMessages,googleAuthEnglish,googleAuthMessages,walletFundingEnglish,walletFundingMessages,sandboxEnglish,sandboxMessages } from './localeExtras';
+import { additionalMessages,googleAuthEnglish,googleAuthMessages,walletFundingEnglish,walletFundingMessages,sandboxEnglish,sandboxMessages,stripeTestingEnglish,stripeTestingMessages } from './localeExtras';
 
 const en = {
   ...googleAuthEnglish,
   ...walletFundingEnglish,
   ...sandboxEnglish,
+  ...stripeTestingEnglish,
   discover:'Discover', explore:'Explore', rankings:'Top charts', myList:'My list', studio:'Creator studio', wallet:'Wallet', account:'Account',
   search:'Find your next obsession', searchTitle:'Explore every story', signIn:'Sign in', signUp:'Create account', signOut:'Sign out',
   language:'Language', allLanguages:'All languages', all:'All', allGenres:'All genres', genre:'Genre', genres:'Genres',
@@ -128,6 +129,7 @@ for(const [locale,messages] of Object.entries(additionalMessages))Object.assign(
 for(const language of LANGUAGES){if(!googleAuthMessages[language.code])throw new Error(`Google translations missing: ${language.code}`);Object.assign(dictionaries[language.code],googleAuthMessages[language.code]);}
 for(const language of LANGUAGES){if(!walletFundingMessages[language.code])throw new Error(`Wallet translations missing: ${language.code}`);Object.assign(dictionaries[language.code],walletFundingMessages[language.code]);}
 for(const language of LANGUAGES){if(!sandboxMessages[language.code])throw new Error(`Sandbox translations missing: ${language.code}`);Object.assign(dictionaries[language.code],sandboxMessages[language.code]);}
+for(const language of LANGUAGES){if(!stripeTestingMessages[language.code])throw new Error(`Stripe testing translations missing: ${language.code}`);Object.assign(dictionaries[language.code],stripeTestingMessages[language.code]);}
 // Shared scripts are deliberately kept in their chosen script; traditional and simplified Chinese are independent locales.
 const I18nContext=createContext<{locale:Locale;setLocale:(l:Locale)=>void;t:(key:Key)=>string}>({locale:'en',setLocale:()=>{},t:k=>en[k]});
 export const baseMessages=en;

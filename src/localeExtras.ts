@@ -359,3 +359,31 @@ export const sandboxMessages:Record<string,Record<keyof typeof sandboxEnglish,st
     "sandboxNotice": "கட்டணச் சோதனைத் தளம். உண்மையான பணம் வசூலிக்கப்படாது. பதிவேற்றங்கள் முடக்கப்பட்டுள்ளன; பணப்பை வாங்குதல்களைச் சோதிக்க மாதிரி அத்தியாயங்களைப் பயன்படுத்துங்கள்."
   }
 };
+
+
+export const stripeTestingEnglish={
+  stripeTestPaymentBody:'Stripe test payments. Use test cards; no real money is charged. Wallet credit and paid unlocks are for testing.',
+} as const;
+export const stripeTestingMessages:Record<string,Record<keyof typeof stripeTestingEnglish,string>>={
+  en:stripeTestingEnglish,
+  'zh-TW':{stripeTestPaymentBody:'Stripe 測試付款。請使用測試卡，不會收取真實款項。錢包餘額及付費解鎖僅供測試。'},
+  'zh-CN':{stripeTestPaymentBody:'Stripe 测试付款。请使用测试卡，不会收取真实款项。钱包余额和付费解锁仅供测试。'},
+  ja:{stripeTestPaymentBody:'Stripe のテスト決済です。テストカードを使用してください。実際の請求は発生しません。ウォレット残高と有料エピソードの購入はテスト専用です。'},
+  ko:{stripeTestPaymentBody:'Stripe 테스트 결제입니다. 테스트 카드를 사용하세요. 실제 요금은 청구되지 않습니다. 지갑 잔액과 유료 에피소드 잠금 해제는 테스트용입니다.'},
+  hi:{stripeTestPaymentBody:'Stripe परीक्षण भुगतान। परीक्षण कार्ड इस्तेमाल करें; असली पैसे नहीं लिए जाते। वॉलेट क्रेडिट और सशुल्क एपिसोड अनलॉक केवल परीक्षण के लिए हैं।'},
+  id:{stripeTestPaymentBody:'Pembayaran uji Stripe. Gunakan kartu uji; tidak ada uang asli yang ditagih. Saldo dompet dan pembukaan episode berbayar hanya untuk pengujian.'},
+  'pt-BR':{stripeTestPaymentBody:'Pagamentos de teste do Stripe. Use cartões de teste; nenhum dinheiro real é cobrado. O saldo da carteira e os desbloqueios pagos são apenas para testes.'},
+  es:{stripeTestPaymentBody:'Pagos de prueba de Stripe. Usa tarjetas de prueba; no se cobra dinero real. El saldo del monedero y los desbloqueos de pago son solo para pruebas.'},
+  ar:{stripeTestPaymentBody:'مدفوعات Stripe التجريبية. استخدم بطاقات الاختبار؛ لن تُخصم أموال حقيقية. رصيد المحفظة وفتح الحلقات المدفوعة مخصصان للاختبار فقط.'},
+  bn:{stripeTestPaymentBody:'Stripe পরীক্ষামূলক পেমেন্ট। টেস্ট কার্ড ব্যবহার করুন; আসল টাকা নেওয়া হয় না। ওয়ালেট ক্রেডিট ও পেইড পর্ব আনলক শুধু পরীক্ষার জন্য।'},
+  ur:{stripeTestPaymentBody:'Stripe کی آزمائشی ادائیگیاں۔ ٹیسٹ کارڈ استعمال کریں؛ حقیقی رقم وصول نہیں کی جاتی۔ والیٹ کریڈٹ اور بامعاوضہ اقساط کھولنا صرف آزمائش کے لیے ہیں۔'},
+  vi:{stripeTestPaymentBody:'Thanh toán thử nghiệm Stripe. Hãy dùng thẻ thử nghiệm; không thu tiền thật. Số dư ví và mở khóa tập trả phí chỉ dùng để thử nghiệm.'},
+  th:{stripeTestPaymentBody:'การชำระเงินทดสอบของ Stripe โปรดใช้บัตรทดสอบ ไม่มีการเรียกเก็บเงินจริง เครดิตในกระเป๋าเงินและการปลดล็อกตอนแบบชำระเงินใช้สำหรับการทดสอบเท่านั้น'},
+  fil:{stripeTestPaymentBody:'Mga pansubok na pagbabayad sa Stripe. Gumamit ng test card; walang totoong perang sisingilin. Para sa pagsubok lang ang wallet credit at pag-unlock ng mga bayad na episode.'},
+  tr:{stripeTestPaymentBody:'Stripe test ödemeleri. Test kartlarını kullanın; gerçek para tahsil edilmez. Cüzdan bakiyesi ve ücretli bölüm açma işlemleri yalnızca test içindir.'},
+  ru:{stripeTestPaymentBody:'Тестовые платежи Stripe. Используйте тестовые карты; настоящие деньги не списываются. Баланс кошелька и платная разблокировка эпизодов предназначены только для тестирования.'},
+  fr:{stripeTestPaymentBody:'Paiements de test Stripe. Utilisez des cartes de test ; aucun argent réel n’est prélevé. Le crédit du portefeuille et les déblocages payants servent uniquement aux tests.'},
+  de:{stripeTestPaymentBody:'Stripe-Testzahlungen. Verwende Testkarten; es wird kein echtes Geld abgebucht. Wallet-Guthaben und kostenpflichtige Freischaltungen dienen nur zum Testen.'},
+  ms:{stripeTestPaymentBody:'Pembayaran ujian Stripe. Gunakan kad ujian; tiada wang sebenar dicaj. Kredit dompet dan pembukaan episod berbayar hanya untuk ujian.'},
+  ta:{stripeTestPaymentBody:'Stripe சோதனைக் கட்டணங்கள். சோதனை அட்டைகளைப் பயன்படுத்துங்கள்; உண்மையான பணம் வசூலிக்கப்படாது. பணப்பை வரவும் கட்டண அத்தியாயத் திறப்புகளும் சோதனைக்கு மட்டுமே.'},
+};

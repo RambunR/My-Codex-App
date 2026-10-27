@@ -42,6 +42,9 @@
     "ENVIRONMENT": "production",
     "APP_URL": "https://aidramio.jimmy-tsoi2001.workers.dev",
     "PAYMENTS_MODE": "stripe",
+    "STRIPE_TEST_MODE": "true",
+    "STRIPE_ACTIVATION_PRICE_ID": "price_1UV7jBJ6Er233b9cr0ahOada",
+    "STRIPE_WALLET_PRODUCT_ID": "prod_VWA3U1So0O5Lqv",
     "USD_TO_HKD": "7.8",
     "SEED_CATALOG": "true"
   },

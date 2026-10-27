@@ -50,6 +50,28 @@ CREATE TABLE IF NOT EXISTS payments (
  amount_cents INTEGER NOT NULL, currency TEXT NOT NULL, provider TEXT NOT NULL, provider_session TEXT UNIQUE,
  status TEXT NOT NULL DEFAULT 'pending', created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS test_accounts (
+ user_id TEXT PRIMARY KEY REFERENCES users(id),
+ wallet_micros INTEGER NOT NULL DEFAULT 0 CHECK(wallet_micros >= 0 AND wallet_micros <= 9007199254740991),
+ earnings_micros INTEGER NOT NULL DEFAULT 0 CHECK(earnings_micros >= 0 AND earnings_micros <= 9007199254740991),
+ publisher_active INTEGER NOT NULL DEFAULT 0 CHECK(publisher_active IN (0,1))
+);
+CREATE TABLE IF NOT EXISTS test_payments (
+ id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), kind TEXT NOT NULL CHECK(kind IN ('funding','activation')),
+ amount_cents INTEGER NOT NULL CHECK(amount_cents > 0 AND amount_cents <= 99999999),
+ currency TEXT NOT NULL CHECK(currency IN ('usd','hkd')), provider TEXT NOT NULL CHECK(provider='stripe'), provider_session TEXT UNIQUE,
+ status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','paid','expired','failed')), created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS test_purchases (
+ id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), episode_id TEXT NOT NULL REFERENCES episodes(id),
+ price_micros INTEGER NOT NULL CHECK(price_micros >= 0), creator_micros INTEGER NOT NULL CHECK(creator_micros >= 0),
+ platform_micros INTEGER NOT NULL CHECK(platform_micros >= 0),
+ created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(user_id,episode_id), CHECK(price_micros=creator_micros+platform_micros)
+);
+CREATE TABLE IF NOT EXISTS test_ledger (
+ id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), kind TEXT NOT NULL, amount_micros INTEGER NOT NULL,
+ reference_id TEXT NOT NULL, description TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 CREATE TABLE IF NOT EXISTS withdrawals (
  id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), amount_micros INTEGER NOT NULL,
  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','processing','paid','rejected')),
@@ -63,5 +85,7 @@ CREATE TABLE IF NOT EXISTS saves (user_id TEXT NOT NULL REFERENCES users(id), se
 CREATE TABLE IF NOT EXISTS progress (user_id TEXT NOT NULL REFERENCES users(id), episode_id TEXT NOT NULL REFERENCES episodes(id) ON DELETE CASCADE, seconds REAL NOT NULL DEFAULT 0, updated_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY(user_id,episode_id));
 CREATE INDEX IF NOT EXISTS episodes_series ON episodes(series_id,number);
 CREATE INDEX IF NOT EXISTS ledger_user ON ledger(user_id,created_at);
+CREATE INDEX IF NOT EXISTS test_ledger_user ON test_ledger(user_id,created_at);
+CREATE INDEX IF NOT EXISTS test_payments_user ON test_payments(user_id,created_at);
 CREATE INDEX IF NOT EXISTS series_catalog ON series(status,language);
 `;

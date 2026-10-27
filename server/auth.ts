@@ -5,6 +5,7 @@ import { one, run } from './db.js';
 import { config } from './config.js';
 import { assert } from './errors.js';
 import type { User } from '../shared/config.js';
+import {financeAccount,usingTestPaymentState} from './payment-state.js';
 
 const scrypt = promisify(crypto.scrypt);
 export async function hashPassword(password: string) {
@@ -21,7 +22,12 @@ export async function verifyPassword(password: string, stored: string) {
 declare global { namespace Express { interface Request { user?: User; } } }
 const digest = (token: string) => crypto.createHash('sha256').update(token).digest('hex');
 const publicFields = 'id,name,email,role,publisher_active,wallet_micros,earnings_micros,quota_bytes,used_bytes,language,stripe_account_id';
-export function getUser(id: string) { return one<User>(`SELECT ${publicFields} FROM users WHERE id=?`, id); }
+export function getUser(id: string) {
+  const user=one<User>(`SELECT ${publicFields} FROM users WHERE id=?`,id);
+  if(!user||!usingTestPaymentState())return user;
+  const account=financeAccount(id)!;
+  return{...user,...account,role:user.role==='admin'?'admin':account.publisher_active?'publisher':user.role,stripe_account_id:undefined} as User;
+}
 export function readSession(req: Request, _res: Response, next: NextFunction) {
   const token = (req.headers.cookie || '').split(';').map(x => x.trim()).find(x => x.startsWith('drama_session='))?.split('=')[1];
   if (token && /^[a-f0-9]{64}$/.test(token)) {

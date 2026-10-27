@@ -2,7 +2,7 @@
 
 A working short-drama platform for live-action, animated, AI-assisted, and AI-generated stories. It has a responsive viewer app, a publisher studio, persistent accounts and media, episode purchases, and an administrator console.
 
-Live application: **[aidramio.jimmy-tsoi2001.workers.dev](https://aidramio.jimmy-tsoi2001.workers.dev)**. See [deployment details](docs/DEPLOYMENT.md) for the Cloudflare application and update command. Real payments and paid publisher activation remain disabled until Stripe is configured.
+Live application: **[aidramio.jimmy-tsoi2001.workers.dev](https://aidramio.jimmy-tsoi2001.workers.dev)**. See [deployment details](docs/DEPLOYMENT.md) for the Cloudflare application and update command. Stripe test Checkout is integrated into this existing website; real charges remain disabled while `STRIPE_TEST_MODE=true`.
 
 Source repository: **[RambunR/My-Codex-App](https://github.com/RambunR/My-Codex-App)**, branch `main`. Commit and push source changes to keep the repository current; deploying with Wrangler alone does not upload source to GitHub. The running website is deployed separately to Cloudflare. Production accounts, wallet records and purchases are stored in the Durable Object database, publisher media in private R2, and credentials in Worker Secrets. Those runtime records and secrets are excluded from Git.
 
@@ -14,13 +14,13 @@ Brand PNG: [transparent AIDramio logo](public/aidramio-logo.png), also served at
 
 The same logo's coral play symbol is used for the website header, browser favicon, Apple touch icon and installed-app icons.
 
-Stripe payment testing: **[AIDramio Test](https://aidramio-sandbox.jimmy-tsoi2001.workers.dev)** uses separate accounts, balances, database and storage. Its test checkouts accept no real money, and uploads are disabled. See [Stripe setup and test instructions](docs/STRIPE_SETUP.md). The public production site accepts live payments only after matching live Stripe credentials are configured.
+Stripe payment testing uses **the same [main website](https://aidramio.jimmy-tsoi2001.workers.dev)**, Google/email accounts, studio and uploads. Wallet **Add funds** and publisher activation open Stripe-hosted **test** Checkout, with a visible test-payment notice. Test balances, activation, paid unlocks and earnings are stored separately from real financial records; no test earnings can be withdrawn. See [Stripe setup and test instructions](docs/STRIPE_SETUP.md). The earlier separate sandbox is no longer the user-facing test workflow.
 
 Screenshots: [viewer on desktop](docs/screenshots/viewer.png) · [publisher on mobile](docs/screenshots/publisher-mobile.png).
 
 ## Deploy to Cloudflare
 
-The full application can run on Cloudflare Workers, with a SQLite-backed Durable Object for accounts and money transactions, and a private R2 bucket for publisher media. See [Cloudflare deployment instructions](docs/CLOUDFLARE.md). Run `npm run build:cloudflare`, validate locally with `npm run test:cloudflare`, and publish a new application using `npm run deploy:cloudflare` after adding the Cloudflare API token securely to environment settings. Production payments start disabled until Stripe is configured.
+The full application can run on Cloudflare Workers, with a SQLite-backed Durable Object for accounts and money transactions, and a private R2 bucket for publisher media. See [Cloudflare deployment instructions](docs/CLOUDFLARE.md). Run `npm run build:cloudflare`, validate locally with `npm run test:cloudflare`, and publish a new application using `npm run deploy:cloudflare` after adding the Cloudflare API token securely to environment settings. The tracked main configuration explicitly enables Stripe test mode; matching test credentials and webhook signing secret are required before Checkout is ready.
 
 ## Start locally
 
@@ -83,13 +83,14 @@ PORT=3000
 APP_URL=https://your-domain.example
 DATA_DIR=/persistent/aidramio
 PAYMENTS_MODE=stripe
+STRIPE_TEST_MODE=false
 SEED_DEMO=false
 USD_TO_HKD=7.8
 ```
 
 **Use a new production data directory.** Startup refuses databases containing the known demo accounts. Keep the production directory on a persistent volume; ephemeral hosting disks will lose accounts and media. Use `PAYMENTS_MODE=disabled` when deploying without real payment credentials; checkout stays unavailable in that mode.
 
-For real payments, provide **`STRIPE_SECRET_KEY`** and **`STRIPE_WEBHOOK_SECRET`**. Configure a Stripe webhook at **`/api/payments/webhook`** for `checkout.session.completed` and `checkout.session.async_payment_succeeded`. Stripe Checkout receives the exact server-created amount/currency. Only a verified paid webhook or server-side Checkout reconciliation can settle a payment. The raw webhook body is preserved for signature verification.
+For real payments, set **`STRIPE_TEST_MODE=false`** and provide matching live **`STRIPE_SECRET_KEY`** and **`STRIPE_WEBHOOK_SECRET`**. The currently deployed main website intentionally uses `STRIPE_TEST_MODE=true` with test credentials. Configure a Stripe webhook at **`/api/payments/webhook`** for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed` and `checkout.session.expired`. Stripe Checkout receives the exact server-created amount/currency. Only a verified paid webhook or server-side Checkout reconciliation can settle a payment. The raw webhook body is preserved for signature verification.
 
 Enable **Stripe Connect Express** and transfers for publisher payouts. Publishers onboard through the studio, complete Stripe verification, and request a payout. The administrator's approval creates an idempotent USD transfer to the connected account. Availability, cross-border transfer support, and payout schedules depend on the platform's Stripe account and publisher countries. These integrations are implemented but have not been exercised against a live merchant account in this workspace.
 
@@ -141,7 +142,7 @@ server/storage.ts     Video validation, processing, local/S3 media delivery
 server/db.ts          SQLite schema and transactions
 server/seed.ts        Development-only sample catalogue
 cloudflare/           Workers entry point, durable SQLite and R2 adapters
-wrangler.jsonc        Cloudflare production bindings, payments disabled by default
+wrangler.jsonc        Existing main Cloudflare bindings, explicit Stripe test mode
 shared/config.ts      Languages, limits, shared types
 tests/                API/integrity tests and Playwright journeys
 public/               Locally hosted artwork, fonts, icons, service worker

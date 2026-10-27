@@ -3,10 +3,13 @@
 The application is deployed at **https://aidramio.jimmy-tsoi2001.workers.dev** in the user-confirmed Jimmy Cloudflare account. See [the deployment record](DEPLOYMENT.md). To update this application with the current workspace's stale account variable, explicitly select the authorized account:
 
 ```bash
-CLOUDFLARE_ACCOUNT_ID=95040c4f244233138195b80657887486 npm run deploy:cloudflare
+CLOUDFLARE_ACCOUNT_ID=95040c4f244233138195b80657887486 \
+XDG_CONFIG_HOME=/tmp/aidramio-cf-config \
+WRANGLER_SEND_METRICS=false \
+npx wrangler deploy --config wrangler.jsonc --keep-vars
 ```
 
-The account ID is not a secret. The API token remains exclusively in secure environment/network settings. Preserve `.cloudflare/deployment.json` when updating this deployment.
+The account ID is not a secret. The API token remains exclusively in secure environment/network settings. Use this explicit existing-Worker update command. The new-application helper can create a suffixed application if its ignored identity file is absent.
 
 This application has a native Cloudflare deployment target. It does not publish only the frontend or run financial data on an ephemeral container filesystem.
 
@@ -73,9 +76,13 @@ Sample catalogue entries are explicitly labelled previews, have no usable publis
 
 Google authentication has its own configuration: see [GOOGLE_SIGN_IN.md](GOOGLE_SIGN_IN.md). Both `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are read from server-side Worker Secrets and retained across code deployments. The fixed production `APP_URL` determines the exact OAuth callback; no Google secret is exposed in the frontend. Google login does not activate publishing or fund a wallet.
 
-Production selects `PAYMENTS_MODE=stripe`, with `paymentsReady: false` until its live Stripe key and webhook signing secret are configured. No test credits or default administrator credentials are published. Register/sign-in and free viewing work; real publisher activation and wallet funding stay unavailable until matching live credentials are supplied. The isolated `aidramio-sandbox` Worker accepts only test keys and has its own database/media bucket; see [STRIPE_SETUP.md](STRIPE_SETUP.md).
+The main website intentionally selects `PAYMENTS_MODE=stripe` and **`STRIPE_TEST_MODE=true`**, as requested by the user. Wallet funding and publisher activation use test Checkout on the current site; Google sign-in, existing accounts, normal publisher uploads and private media storage are preserved. `/api/config` must report `sandbox: false`, `paymentsTestMode: true`, `uploadsEnabled: true` and `auth.google: true`, plus `paymentsReady: true` once the matching test credentials are configured. The existing namespace and bucket must remain unchanged.
 
-After deployment, use Worker secrets for `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`. Keep `PAYMENTS_MODE=stripe` and HTTPS `APP_URL`, configure the webhook at `/api/payments/webhook`, and enable the appropriate Stripe Connect capabilities for publisher payouts. Subscribe to Checkout completed, asynchronous success/failure and expired events. Never put Stripe signing secrets in public Wrangler `vars`. Production rejects test keys and test-mode events; the sandbox rejects live keys. Optional `STRIPE_ACTIVATION_PRICE_ID` and `STRIPE_WALLET_PRODUCT_ID` must belong to the same Stripe mode as the key. The fixed activation price is validated as HK$88 once before Checkout; wallet Checkout uses the exact app-selected USD amount with the persistent wallet product.
+Test financial state uses `test_accounts`, `test_payments`, `test_purchases` and `test_ledger` within the same Durable Object database. Real wallet balances and purchases are not overwritten by test transactions. Test Stripe Connect and withdrawals are blocked. The former separate sandbox is a legacy deployment, not a required second site.
+
+Store `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` as encrypted secrets on the existing **aidramio** Worker, with the test webhook at `https://aidramio.jimmy-tsoi2001.workers.dev/api/payments/webhook`. Subscribe to Checkout completed, asynchronous success/failure and expired events. Never put keys or signing secrets in public Wrangler `vars`. Optional `STRIPE_ACTIVATION_PRICE_ID` and `STRIPE_WALLET_PRODUCT_ID` must match the current Stripe mode. The activation price is HK$88 once; wallet Checkout uses the exact app-selected USD amount. See [STRIPE_SETUP.md](STRIPE_SETUP.md).
+
+Later, accepting real money requires `STRIPE_TEST_MODE=false`, matching live keys/webhook, live catalog counterparts or no optional catalog IDs, and deliberate live payment validation. Do not promote or migrate test balances, activations or unlocks into real financial records. Preserve the separate test tables for audit. Configure approved Stripe Connect capabilities before real publisher payouts.
 
 To create the first administrator, set a random `BOOTSTRAP_TOKEN` Worker secret of at least 32 characters, provide the same value plus `APP_URL`, `ADMIN_EMAIL`, and a password of at least 16 characters securely to the administration command, then run:
 

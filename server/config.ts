@@ -6,6 +6,7 @@ export const config = {
   port: Number(process.env.PORT || 3000),
   production: process.env.NODE_ENV === 'production',
   sandbox: false,
+  stripeTestMode: process.env.STRIPE_TEST_MODE === 'true',
   appUrl: process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`,
   dataDir: path.resolve(process.env.DATA_DIR || './data'),
   payments: process.env.PAYMENTS_MODE || (process.env.NODE_ENV === 'production' ? 'disabled' : 'demo'),

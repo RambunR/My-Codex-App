@@ -20,6 +20,7 @@
     "test:cloudflare": "node scripts/smoke-cloudflare.mjs",
     "stripe:catalog:test": "node scripts/provision-stripe-test.mjs",
     "stripe:connect:sandbox": "node scripts/connect-stripe-sandbox.mjs",
+    "stripe:connect:test": "node scripts/connect-stripe-main-test.mjs",
     "deploy:sandbox": "CLOUDFLARE_ACCOUNT_ID=95040c4f244233138195b80657887486 XDG_CONFIG_HOME=/tmp/aidramio-cf-config WRANGLER_SEND_METRICS=false wrangler deploy --config wrangler.sandbox.jsonc --keep-vars"
   },
   "dependencies": {

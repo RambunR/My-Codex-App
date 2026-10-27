@@ -12,11 +12,12 @@ const port=Number(process.env.CLOUDFLARE_TEST_PORT||8789),base=`http://127.0.0.1
 const bootstrap=randomBytes(32).toString('hex');
 const password='LocalSmokePassword123!';
 let child,logs='';
-async function start(production=false){
+async function start(production=false,testStripe=false){
   logs='';
   const args=['node_modules/wrangler/bin/wrangler.js','dev','--local','--port',String(port),'--inspector-port',String(port+400),'--persist-to',path.join(dir,'state'),
-    '--var',`ENVIRONMENT:${production?'production':'development'}`,'--var',`PAYMENTS_MODE:${production?'disabled':'demo'}`,'--var',`APP_URL:${base}`,'--var',`BOOTSTRAP_TOKEN:${bootstrap}`];
-  if(!production)args.push('--var','GOOGLE_CLIENT_ID:local-test.apps.googleusercontent.com','--var','GOOGLE_CLIENT_SECRET:local-test-only-google-secret');
+    '--var',`ENVIRONMENT:${production?'production':'development'}`,'--var',`PAYMENTS_MODE:${testStripe?'stripe':production?'disabled':'demo'}`,'--var',`STRIPE_TEST_MODE:${testStripe}`,'--var',`APP_URL:${base}`,'--var',`BOOTSTRAP_TOKEN:${bootstrap}`];
+  if(!production||testStripe)args.push('--var','GOOGLE_CLIENT_ID:local-test.apps.googleusercontent.com','--var','GOOGLE_CLIENT_SECRET:local-test-only-google-secret');
+  if(testStripe)args.push('--var','STRIPE_SECRET_KEY:rk_test_local_cloudflare_fixture_only','--var','STRIPE_WEBHOOK_SECRET:whsec_local_cloudflare_fixture_only');
   child=spawn(process.execPath,args,{env:{...process.env,XDG_CONFIG_HOME:path.join(dir,'config'),WRANGLER_SEND_METRICS:'false',WRANGLER_LOG_PATH:path.join(dir,'wrangler.log')},stdio:['ignore','pipe','pipe']});
   child.stdout.on('data',d=>{logs+=d;});child.stderr.on('data',d=>{logs+=d;});
   for(let n=0;n<120;n++){
@@ -110,6 +111,18 @@ try{
   await request(`/api/admin/storage-requests/${pending.id}`,{approve:true},admin);
   assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.quota_bytes,10*1024**3);
   console.log('PASS: concurrent purchases debit once, exact fractional-cent 70/30 split, payout minimum/approval, storage approval.');
+
+  await stop();await start(true,true);
+  const stripeTest=(await request('/api/config')).data;
+  assert.equal(stripeTest.paymentsMode,'stripe');assert.equal(stripeTest.paymentsTestMode,true);assert.equal(stripeTest.paymentsReady,true);assert.equal(stripeTest.sandbox,false);assert.equal(stripeTest.uploadsEnabled,true);assert.equal(stripeTest.auth.google,true);
+  assert.equal((await request('/api/auth/me',undefined,viewer)).data.user.wallet_micros,0);
+  assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.earnings_micros,0);
+  assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.publisher_active,1);
+  const testWallet=(await request('/api/wallet',undefined,viewer)).data;assert.deepEqual(testWallet.ledger,[]);assert.deepEqual(testWallet.payments,[]);
+  const retainedUnlock=(await request(`/api/episodes/${second.id}/unlock`,{},viewer)).data;assert.equal(retainedUnlock.alreadyUnlocked,true);assert.equal(retainedUnlock.user.wallet_micros,0);
+  await request('/api/studio/connect',{},publisher,503);
+  await request('/api/studio/withdrawals',{amount_cents:300},publisher,503);
+  console.log('PASS: same-site Stripe test mode retains Google, uploads and real entitlements, exposes separate zero test balances, and blocks payouts.');
 
   await stop();await start(true);
   const production=(await request('/api/config')).data;assert.equal(production.paymentsMode,'disabled');assert.equal(production.runtime,'cloudflare');assert.equal(production.auth.google,false);
