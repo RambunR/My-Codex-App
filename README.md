@@ -6,6 +6,8 @@ Live application: **[aidramio.jimmy-tsoi2001.workers.dev](https://aidramio.jimmy
 
 Source repository: **[RambunR/My-Codex-App](https://github.com/RambunR/My-Codex-App)**, branch `main`. Commit and push source changes to keep the repository current; deploying with Wrangler alone does not upload source to GitHub. The running website is deployed separately to Cloudflare. Production accounts, wallet records and purchases are stored in the Durable Object database, publisher media in private R2, and credentials in Worker Secrets. Those runtime records and secrets are excluded from Git.
 
+Agent shortcut: send **`/push`** in chat, optionally followed by a commit message, to check the changes, commit and push them to GitHub `main`, update the existing Cloudflare website, and verify the live site. **“Push and deploy”** is an equivalent plain-language request. This project convention is defined in [AGENTS.md](AGENTS.md); it does not add a built-in Codex slash-menu entry or a terminal command. Future agents working in this repository should follow those instructions.
+
 Google registration/sign-in is implemented alongside email/password. Follow [the Google setup guide](docs/GOOGLE_SIGN_IN.md) to add the OAuth client credentials securely on the Worker. The Google button appears once both bindings exist. Existing password accounts connect Google explicitly from Account settings, preserving their original wallet and purchases.
 
 Brand PNG: [transparent AIDramio logo](public/aidramio-logo.png), also served at `/aidramio-logo.png`.
