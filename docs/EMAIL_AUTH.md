@@ -8,7 +8,9 @@ The delivery integration supports [Cloudflare Email Service Sending](https://dev
 
 Cloudflare can send the application's recovery and verification emails. Its **Email Sending** service is different from inbound Email Routing forwarding and the earlier restricted `send_email` capability. Under the current Email Sending beta rules, sending to arbitrary public users requires a **Workers Paid** account and a sending domain using Cloudflare DNS. Free-tier sending is restricted to verified recipients and cannot support general public password recovery.
 
-An existing domain you control in Cloudflare DNS is enough; buying an additional domain or creating a mailbox is unnecessary for sending. The account already lists `hknovaxrproduction.com` and `promosparkai.com` as active domains. The operator should choose the intended brand/sender domain before configuring Sending. Neither domain has been selected or activated for these application emails, and the website can remain on its existing `workers.dev` address.
+The operator selected **`hknovaxrproduction.com`**, with sender **`AIDramio <accounts@hknovaxrproduction.com>`**. The tracked main configuration selects Cloudflare Email Sending and this sender, keeping the website at its existing `workers.dev` address. Buying another domain or creating a mailbox is unnecessary for sending.
+
+Domain selection is not delivery activation. The existing deployment credential cannot read this zone's DNS records, inspect its Email Sending onboarding or manage user/account API tokens; those API reads returned HTTP 403. No `CF_EMAIL_API_TOKEN` is installed. Sender-domain onboarding and the scoped Email Sending credential must be completed before `auth.email` can become true. Existing DNS/mail records have not been changed, and no subscription has been upgraded. Public DNS shows existing Google mail MX records and a DMARC record; retain those while onboarding outbound sending.
 
 1. Use a domain you own in this Cloudflare account. In **Email Service → Sending**, complete onboarding and the sender-domain verification/DNS steps requested by Cloudflare. Use a dedicated subdomain if desired. The website may stay on `workers.dev`; the outbound sender needs a verified custom domain.
 2. Confirm the account has the required Workers Paid subscription and Sending entitlement. This implementation does not upgrade a plan or claim that this account's current subscription has been verified. The published beta allowance is **3,000 outgoing emails/month**, then **US$0.35 per additional 1,000**, on Workers Paid; consult the [current Cloudflare Email Service documentation](https://developers.cloudflare.com/email-service/) for pricing and eligibility changes. Workers Paid subscription charges are separate.
@@ -20,7 +22,7 @@ An existing domain you control in Cloudflare DNS is enough; buying an additional
    | `EMAIL_PROVIDER` | Variable | `cloudflare` |
    | `CF_EMAIL_ACCOUNT_ID` | Variable | `95040c4f244233138195b80657887486` for the existing Jimmy account |
    | `CF_EMAIL_API_TOKEN` | Secret | The token with Email Sending Edit permission |
-   | `MAIL_FROM` | Variable or Secret | A verified sender, e.g. `AIDramio <accounts@mail.your-domain.example>` |
+   | `MAIL_FROM` | Variable or Secret | `AIDramio <accounts@hknovaxrproduction.com>` after onboarding that domain |
 
 5. Save/deploy the configuration and follow the testing steps below. If Cloudflare reports that the account is not entitled or the sender is not verified, complete provider onboarding before expecting messages to arrive. A HTTP 200 response alone does not establish delivery: the app also requires Cloudflare's successful result to list the requested recipient as delivered or queued, and rejects permanent bounces.
 

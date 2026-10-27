@@ -18,6 +18,19 @@ The application supports Apple registration and returning-user sign-in alongside
    Use HTTPS and the exact callback path, without a trailing slash. Register a future custom domain and its corresponding return URL before changing `APP_URL`. Apple's current [web configuration guide](https://developer.apple.com/help/account/capabilities/configure-sign-in-with-apple-for-the-web/) says that no domain verification file upload is required; this guide does not claim that `workers.dev` is categorically prohibited. The old `aidramio-sandbox` is a separate application and is not the main site's callback.
 6. Under **Keys**, create a key with **Sign in with Apple** enabled and associate the primary App ID. Download the `.p8` private key once and keep it securely. Retain its **Key ID** and your team's **Team ID**. See [Apple's private-key instructions](https://developer.apple.com/help/account/capabilities/create-a-sign-in-with-apple-private-key/).
 
+### First-time portal walkthrough
+
+If no AIDramio identifiers exist yet, use this order:
+
+1. Finish enrollment at [Apple Developer Program](https://developer.apple.com/programs/enroll/), then sign into [the account portal](https://developer.apple.com/account/) with the enrolled Apple Account. Open **Membership details** and copy the **Team ID** for later.
+2. Open **Certificates, Identifiers & Profiles → Identifiers → + → App IDs → App**. Enter description `AIDramio`, choose an explicit Bundle ID such as `com.hknovaxrproduction.aidramio`, enable **Sign in with Apple**, configure it as the primary App ID, then continue and register. These are example identifiers; use identifiers actually accepted for your team.
+3. Return to **Identifiers → + → Services IDs**. Enter description `AIDramio Web` and identifier `com.hknovaxrproduction.aidramio.web` (or the unique identifier you choose), then register. This **Services ID**, rather than the native Bundle ID, becomes `APPLE_CLIENT_ID`.
+4. Open that Services ID, enable **Sign in with Apple**, select **Configure**, and choose the primary App ID from step 2. Add domain `aidramio.jimmy-tsoi2001.workers.dev` and return URL `https://aidramio.jimmy-tsoi2001.workers.dev/api/auth/apple/callback`. Save the configuration and the identifier. The selected email-sending domain does not change this website callback.
+5. Open **Keys → +**, name the key `AIDramio Apple sign-in`, enable **Sign in with Apple**, configure the same primary App ID, then register. Download the `.p8` file and record its **Key ID**. Keep the private key outside Git and chat.
+6. Add the four Cloudflare Secrets in the table below to the existing **aidramio** Worker. Paste the complete `.p8` text into `APPLE_PRIVATE_KEY`, including its BEGIN/END lines. Save/deploy the configuration.
+7. Open the main AIDramio sign-in page in a fresh browser session and choose **Continue with Apple**. Complete consent, sign out and sign in again to check returning-user access. A new Apple identity creates a viewer; it does not automatically buy Dramio Pass or merge another account's wallet.
+8. For messages to Apple Hide My Email addresses, also register the outgoing sender `accounts@hknovaxrproduction.com` in Apple's private email relay configuration after setting up that sending domain. See the relay section below.
+
 ## Add the Worker credentials
 
 Open **Cloudflare → Workers & Pages → aidramio → Settings → Variables and Secrets**. Add the following as encrypted **Secrets** on the existing main Worker:

@@ -47,7 +47,10 @@
     "STRIPE_ACTIVATION_PRICE_ID": "price_1UV7jBJ6Er233b9cr0ahOada",
     "STRIPE_WALLET_PRODUCT_ID": "prod_VWA3U1So0O5Lqv",
     "USD_TO_HKD": "7.8",
-    "SEED_CATALOG": "true"
+    "SEED_CATALOG": "true",
+    "EMAIL_PROVIDER": "cloudflare",
+    "CF_EMAIL_ACCOUNT_ID": "95040c4f244233138195b80657887486",
+    "MAIL_FROM": "AIDramio <accounts@hknovaxrproduction.com>"
   },
   "observability": {
     "enabled": true
