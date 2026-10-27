@@ -41,7 +41,7 @@ export interface User {
 export interface Series {
   id: string; title: string; description: string; language: string; genres: string[]; cover: string; creator_id: string;
   creator_name: string; creation_type: 'human' | 'ai-assisted' | 'ai-generated'; price_cents: number; free_episodes: number;
-  episode_count: number; views: number; saves: number; status: string; featured: number; created_at: string;
+  episode_count: number; views: number; saves: number; status: string; featured: number; created_at: string; published_at?: string;
   likes: number; liked: boolean;
   saved?: boolean; demo?: number; subtitle_languages?: string[]; first_episode_id?: string;
 }

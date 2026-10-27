@@ -36,6 +36,9 @@ CREATE TABLE IF NOT EXISTS episodes (
  bytes INTEGER NOT NULL CHECK(bytes > 0), storage_key TEXT NOT NULL, original_name TEXT NOT NULL DEFAULT '',
  created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(series_id, number)
 );
+CREATE TABLE IF NOT EXISTS series_publications (
+ series_id TEXT PRIMARY KEY REFERENCES series(id) ON DELETE CASCADE, published_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS purchases (
  id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), episode_id TEXT NOT NULL REFERENCES episodes(id),
  price_micros INTEGER NOT NULL, creator_micros INTEGER NOT NULL, platform_micros INTEGER NOT NULL,

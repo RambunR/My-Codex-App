@@ -19,12 +19,31 @@ test('registration, test wallet funding and a paid unlock persist across reload'
 test('publisher pays activation, creates a series, uploads a folder, edits and publishes',async({page})=>{
   await page.goto('/auth?mode=register&next=/studio');await page.getByLabel('Name',{exact:true}).fill('Browser Creator');await page.getByLabel('Email address',{exact:true}).fill(`creator-${Date.now()}@browser.test`);await page.getByLabel('Password',{exact:true}).fill('BrowserPass123!');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Create account',exact:true}).last().click();await expect(page).toHaveURL('/studio');
   await page.getByRole('button',{name:'Get Dramio Pass · HK$88'}).click();await expect(page.getByRole('dialog')).toContainText('HK$88.00');await page.getByRole('button',{name:'Confirm test payment'}).click();await page.getByRole('link',{name:'New series',exact:true}).first().click();
-  await page.getByLabel('Series title',{exact:true}).fill(`A Browser Original ${Date.now()}`);await page.getByLabel('Synopsis',{exact:true}).fill('A short original story published through the complete creator workflow.');await page.getByLabel('Drama language',{exact:false}).selectOption('zh-TW');
+  const title=`A Browser Original ${Date.now()}`;
+  await page.getByLabel('Series title',{exact:true}).fill(title);await page.getByLabel('Synopsis',{exact:true}).fill('A short original story published through the complete creator workflow.');await page.getByLabel('Drama language',{exact:false}).selectOption('zh-TW');
+  const genres=page.locator('#series-genres');
+  await genres.getByRole('button',{name:'Romance',exact:true}).click();
+  await genres.getByRole('button',{name:'Thriller',exact:true}).click();
+  await genres.getByRole('button',{name:'Drama',exact:true}).click();
+  await page.getByLabel('How was it made?',{exact:true}).selectOption('ai-generated');
   await page.locator('input[type=file][accept="image/jpeg,image/png,image/webp"]').setInputFiles(path.resolve('public/images/midnight.jpg'));
   await page.getByRole('button',{name:'Save details',exact:true}).first().click();await expect(page).toHaveURL(/\/studio\/series\//);
+  const editorUrl=page.url();const seriesId=new URL(editorUrl).pathname.split('/').at(-1)!;
+  const rejectedPublish=page.waitForResponse(response=>response.url().endsWith(`/api/studio/series/${seriesId}/status`)&&response.request().method()==='POST');
+  await page.getByRole('button',{name:'Publish series',exact:true}).click();
+  expect((await rejectedPublish).status()).toBe(400);
+  await expect(page.locator('.editor-validation-summary')).toContainText('Upload at least one episode before publishing.');
+  await expect(page).toHaveURL(editorUrl);await expect(page.locator('.editor-details .status')).toHaveText('Draft');
   const fs=await import('node:fs/promises');const folder=await fs.mkdtemp('/tmp/aidramio-folder-');await fs.copyFile('/tmp/aidramio-browser-tests/objects/demo/preview.mp4',path.join(folder,'02 A second encounter.mp4'));await fs.copyFile('/tmp/aidramio-browser-tests/objects/demo/preview.mp4',path.join(folder,'01 Opening.mp4'));const chooser=page.waitForEvent('filechooser');await page.getByRole('button',{name:'Choose a folder',exact:true}).click();await (await chooser).setFiles(folder);
-  await expect(page.locator('.queue-row small')).toHaveText(['Uploaded','Uploaded'],{timeout:30000});await fs.rm(folder,{recursive:true,force:true});await page.getByRole('button',{name:'Publish series',exact:true}).click();await expect(page.locator('.editor-details .status')).toHaveText('Published');
-  await page.getByRole('link',{name:'Watch',exact:true}).click();await expect(page.locator('.detail-info h1')).toContainText('A Browser Original');await expect(page.locator('.episode-tile')).toHaveCount(2);
+  await expect(page.locator('.queue-row small')).toHaveText(['Uploaded','Uploaded'],{timeout:30000});await fs.rm(folder,{recursive:true,force:true});await page.getByRole('button',{name:'Publish series',exact:true}).click();
+  await expect(page).toHaveURL(url=>url.pathname==='/browse'&&url.searchParams.get('sort')==='new'&&url.searchParams.get('language')==='zh-TW'&&url.searchParams.get('genre')==='thriller'&&url.searchParams.get('creation')==='ai-generated');
+  await expect(page.getByLabel('Sort by',{exact:true})).toHaveValue('new');
+  await expect(page.getByLabel('Drama language',{exact:true})).toHaveValue('zh-TW');
+  await expect(page.getByLabel('Genre',{exact:true})).toHaveValue('thriller');
+  await expect(page.getByLabel('How was it made?',{exact:true})).toHaveValue('ai-generated');
+  const publishedCard=page.locator('.series-card').filter({has:page.getByRole('heading',{name:title,exact:true})});
+  await expect(publishedCard).toBeVisible();await expect(publishedCard).toContainText(title);
+  await publishedCard.locator('.poster-link').click();await expect(page).toHaveURL(`/series/${seriesId}`);await expect(page.locator('.detail-info h1')).toHaveText(title);await expect(page.locator('.episode-tile')).toHaveCount(2);
 });
 test('all 21 language options work and Arabic has right-to-left layout',async({page})=>{
   await page.goto('/');await page.locator('.header-language').click();await expect(page.locator('.language-option')).toHaveCount(21);await page.locator('.language-option').filter({hasText:'繁體中文'}).click();await expect(page.locator('html')).toHaveAttribute('lang','zh-TW');await expect(page.locator('.home-heading h1')).toHaveText('小小篇幅。 大大心動。');

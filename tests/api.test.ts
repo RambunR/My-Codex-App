@@ -76,6 +76,10 @@ test('series metadata validates price and language and enforces ownership',async
   assert.equal((await request(`/api/series/${seriesId}`,undefined,viewer)).status,404);
   assert.equal((await request(`/api/studio/series/${seriesId}`,body,other,'PATCH')).status,403);
   assert.equal((await request(`/api/studio/series/${seriesId}/status`,{status:'published'},publisher)).status,400);
+  assert.equal(one('SELECT published_at FROM series_publications WHERE series_id=?',seriesId),undefined);
+  assert.ok(!(await request('/api/series?sort=new')).data.series.some((series:any)=>series.id===seriesId));
+  // Saving a draft long before it goes live must not bury its eventual release.
+  run('UPDATE series SET created_at=? WHERE id=?','2000-01-01 00:00:00',seriesId);
 });
 test('server rejects episodes longer than 180 seconds and videos over 75 MB',async()=>{
   const long=path.join(dir,'long.mp4');execFileSync('ffmpeg',['-v','error','-f','lavfi','-i','color=c=black:s=16x16:r=1','-t','181','-c:v','libx264','-y',long]);
@@ -95,6 +99,40 @@ test('quota, real video processing, cover upload, publishing and episode edits w
   assert.equal((await request(`/api/studio/series/${seriesId}/status`,{status:'published'},publisher)).status,200);
   const detail=await request(`/api/series/${seriesId}`);assert.equal(detail.data.series.language,'zh-TW');assert.equal(detail.data.episodes[0].title,'Opening');
   assert.equal((await request(`/api/studio/episodes/${uploadedId}`,{title:'A New Opening',number:1},publisher,'PATCH')).status,200);
+});
+test('first publication brings an older draft to Newest and later edits preserve its release date',async()=>{
+  const detail=await request(`/api/series/${seriesId}`);assert.equal(detail.status,200);
+  const firstPublishedAt=detail.data.series.published_at;
+  assert.ok(Number.isFinite(Date.parse(firstPublishedAt)));
+  assert.ok(Date.parse(firstPublishedAt)>Date.parse(detail.data.series.created_at));
+  const allNewest=await request('/api/series?sort=new');assert.equal(allNewest.status,200);
+  assert.equal(allNewest.data.series[0].id,seriesId,'release time must outrank newer draft creation dates');
+  const newest=await request('/api/series?sort=new&language=zh-TW&genre=romance&creation=human');
+  assert.equal(newest.status,200);assert.equal(newest.data.series[0].id,seriesId);
+  assert.equal(newest.data.series[0].published_at,firstPublishedAt);
+  const metadata={title:'Integration Series Updated',description:'An original test series with updated release information.',language:'zh-TW',genres:['romance'],creation_type:'human',price_cents:10,free_episodes:1};
+  assert.equal((await request(`/api/studio/series/${seriesId}`,metadata,publisher,'PATCH')).status,200);
+  assert.equal((await request(`/api/studio/series/${seriesId}/status`,{status:'published'},publisher)).status,200);
+  const updated=await request(`/api/series/${seriesId}`);
+  assert.equal(updated.data.series.title,metadata.title);
+  assert.equal(updated.data.series.published_at,firstPublishedAt,'editing or pressing Publish again must not reset the original release date');
+});
+test('Newest preserves legacy releases and orders ISO and SQLite timestamps chronologically',async()=>{
+  const legacy=(await request('/api/series')).data.series.filter((series:any)=>series.id!==seriesId).slice(0,2);
+  assert.equal(legacy.length,2);
+  const [earlier,later]=legacy;
+  try{
+    // Both representations refer to UTC; their lexical order disagrees with time order.
+    run('UPDATE series SET created_at=? WHERE id=?','2035-01-01T08:00:00.000Z',earlier.id);
+    run('UPDATE series SET created_at=? WHERE id=?','2035-01-01 09:00:00',later.id);
+    const newest=await request('/api/series?sort=new');assert.equal(newest.status,200);
+    assert.deepEqual(newest.data.series.slice(0,2).map((series:any)=>series.id),[later.id,earlier.id]);
+    assert.equal(newest.data.series[0].published_at,'2035-01-01 09:00:00');
+    assert.equal(newest.data.series[1].published_at,'2035-01-01T08:00:00.000Z');
+  }finally{
+    run('UPDATE series SET created_at=? WHERE id=?',earlier.created_at,earlier.id);
+    run('UPDATE series SET created_at=? WHERE id=?',later.created_at,later.id);
+  }
 });
 test('payout minimum, reservation, rejection refund and duplicate processing are enforced',async()=>{
   run('UPDATE users SET earnings_micros=? WHERE id=?',5_000_000,publisherId);

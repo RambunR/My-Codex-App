@@ -1,4 +1,4 @@
-# Validation — updated 27 October 2026 (Hong Kong)
+# Validation — updated 28 October 2026 (Hong Kong)
 
 The final application was checked in the actual cloud environment with Node.js 24.19.0, FFmpeg/FFprobe, and system Chromium.
 
@@ -96,3 +96,11 @@ Reproduced the reported new-series blocker before editing: a nonempty four-chara
 The editor now shows visible limits, linked inline errors, a persistent summary and focus on the first invalid field, while retaining entered values. Header and keyboard submissions use the same form validation. Shared frontend/API limits cover title, synopsis, genres, language, production method, prices and free-episode counts. Prices and free counts retain their typed values instead of silently rounding fractional cents or fractions of episodes. The upload panel includes an active Save details to enable uploads action and displays readiness after the draft loads. Cover artwork remains a publishing requirement rather than a draft-save requirement.
 
 All **61 backend checks**, **12 browser journeys**, Cloudflare build/type checks and the local Cloudflare SQL/R2 integration smoke passed. Three new browser regressions verify short filled fields with exact errors and preserved data, recovery into a real folder upload and reload, empty-genre recovery through the upload action, and exact numeric validation. Additional Traditional Chinese and Arabic 390-pixel checks passed with correct RTL behavior, successful corrected saves, no horizontal overflow and no browser errors. Existing accounts, Dramio Pass ownership, Stripe test payments, Google login and media storage are preserved.
+
+## Publish to filtered Explore — 28 October 2026
+
+Successful publication now opens `/browse` with Newest and the submitted series' language, first selected genre and production method. A failed save or publish keeps the editor open with the actionable error and entered details. The browser publishing journey exercises a real two-video folder, first confirms that publishing without episodes is rejected without navigation, then verifies the successful Explore filters, visible public series and both public episode tiles.
+
+An additive `series_publications` table records the first successful publication atomically with the status change. Newest sorts by this date, with creation dates as the fallback for existing published series. Old drafts appear when first published, while ordinary edits and repeated publication do not bump a release. SQLite date conversion handles both existing ISO and space-separated UTC timestamps.
+
+All **63 backend tests**, **12 browser journeys**, Cloudflare build/type checks and the local Cloudflare SQL/R2 integration smoke passed. The additional API checks cover failed publication, older drafts, stable release dates, matching catalogue filters and mixed-format legacy dates. The Cloudflare smoke verifies filtered discovery and that the first publication date survives a full runtime restart. No production user or media records were changed by these tests.

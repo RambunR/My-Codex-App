@@ -27,12 +27,12 @@ function ownSeries(req: Request, seriesId = id(req)) {
   const s = one('SELECT * FROM series WHERE id=?', seriesId);
   assert(s, 404, 'NOT_FOUND', 'Series not found.'); assert(s.creator_id === req.user!.id, 403, 'FORBIDDEN', 'This series belongs to another publisher.'); return s;
 }
-const catalogSelect = `SELECT s.*,u.name AS creator_name,
+const catalogSelect = `SELECT s.*,u.name AS creator_name,COALESCE(sp.published_at,s.created_at) AS published_at,
  (SELECT id FROM episodes e WHERE e.series_id=s.id ORDER BY number LIMIT 1) AS first_episode_id,
  (SELECT COUNT(*) FROM episodes e WHERE e.series_id=s.id) AS episode_count,
  (SELECT COUNT(*) FROM saves sv WHERE sv.series_id=s.id) AS saves,
  (SELECT COUNT(*) FROM series_likes sl WHERE sl.series_id=s.id) AS likes
- FROM series s JOIN users u ON u.id=s.creator_id`;
+ FROM series s JOIN users u ON u.id=s.creator_id LEFT JOIN series_publications sp ON sp.series_id=s.id`;
 function serializeSeries(s: Record<string, any>, userId?: string) {
   const { cover_key, cover_bytes, ...safe } = s;
   return { ...safe, genres: JSON.parse(s.genres), cover: cover_key.startsWith('public:') ? cover_key.slice(7) : cover_key ? `/api/series/${s.id}/cover` : '/images/placeholder.svg',
@@ -122,7 +122,7 @@ export function createApp() {
     if (query.genre) { conditions.push('s.genres LIKE ?'); params.push(`%"${query.genre}"%`); }
     if (query.creation) { conditions.push('s.creation_type=?'); params.push(query.creation); }
     if (query.saved) { assert(req.user,401,'AUTH_REQUIRED','Sign in to view your list.'); conditions.push('EXISTS(SELECT 1 FROM saves sv WHERE sv.series_id=s.id AND sv.user_id=?)'); params.push(req.user.id); }
-    const order = query.sort === 'new' ? 's.created_at DESC' : query.sort === 'saved' ? 'saves DESC,s.views DESC' : 's.views DESC';
+    const order = query.sort === 'new' ? 'julianday(COALESCE(sp.published_at,s.created_at)) DESC,s.rowid DESC' : query.sort === 'saved' ? 'saves DESC,s.views DESC' : 's.views DESC';
     res.json({ series: all(`${catalogSelect} WHERE ${conditions.join(' AND ')} ORDER BY ${order} LIMIT 150`, ...params).map(s => serializeSeries(s,req.user?.id)) });
   });
   app.get('/api/series/:id', (req,res) => {
@@ -253,7 +253,10 @@ export function createApp() {
     const s=ownSeries(req);const {status}=z.object({status:z.enum(['draft','published','archived'])}).parse(req.body);
     if(status==='published'){assert(s.cover_key,400,'COVER_REQUIRED','Add a cover before publishing.');assert(one('SELECT id FROM episodes WHERE series_id=?',s.id),400,'EPISODES_REQUIRED','Upload at least one episode before publishing.');}
     if(status!=='published')assert(!one('SELECT p.id FROM purchases p JOIN episodes e ON e.id=p.episode_id WHERE e.series_id=? UNION ALL SELECT p.id FROM test_purchases p JOIN episodes e ON e.id=p.episode_id WHERE e.series_id=? LIMIT 1',s.id,s.id),409,'HAS_PURCHASES','This series has paid viewers. Contact support before removing access.');
-    run('UPDATE series SET status=? WHERE id=?',status,s.id);res.json({ok:true});
+    transaction(()=>{
+      if(status==='published')run('INSERT OR IGNORE INTO series_publications (series_id,published_at) VALUES (?,?)',s.id,s.status==='published'?s.created_at:new Date().toISOString());
+      run('UPDATE series SET status=? WHERE id=?',status,s.id);
+    });res.json({ok:true});
   });
   app.post('/api/studio/storage-requests', requirePublisher, (req,res) => {
     const b=z.object({requested_gb:z.number().int().min(6).max(1000),reason:z.string().trim().min(10).max(1000)}).parse(req.body);

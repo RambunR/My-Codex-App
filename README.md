@@ -18,6 +18,8 @@ Upload test files: [download 10 numbered test episodes](https://aidramio.jimmy-t
 
 To enable episode uploads, first save the series details: a 2–120-character title, 10–4,000-character synopsis and 1–3 genres. The editor shows each requirement and focuses any invalid field while preserving entered text. **Save details to enable uploads** is also available directly in the upload panel. Cover artwork and at least one episode are required for publishing, rather than the initial draft save.
 
+After successful publication, the studio opens **Explore → Newest** with the series' spoken language, first selected genre and production method already selected. Newest uses the first publication date so older drafts appear when they go live; editing or pressing Publish again does not reset that date. Existing published series retain their original creation-date ordering when a publication date was not recorded.
+
 Stripe payment testing uses **the same [main website](https://aidramio.jimmy-tsoi2001.workers.dev)**, Google/email accounts, studio and uploads. Wallet **Add funds** and publisher activation open Stripe-hosted **test** Checkout, with a visible test-payment notice. Test balances, activation, paid unlocks and earnings are stored separately from real financial records; no test earnings can be withdrawn. See [Stripe setup and test instructions](docs/STRIPE_SETUP.md). The earlier separate sandbox is no longer the user-facing test workflow.
 
 Screenshots: [viewer on desktop](docs/screenshots/viewer.png) · [publisher on mobile](docs/screenshots/publisher-mobile.png).

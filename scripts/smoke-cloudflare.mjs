@@ -93,6 +93,11 @@ try{
   const large=await upload(`/api/studio/series/${sid}/episodes`,Buffer.alloc(75*1024**2+1),'oversized.mp4',publisher,{title:'Too large',number:3},'video',413);assert.equal(large.error.code,'FILE_TOO_LARGE');
   assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.used_bytes,used);
   await request(`/api/studio/series/${sid}/status`,{status:'published'},publisher);
+  const newestPath='/api/series?'+new URLSearchParams({sort:'new',language:body.language,genre:body.genres[0],creation:body.creation_type});
+  const newest=(await request(newestPath)).data.series;assert.equal(newest[0].id,sid);
+  const publishedAt=newest[0].published_at;assert.ok(Number.isFinite(Date.parse(publishedAt)));
+  await request(`/api/studio/series/${sid}/status`,{status:'published'},publisher);
+  assert.equal((await request(newestPath)).data.series[0].published_at,publishedAt);
   const image=await fetch(base+`/api/series/${sid}/cover`);assert.equal(image.headers.get('content-type'),'image/jpeg');assert.deepEqual(Buffer.from(await image.arrayBuffer()),cover);
   const free=await fetch(base+`/api/episodes/${first.id}/stream`,{headers:{Range:'bytes=0-31'}});assert.equal(free.status,206);assert.equal((await free.arrayBuffer()).byteLength,32);
   await request(`/api/episodes/${second.id}/stream`,undefined,'',403);
@@ -144,6 +149,7 @@ try{
   await stop();await start(true);
   const production=(await request('/api/config')).data;assert.equal(production.paymentsMode,'disabled');assert.equal(production.runtime,'cloudflare');assert.equal(production.auth.google,false);
   const retainedLikes=(await request(`/api/series/${sid}`,undefined,viewer)).data;assert.equal(retainedLikes.series.likes,1);assert.equal(retainedLikes.series.liked,true);
+  const retainedNewest=(await request(newestPath)).data.series;assert.equal(retainedNewest[0].id,sid);assert.equal(retainedNewest[0].published_at,publishedAt);
   const resumedGuest=(await request(`/api/episodes/${first.id}/playback`,{},guestPlayback.cookie)).data;assert.equal(resumedGuest.sessionId,guestPlayback.data.sessionId);assert.equal(resumedGuest.viewCounted,true);
   const retainedAnalytics=(await request(`/api/studio/series/${sid}/analytics?period=7d`,undefined,publisher)).data;assert.equal(retainedAnalytics.totals.views,1);assert.equal(retainedAnalytics.totals.avgWatchSeconds,3.2);assert.equal(retainedAnalytics.totals.paidViewers,1);assert.equal(retainedAnalytics.episodes.find(episode=>episode.id===second.id).paidViewers,1);
   await request('/api/auth/google/start',undefined,'',503);

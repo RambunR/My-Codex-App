@@ -85,7 +85,7 @@ function SeriesEditorContent(){
     return seriesId!;
   };
   const save=async(e?:FormEvent)=>{e?.preventDefault();if(saving||publishing||uploading||!validate())return;setSaving(true);try{const sid=await saveDetails();setAttempted(false);toast(t('savedSuccess'));if(!id)navigate(`/studio/series/${sid}`,{replace:true});else refresh();}catch(error){reportSaveError(error);}finally{setSaving(false);}};
-  const publish=async()=>{if(saving||publishing||uploading||!validate())return;setPublishing(true);try{const sid=await saveDetails();await post(`/api/studio/series/${sid}/status`,{status:'published'});setAttempted(false);toast(t('publishedSuccess'));if(!id)navigate(`/studio/series/${sid}`,{replace:true});else refresh();}catch(error){reportSaveError(error);}finally{setPublishing(false);}};
+  const publish=async()=>{if(saving||publishing||uploading||!validate())return;setPublishing(true);try{const sid=await saveDetails();await post(`/api/studio/series/${sid}/status`,{status:'published'});setAttempted(false);toast(t('publishedSuccess'));const filters=new URLSearchParams({sort:'new',language:form.language,genre:form.genres[0],creation:form.creation_type});navigate(`/browse?${filters}`);}catch(error){reportSaveError(error);}finally{setPublishing(false);}};
   const updateQueue=(i:number,update:Partial<QueueItem>)=>setQueue(q=>q.map((item,n)=>n===i?{...item,...update}:item));
   const uploadOne=(file:File,number:number,i:number)=>new Promise<void>((resolve,reject)=>{
     const request=new XMLHttpRequest();xhr.current=request;request.open('POST',`/api/studio/series/${id}/episodes`);request.upload.onprogress=e=>{if(e.lengthComputable)updateQueue(i,{status:e.loaded===e.total?'processing':'uploading',progress:Math.round(e.loaded/e.total*100)});};
