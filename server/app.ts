@@ -14,13 +14,14 @@ import { createCheckout, settlePayment, unlockEpisode, requestWithdrawal,returnW
 import { paymentTable,purchaseTable,ledgerTable,hasEpisodePurchase,usingTestPaymentState } from './payment-state.js';
 import { startPlayback,recordPlayback,readSeriesAnalytics } from './analytics.js';
 import { LANGUAGES, GENRES, MAX_EPISODE_BYTES, DEFAULT_QUOTA_BYTES,MIN_WALLET_FUNDING_CENTS,MAX_WALLET_FUNDING_CENTS } from '../shared/config.js';
+import {SERIES_LIMITS} from '../shared/series-validation.js';
 
 const language = z.enum(LANGUAGES.map(x => x.code) as [string, ...string[]]);
 const id = (req: Request, field = 'id') => String(req.params[field] || '');
 const registration = z.object({ name: z.string().trim().min(2).max(60), email: z.email().max(254).transform(s => s.toLowerCase()), password: z.string().min(10).max(128), language: language.default('en') });
-const seriesSchema = z.object({ title: z.string().trim().min(2).max(120), description: z.string().trim().min(10).max(4000), language,
-  genres: z.array(z.enum(GENRES)).min(1).max(3), creation_type: z.enum(['human','ai-assisted','ai-generated']).default('human'),
-  price_cents: z.number().int().min(10).max(10000), free_episodes: z.number().int().min(0).max(1000),
+const seriesSchema = z.object({ title: z.string().trim().min(SERIES_LIMITS.titleMin).max(SERIES_LIMITS.titleMax), description: z.string().trim().min(SERIES_LIMITS.synopsisMin).max(SERIES_LIMITS.synopsisMax), language,
+  genres: z.array(z.enum(GENRES)).min(SERIES_LIMITS.genresMin).max(SERIES_LIMITS.genresMax), creation_type: z.enum(['human','ai-assisted','ai-generated']).default('human'),
+  price_cents: z.number().int().min(SERIES_LIMITS.priceMin).max(SERIES_LIMITS.priceMax), free_episodes: z.number().int().min(SERIES_LIMITS.freeMin).max(SERIES_LIMITS.freeMax),
 });
 function ownSeries(req: Request, seriesId = id(req)) {
   const s = one('SELECT * FROM series WHERE id=?', seriesId);

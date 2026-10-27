@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { LANGUAGES, type Locale } from '../shared/config';
-import { additionalMessages,googleAuthEnglish,googleAuthMessages,walletFundingEnglish,walletFundingMessages,sandboxEnglish,sandboxMessages,stripeTestingEnglish,stripeTestingMessages,analyticsEnglish,analyticsMessages,dramioPassEnglish,dramioPassMessages } from './localeExtras';
+import { additionalMessages,googleAuthEnglish,googleAuthMessages,walletFundingEnglish,walletFundingMessages,sandboxEnglish,sandboxMessages,stripeTestingEnglish,stripeTestingMessages,analyticsEnglish,analyticsMessages,dramioPassEnglish,dramioPassMessages,editorValidationEnglish,editorValidationMessages } from './localeExtras';
 
 const en = {
   ...googleAuthEnglish,
@@ -8,6 +8,7 @@ const en = {
   ...sandboxEnglish,
   ...stripeTestingEnglish,
   ...analyticsEnglish,
+  ...editorValidationEnglish,
   discover:'Discover', explore:'Explore', rankings:'Top charts', myList:'My list', studio:'Creator studio', wallet:'Wallet', account:'Account',
   search:'Find your next obsession', searchTitle:'Explore every story', signIn:'Sign in', signUp:'Create account', signOut:'Sign out',
   language:'Language', allLanguages:'All languages', all:'All', allGenres:'All genres', genre:'Genre', genres:'Genres',
@@ -134,6 +135,7 @@ for(const language of LANGUAGES){if(!sandboxMessages[language.code])throw new Er
 for(const language of LANGUAGES){if(!stripeTestingMessages[language.code])throw new Error(`Stripe testing translations missing: ${language.code}`);Object.assign(dictionaries[language.code],stripeTestingMessages[language.code]);}
 for(const language of LANGUAGES){if(!analyticsMessages[language.code])throw new Error(`Analytics translations missing: ${language.code}`);Object.assign(dictionaries[language.code],analyticsMessages[language.code]);}
 for(const language of LANGUAGES){if(!dramioPassMessages[language.code])throw new Error(`Dramio Pass translations missing: ${language.code}`);Object.assign(dictionaries[language.code],dramioPassMessages[language.code]);}
+for(const language of LANGUAGES){if(!editorValidationMessages[language.code])throw new Error(`Editor validation translations missing: ${language.code}`);Object.assign(dictionaries[language.code],editorValidationMessages[language.code]);}
 // Shared scripts are deliberately kept in their chosen script; traditional and simplified Chinese are independent locales.
 const I18nContext=createContext<{locale:Locale;setLocale:(l:Locale)=>void;t:(key:Key)=>string}>({locale:'en',setLocale:()=>{},t:k=>en[k]});
 export const baseMessages=en;

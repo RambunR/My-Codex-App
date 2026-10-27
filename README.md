@@ -16,6 +16,8 @@ The same logo's coral play symbol is used for the website header, browser favico
 
 Upload test files: [download 10 numbered test episodes](https://aidramio.jimmy-tsoi2001.workers.dev/downloads/dramio-test-episodes.zip). Unzip the archive and select its `Dramio_Test_Episodes` folder in the studio folder uploader. Each MP4 is 10 seconds, 720×1280, H.264 with silent AAC audio, and shows a white episode number on black. All ten were created with FFmpeg without an AI video model; each is approximately 21 KB.
 
+To enable episode uploads, first save the series details: a 2–120-character title, 10–4,000-character synopsis and 1–3 genres. The editor shows each requirement and focuses any invalid field while preserving entered text. **Save details to enable uploads** is also available directly in the upload panel. Cover artwork and at least one episode are required for publishing, rather than the initial draft save.
+
 Stripe payment testing uses **the same [main website](https://aidramio.jimmy-tsoi2001.workers.dev)**, Google/email accounts, studio and uploads. Wallet **Add funds** and publisher activation open Stripe-hosted **test** Checkout, with a visible test-payment notice. Test balances, activation, paid unlocks and earnings are stored separately from real financial records; no test earnings can be withdrawn. See [Stripe setup and test instructions](docs/STRIPE_SETUP.md). The earlier separate sandbox is no longer the user-facing test workflow.
 
 Screenshots: [viewer on desktop](docs/screenshots/viewer.png) · [publisher on mobile](docs/screenshots/publisher-mobile.png).
