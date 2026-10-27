@@ -8,9 +8,11 @@ Source repository: **[RambunR/My-Codex-App](https://github.com/RambunR/My-Codex-
 
 Agent shortcut: send **`/push`** in chat, optionally followed by a commit message, to check the changes, commit and push them to GitHub `main`, update the existing Cloudflare website, and verify the live site. **“Push and deploy”** is an equivalent plain-language request. This project convention is defined in [AGENTS.md](AGENTS.md); it does not add a built-in Codex slash-menu entry or a terminal command. Future agents working in this repository should follow those instructions.
 
-Google registration/sign-in is implemented alongside email/password. Follow [the Google setup guide](docs/GOOGLE_SIGN_IN.md) to add the OAuth client credentials securely on the Worker. The Google button appears once both bindings exist. Existing password accounts connect Google explicitly from Account settings, preserving their original wallet and purchases.
+Google registration/sign-in is enabled alongside email/password, with both OAuth credentials configured securely on the Worker. Follow [the Google setup guide](docs/GOOGLE_SIGN_IN.md) for testing, credential rotation and release settings. Existing password accounts connect Google explicitly from Account settings, preserving their original wallet and purchases.
 
 Brand PNG: [transparent AIDramio logo](public/aidramio-logo.png), also served at `/aidramio-logo.png`.
+
+The same logo's coral play symbol is used for the website header, browser favicon, Apple touch icon and installed-app icons.
 
 Screenshots: [viewer on desktop](docs/screenshots/viewer.png) · [publisher on mobile](docs/screenshots/publisher-mobile.png).
 

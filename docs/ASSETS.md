@@ -2,7 +2,9 @@
 
 The demo catalogue titles, synopses, layout, branding, and poster typography were created for this project. The sample preview video is generated locally by FFmpeg and is explicitly labelled as a sample, not an episode from a licensed commercial drama.
 
-`public/aidramio-logo.png` is a newly generated AIDramio brand logo requested by the operator on 27 October 2026. It is a 1254 × 1254 RGBA PNG with a transparent background (389 KiB), suitable as the supplied Google consent-screen logo asset. The original generated image is retained in `/workspace/generated_images/`. This additional downloadable brand graphic does not replace the existing app icons or website header mark.
+`public/aidramio-logo.png` is an AIDramio brand logo requested by the operator on 27 October 2026. It is a 1254 × 1254 RGBA PNG with a transparent background (389 KiB), suitable as the supplied Google consent-screen logo asset. The original generated image is retained in `/workspace/generated_images/` and the full downloadable PNG remains unchanged.
+
+At the operator's request, the new logo's coral play symbol also replaces the earlier L-style website and app mark. `brand-mark.png` is its transparent 512-pixel header graphic; `favicon-32.png`, `apple-touch-icon.png`, `icon-192.png`, and `icon-512.png` supply the browser, Apple and PWA sizes. Apple/PWA variants use a white background and a circular safe area. The legacy `icon.svg` now embeds the new symbol for old references. Icon/manifest links and the service-worker cache are versioned to refresh the earlier icon. The wordmark remains legible in white on the website's dark theme.
 
 Cover photography is downloaded from Unsplash's image service and hosted locally. Source photo identifiers:
 

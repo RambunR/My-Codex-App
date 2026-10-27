@@ -1,6 +1,6 @@
 # Live Cloudflare application
 
-First published and verified on **26 October 2026, Hong Kong time**. Updated on **27 October 2026** with Google registration/sign-in and the downloadable PNG logo.
+First published and verified on **26 October 2026, Hong Kong time**. Updated on **27 October 2026** with Google registration/sign-in, the downloadable PNG logo, and matching website/app icons derived from its coral play symbol.
 
 - Site: https://aidramio.jimmy-tsoi2001.workers.dev
 - Dashboard: https://dash.cloudflare.com/95040c4f244233138195b80657887486/workers/services/view/aidramio/production
@@ -8,12 +8,12 @@ First published and verified on **26 October 2026, Hong Kong time**. Updated on 
 - New Worker: `aidramio`.
 - New private R2 media bucket: `aidramio-media-887486`; managed public access verified disabled.
 - Database: SQLite-backed `AIDramioApp` Durable Object, bound as `APP`.
-- Current deployment version: `8363714d-c672-4685-9950-f3aeb6731fb1`.
+- Google authentication code release: `8363714d-c672-4685-9950-f3aeb6731fb1` (historical; see the Cloudflare dashboard for the latest branding deployment).
 - Brand logo: https://aidramio.jimmy-tsoi2001.workers.dev/aidramio-logo.png (transparent PNG, 1254 × 1254, 389 KiB).
 
 The Worker serves the complete frontend and API. The production database starts with free, labelled sample previews and no default administrator login or development wallet credits. Existing Cloudflare applications and buckets were preserved. No account plan was upgraded.
 
-Google OAuth code is deployed. `GOOGLE_CLIENT_ID` is configured as a Worker Secret from the operator's Google-generated credential filename. `GOOGLE_CLIENT_SECRET` is still absent at verification time, so the public configuration correctly reports `auth.google: false`, the Google button stays hidden, and the start endpoint returns 503 rather than sending visitors into an unconfigured flow. Add the matching Client secret directly to the Worker's secure settings; see [GOOGLE_SIGN_IN.md](GOOGLE_SIGN_IN.md). A real Google consent/registration has not yet been completed with the operator's client.
+Google OAuth code is deployed, both Google credentials are configured as Worker Secrets, and the public configuration reports `auth.google: true`. The Google button is available alongside email/password; its start endpoint returns a valid Google authorization redirect. The live Google account service and the cancellation return were checked without creating a real user or entering Google passwords. Complete an interactive registration/sign-in using your own Google account to verify consent; see [GOOGLE_SIGN_IN.md](GOOGLE_SIGN_IN.md).
 
 ## Update this application
 

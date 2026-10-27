@@ -1,6 +1,6 @@
 # Enable Google sign-in for AIDramio
 
-The integration supports both Google registration and returning-user sign-in. The operator's **Client ID has been configured** from the Google-generated credential filename. **The Client secret is still missing**, so Google sign-in stays hidden until it is saved on the Cloudflare Worker. Real Google authorization has not yet been verified with the operator's OAuth client.
+Google registration and returning-user sign-in are **enabled alongside email/password**. Both `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are configured as Worker Secrets. The live sign-in start reaches Google's account-selection service without a detected client or redirect configuration error, and cancellation returns safely to AIDramio. Completing Google consent with the operator's own Google account remains the final interactive verification; the agent has not created a real Google user account.
 
 ## 1. Create the Google OAuth client
 
@@ -52,7 +52,7 @@ Add these two bindings, choosing **Secret** for both:
 
 Use **Save/Deploy** to apply the settings. Although the Client ID is public identification, storing it as a Worker Secret also preserves it during Wrangler deployments. A dashboard plaintext variable omitted from the repository configuration can be removed by a later deployment.
 
-If you downloaded Google's `client_secret_…apps.googleusercontent.com.json` file, open its `web` object: `client_id` and `client_secret` map to the two bindings above. The Mac-local Downloads path is not mounted into this cloud workspace. The Client ID was already set from the supplied filename; only the `web.client_secret` value remains to be entered securely on the Worker. Do not upload the JSON into the public website or repository.
+If you downloaded Google's `client_secret_…apps.googleusercontent.com.json` file, open its `web` object: `client_id` and `client_secret` map to the two bindings above. The Mac-local Downloads path is not mounted into this cloud workspace. Both values are now configured on the Worker; use this mapping if rotating the credentials later. Do not upload the JSON into the public website or repository.
 
 Do not paste either credential into chat, commit downloaded Google client JSON files, or place the Client secret in frontend code. These values belong directly in the Worker's secure settings. They are different from the Cloudflare API token used to deploy the site.
 
@@ -86,6 +86,12 @@ If you change domains, connect the domain in Cloudflare, update `APP_URL`, and a
 | Generic Google failure | Check that the Client ID and secret come from the same Web application client and that `APP_URL` matches its authorized callback. Do not share credentials or callback authorization codes in logs or chat. |
 
 ## Local development and future updates
+
+### Login costs
+
+Standard Google OAuth/OpenID Connect has no separate per-login service fee. This integration runs on the same Cloudflare Worker and SQLite-backed Durable Object as email/password login; it does not use paid Firebase Identity Platform or Cloudflare Access seats. Login can fit a US$0 Cloudflare Free allowance, including 100,000 Worker dynamic requests/day and the separate Durable Object free limits. Other CPU, database and request limits also apply. A Workers Paid account starts at US$5/month (about HK$39) with included usage and further usage charges. These are account hosting charges, not a charge per user or Google login. The current account's billing subscription has not been inspected, and video/R2 storage remains a separate cost. Official pricing: [Workers](https://developers.cloudflare.com/workers/platform/pricing/) and [Durable Objects](https://developers.cloudflare.com/durable-objects/platform/pricing/).
+
+### Development and deployment
 
 Local Node development can read `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` from the ignored `.env` file; see `.env.example`. An optional separate development OAuth client can authorize `http://localhost:3000` and `http://localhost:3000/api/auth/google/callback` when `APP_URL=http://localhost:3000`. Use the same browser hostname throughout the flow. Keep development credentials outside Git and separate from the production client when practical.
 

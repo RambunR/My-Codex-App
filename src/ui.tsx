@@ -7,7 +7,7 @@ import { useApp } from './context';
 import { post } from './api';
 import { LANGUAGES,type Series } from '../shared/config';
 
-export function Brand({small=false}:{small?:boolean}){return <Link to="/" className={`brand ${small?'brand-small':''}`} aria-label="AIDramio home"><span className="brand-symbol"><span/><i/></span><span><b>AI</b>Dramio<span className="brand-dot">.</span></span></Link>;}
+export function Brand({small=false}:{small?:boolean}){return <Link to="/" className={`brand ${small?'brand-small':''}`} aria-label="AIDramio home"><img className="brand-image" src="/brand-mark.png" alt="" width="36" height="36"/><span><b>AI</b>Dramio<span className="brand-dot">.</span></span></Link>;}
 export function Modal({open,onClose,title,children,wide=false}:{open:boolean;onClose:()=>void;title:string;children:ReactNode;wide?:boolean}){
   const{t}=useI18n();
   const ref=useRef<HTMLDivElement>(null);const onCloseRef=useRef(onClose);onCloseRef.current=onClose;
