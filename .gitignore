@@ -1,0 +1,16 @@
+node_modules/
+dist/
+data/
+.env
+.env.*
+!.env.example
+playwright-report/
+test-results/
+*.log
+.wrangler/
+.dev.vars
+.dev.vars.*
+.cloudflare/
+
+.npm-cache/
+client_secret*.json

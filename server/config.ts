@@ -1,0 +1,21 @@
+import { existsSync, mkdirSync } from 'node:fs';
+import path from 'node:path';
+
+if (existsSync('.env')) process.loadEnvFile('.env');
+export const config = {
+  port: Number(process.env.PORT || 3000),
+  production: process.env.NODE_ENV === 'production',
+  appUrl: process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`,
+  dataDir: path.resolve(process.env.DATA_DIR || './data'),
+  payments: process.env.PAYMENTS_MODE || (process.env.NODE_ENV === 'production' ? 'disabled' : 'demo'),
+  usdToHkd: Number(process.env.USD_TO_HKD || 7.8),
+  stripeKey: process.env.STRIPE_SECRET_KEY || '',
+  stripeWebhook: process.env.STRIPE_WEBHOOK_SECRET || '',
+  googleClientId: process.env.GOOGLE_CLIENT_ID || '',
+  googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+  seed: process.env.SEED_DEMO === 'true' || (process.env.NODE_ENV !== 'production' && process.env.SEED_DEMO !== 'false'),
+  ffmpeg: process.env.FFMPEG_PATH || 'ffmpeg',
+  ffprobe: process.env.FFPROBE_PATH || 'ffprobe',
+};
+if (!Number.isFinite(config.usdToHkd) || config.usdToHkd <= 0) throw new Error('USD_TO_HKD must be positive.');
+for (const sub of ['', 'objects', 'tmp']) mkdirSync(path.join(config.dataDir, sub), { recursive: true });

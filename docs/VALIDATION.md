@@ -1,0 +1,44 @@
+# Validation — updated 27 October 2026 (Hong Kong)
+
+The final application was checked in the actual cloud environment with Node.js 24.19.0, FFmpeg/FFprobe, and system Chromium.
+
+| Check | Result |
+|---|---|
+| Frozen dependency installation (`npm ci`) | Passed |
+| TypeScript check | Passed |
+| Production client/server build | Passed |
+| Backend/integrity and locale tests | **12 passed, 0 failed** |
+| Google authentication security/integration tests | **15 passed, 0 failed**; signed RSA JWTs and mocked fixed Google endpoints |
+| Playwright browser journeys | **6 passed, 0 failed** |
+| Compiled production-mode smoke test | Passed |
+| Production dependency audit | **0 known advisories** returned |
+| Cloudflare adapter and client TypeScript/build | Passed |
+| Wrangler production deployment dry run | Passed; bundled Worker 521 KiB gzip; no remote resources created |
+| Cloudflare local integration and restart smoke | Passed against actual local Workers/Durable Object/R2 emulation |
+| Live Cloudflare publication and API smoke | Passed at https://aidramio.jimmy-tsoi2001.workers.dev |
+| Real R2 bucket privacy | Managed public access verified disabled |
+| Live viewer browser check | Desktop, language filter, 12-second preview playback, Traditional Chinese, Arabic RTL and mobile layout passed |
+
+The checks cover real local media processing and a two-file directory upload, publication, guest/free playback, locked media authorization, registration, test checkout, permanent purchases, exact 70/30 revenue accounting, duplicate/concurrent payment handling, signed Stripe webhook verification, storage quotas and approvals, payout reservation/refunds, all 21 interface dictionaries, RTL, and mobile navigation. The production smoke used a fresh temporary database, bootstrapped an administrator, authenticated against the compiled server, verified secure cookie flags and immutable asset delivery, and confirmed that test funding cannot run in production.
+
+Manual visual checks covered the desktop viewer, desktop publisher dashboard, mobile episode editor, and Arabic mobile view. No page errors or failed HTTP requests were observed in that browser check. The mobile editor and Arabic viewer had no horizontal document overflow at a 390px viewport.
+
+No real money was charged or paid out. Hosted Stripe Checkout and actual Connect transfers still need the operator's credentials and have not been exercised live. A private R2 bucket has been created in the confirmed Cloudflare account; paid publisher activation stays disabled until Stripe is configured, so real production publisher uploads have not been exercised. The site is live on its Cloudflare workers.dev URL. A custom domain and business/support details remain the operator's responsibility. Starter terms/privacy text is English, while the application interface has 21 complete language dictionaries. Password recovery/email verification is outside the implemented registration/sign-in workflow.
+
+The Cloudflare integration smoke registered and authenticated accounts using scrypt, created the first administrator through the secret-protected bootstrap endpoint, verified activation and funding replay protection, uploaded two real videos plus a JPEG cover into emulated R2, rejected 181-second and oversized inputs, verified byte-range/private playback, charged once across eight concurrent unlocks, and recorded exactly USD 3.507 publisher / USD 1.503 platform revenue for a USD 5.01 unlock. It also verified minimum payouts, approval and replay prevention, and a storage increase. After a full runtime stop/restart, the same sessions, balances, purchase entitlement and R2 objects remained accessible, while production demo-confirmation and funding stayed unavailable. Production cookie flags and SPA fallback were checked.
+
+The initial browser rerun caught a route-transition race: a directory input could briefly appear before the saved series finished loading, then disappear while the browser was selecting its files. The editor now keeps upload inputs unavailable until that series has loaded. All six browser journeys passed after this fix.
+
+Actual Cloudflare publication succeeded after the user confirmed Jimmy.tsoi2001@gmail.com's Account, ID `95040c4f244233138195b80657887486`. The new Worker is `aidramio`, with a new private `aidramio-media-887486` R2 bucket and its own durable SQLite namespace. Existing applications were not overwritten. The deployed production API reported a healthy database, Cloudflare runtime, disabled payments and all 21 languages. Public homepage, browse/studio SPA routes, artwork, manifest and the 20-series sample catalogue returned HTTP 200. Invalid registration, invalid login and unauthorized administrator bootstrap returned their expected 400, 401 and 403 responses without creating any accounts. The static sample MP4 was returned successfully as a complete 1,037,034-byte `video/mp4` response; Cloudflare's static delivery returned HTTP 200 for that range request, whereas private R2 range handling was verified in local integration. No plan changes were made. Real Stripe services and production publisher media uploads remain unverified.
+
+The live viewer browser check rendered the actual public HTML, JavaScript, images and API responses in Chromium. It verified 12 homepage cards, a Korean filter returning two series, sample video duration 12 seconds and readyState 4, 21 language choices, Traditional Chinese switching, Arabic RTL, and mobile navigation without horizontal overflow at 390px. No page errors or failed final-check requests were observed. The workspace proxy's CA is not included in Chromium's bundled trust store, so requests and complete redirect chains were retrieved through the TLS-verifying Node proxy client and fulfilled into Chromium; certificate verification was not disabled. This checks live deployed assets and behavior while using the workspace's trusted HTTPS transport. The sample public preview was fully fetched for this check; no production user or payment records were created.
+
+## Google authentication update — 27 October 2026
+
+The 15 Google tests verify authorization-code PKCE, cryptographic RS256 ID-token verification against mocked Google JWKS, issuer/audience/nonce/authorized-party/verified-email/time claims, rejection of unsigned or incorrectly signed tokens, private secure browser cookies, ten-minute single-use state, cancellation/replay/expiry, stable subject IDs, ordinary new viewer registration, account-link password confirmation, origin checks, preservation of wallet balances and purchases, identity conflicts, and logout/session-rotation protection. Redirect regression cases include dot-segment normalization that could otherwise turn a local path into a protocol-relative URL. No Google access, refresh, or ID tokens are stored.
+
+The local Cloudflare integration also exercised Google start/cancellation/replay using real Durable Object SQL state and verified availability turns off when credentials are absent after restart. It then passed the existing upload, quota, financial, approval and persistence flows. The Node production smoke, Cloudflare build/type checks, production dependency audit (zero vulnerabilities), all 21 locale dictionaries, and all 6 browser journeys passed after the update. An additional UI smoke exercised enabled/disabled Google buttons, registration/sign-in return paths, linking failures/success, linked Google-only display, Traditional Chinese and Arabic mobile layout using mocked API responses.
+
+The browser publisher test exposed another timing window where history changed before React replaced the previous route's hidden directory input. Both episode inputs now stay disabled until the saved series is ready and while uploading; the browser test chooses the folder through the actual visible button/file chooser. Its original assertions for two completed uploads, published status and two playable episode tiles remain intact. All six browser tests passed after this correction.
+
+The Google update was deployed to the existing `aidramio` Worker, version `8363714d-c672-4685-9950-f3aeb6731fb1`, preserving its R2 bucket, durable database and configured secrets. Production `APP_URL` is pinned to the live HTTPS origin. The public PNG download returned HTTP200 with the exact SHA-256 hash of the generated source. At verification time only `GOOGLE_CLIENT_ID` was configured; `GOOGLE_CLIENT_SECRET` was absent. Production correctly returned `auth.google: false` and Google-start HTTP503, while malformed callbacks redirected safely with `google_expired` and `Referrer-Policy: no-referrer`. Real Google consent, registration and returning-user login still require the operator's Client secret and an interactive Google account test. No real Google user, payment, or wallet record was created during live verification.

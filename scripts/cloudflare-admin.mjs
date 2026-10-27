@@ -1,0 +1,5 @@
+import {fetch,ProxyAgent} from 'undici';
+const {APP_URL,BOOTSTRAP_TOKEN,ADMIN_EMAIL,ADMIN_PASSWORD}=process.env;
+if(!APP_URL?.startsWith('https://')||!BOOTSTRAP_TOKEN||!ADMIN_EMAIL||!ADMIN_PASSWORD){console.error('Set HTTPS APP_URL, BOOTSTRAP_TOKEN, ADMIN_EMAIL and ADMIN_PASSWORD securely in the process environment. Do not paste credentials into chat.');process.exit(2);}
+const dispatcher=process.env.HTTPS_PROXY?new ProxyAgent(process.env.HTTPS_PROXY):undefined;
+try{const response=await fetch(APP_URL+'/api/admin/bootstrap',{method:'POST',dispatcher,headers:{'Content-Type':'application/json','x-bootstrap-token':BOOTSTRAP_TOKEN},body:JSON.stringify({email:ADMIN_EMAIL,password:ADMIN_PASSWORD,name:process.env.ADMIN_NAME||'Platform administrator'})});const result=await response.json();if(!response.ok)throw new Error(result.error?.message||'Administrator setup failed.');console.log('Administrator created. Remove the BOOTSTRAP_TOKEN Worker secret after setup. No credentials were logged.');}catch(error){console.error(error.message);process.exitCode=1;}finally{await dispatcher?.close();}

@@ -1,0 +1,1 @@
+export const DEMO_PREVIEW_BYTES = 1037034;
