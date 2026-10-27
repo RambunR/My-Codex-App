@@ -26,7 +26,7 @@ The two products and their one-time prices are recorded in `stripe/catalog.test.
 | Publisher activation | `prod_VWA3RFHkUr0TuM` | `price_1UV7jBJ6Er233b9cr0ahOada` | 8,800 HKD cents = HK$88, once |
 | Wallet credit | `prod_VWA3U1So0O5Lqv` | `price_1UV7nXJ6Er233b9c4M2mAz87` | 500 USD cents = US$5, once |
 
-The wallet's fixed US$5 catalog price is its base/default price, not a limit on the viewer's choice. AIDramio validates the chosen amount and creates Checkout with server-controlled `price_data.unit_amount` linked to the wallet product. Stripe's native `custom_unit_amount` feature was rejected for this Hong Kong account, so amount selection happens in AIDramio. This is a purchase of closed-loop content credit, not a donation.
+The wallet's fixed US$5 catalog price is its base/default price, not a limit on the viewer's choice. AIDramio validates the chosen amount and creates Checkout with server-controlled `price_data.unit_amount` linked to the wallet product. Stripe rejected its native `custom_unit_amount` feature for this account's country, so amount selection happens in AIDramio. This is a purchase of closed-loop content credit, not a donation.
 
 The registered **test webhook** is `we_1UV7yhJ6Er233b9cacJqN4tx`:
 
