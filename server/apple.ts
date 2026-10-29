@@ -16,6 +16,32 @@ const keys=createRemoteJWKSet(new URL(ISSUER+'/auth/keys'),{timeoutDuration:5000
 const digest=(value:string)=>crypto.createHash('sha256').update(value).digest('hex');
 const passwordEnabled=(hash:string)=>/^[a-f0-9]{32}:[a-f0-9]{128}$/i.test(hash);
 type Failure='apple_cancelled'|'apple_failed'|'apple_expired'|'apple_email_exists'|'apple_identity_conflict'|'apple_account_changed';
+type FailureStage='browser_binding'|'provider_callback'|'authorization_code'|'private_key'|'token_exchange'|'id_token_parse'|'id_token_verify'|'identity_store'|'session_create';
+interface Diagnostic{stage:FailureStage;upstreamStatus?:number;upstreamError?:string;}
+const providerErrors=new Set(['invalid_request','invalid_client','invalid_grant','unauthorized_client','unsupported_grant_type','invalid_scope','server_error','temporarily_unavailable']);
+const joseErrors=new Set(['ERR_JOSE_ALG_NOT_ALLOWED','ERR_JOSE_NOT_SUPPORTED','ERR_JWK_INVALID','ERR_JWKS_INVALID','ERR_JWKS_NO_MATCHING_KEY','ERR_JWKS_MULTIPLE_MATCHING_KEYS','ERR_JWKS_TIMEOUT','ERR_JWS_INVALID','ERR_JWS_SIGNATURE_VERIFICATION_FAILED','ERR_JWT_INVALID','ERR_JWT_EXPIRED','ERR_JWT_CLAIM_VALIDATION_FAILED']);
+const privateKeyErrors=new Set(['TypeError','DataError','NotSupportedError','OperationError','InvalidCharacterError']);
+function providerError(value:unknown){return typeof value==='string'&&providerErrors.has(value)?value:undefined;}
+function privateKeyFormat(){
+  const value=config.applePrivateKey.trim();
+  try{if(typeof JSON.parse(value)==='string')return 'json_string';}catch{/* PEM is not JSON. */}
+  const pem=value.replace(/\\n/g,'\n');
+  return pem.startsWith('-----BEGIN PRIVATE KEY-----')&&pem.endsWith('-----END PRIVATE KEY-----')?'pkcs8_pem':'other';
+}
+function reportFailure(diagnostic:Diagnostic,failure:Failure,error:unknown){
+  if(failure!=='apple_failed')return;
+  const detail=error&&typeof error==='object'?error as {code?:unknown;name?:unknown}:undefined;
+  const code=typeof detail?.code==='string'&&joseErrors.has(detail.code)?detail.code:undefined;
+  const name=diagnostic.stage==='private_key'&&typeof detail?.name==='string'&&privateKeyErrors.has(detail.name)?detail.name:undefined;
+  const status=diagnostic.upstreamStatus,upstream=providerError(diagnostic.upstreamError);
+  // Only fixed stages and allowlisted error identifiers reach logs. Never include
+  // exception messages, callback bodies, tokens, identity claims or credentials.
+  try{console.error(JSON.stringify({event:'apple_auth_failure',stage:diagnostic.stage,failure,
+    ...(typeof status==='number'&&Number.isInteger(status)&&status>=100&&status<=599?{upstream_status:status}:{}),
+    ...(upstream?{upstream_error:upstream}:{}),
+    ...(code?{error_code:code}:{}),...(name?{error_name:name}:{}),
+    ...(diagnostic.stage==='private_key'?{key_format:privateKeyFormat()}:{})}));}catch{/* Diagnostics must not interrupt the normal error redirect. */}
+}
 class FlowError extends Error{constructor(public code:Failure){super(code);}}
 interface Attempt{
   state_hash:string;browser_hash:string;nonce:string;next_path:string;language:string;
@@ -86,11 +112,19 @@ function displayName(value:unknown,email:string){
   name=name.trim().replace(/[\u0000-\u001f\u007f]/g,'').slice(0,60);
   return name.length>=2?name:(email.split('@')[0]+' viewer').slice(0,60);
 }
-async function profile(code:string,attempt:Attempt,name:unknown){
-  const response=await fetch(ISSUER+'/auth/token',{method:'POST',signal:AbortSignal.timeout(10_000),headers:{'Content-Type':'application/x-www-form-urlencoded',Accept:'application/json'},body:new URLSearchParams({client_id:config.appleClientId,client_secret:await clientSecret(),code,grant_type:'authorization_code',redirect_uri:redirectUri()})});
-  if(!response.ok)throw new FlowError('apple_failed');
+async function profile(code:string,attempt:Attempt,name:unknown,diagnostic:Diagnostic){
+  diagnostic.stage='private_key';const secret=await clientSecret();
+  diagnostic.stage='token_exchange';
+  const response=await fetch(ISSUER+'/auth/token',{method:'POST',signal:AbortSignal.timeout(10_000),headers:{'Content-Type':'application/x-www-form-urlencoded',Accept:'application/json'},body:new URLSearchParams({client_id:config.appleClientId,client_secret:secret,code,grant_type:'authorization_code',redirect_uri:redirectUri()})});
+  diagnostic.upstreamStatus=response.status;
+  if(!response.ok){
+    try{const data=await response.json() as {error?:unknown}|null;diagnostic.upstreamError=providerError(data?.error);}catch{/* The HTTP status still identifies an upstream rejection. */}
+    throw new FlowError('apple_failed');
+  }
+  diagnostic.stage='id_token_parse';
   const tokens=await response.json() as {id_token?:unknown};
   if(typeof tokens.id_token!=='string'||tokens.id_token.length>16_384)throw new FlowError('apple_failed');
+  diagnostic.stage='id_token_verify';
   const {payload}=await jwtVerify(tokens.id_token,keys,{issuer:ISSUER,audience:config.appleClientId,algorithms:['RS256'],clockTolerance:5,maxTokenAge:'1h',requiredClaims:['sub','email','email_verified','nonce','iat','exp']});
   if(payload.aud!==config.appleClientId||payload.nonce!==attempt.nonce||![true,'true'].includes(payload.email_verified as boolean|string)||typeof payload.sub!=='string'||!payload.sub||payload.sub.length>255||!z.email().max(254).safeParse(payload.email).success)throw new FlowError('apple_failed');
   const email=(payload.email as string).toLowerCase();
@@ -128,17 +162,22 @@ export function registerAppleAuth(app:Express){
     res.json({url:start(req,res,'link','/account',body.language)});
   });
   app.post('/api/auth/apple/callback',rateLimit('apple-callback',90,15*60_000),async(req,res)=>{
-    let attempt:Attempt|undefined;res.setHeader('Referrer-Policy','no-referrer');
+    let attempt:Attempt|undefined;const diagnostic:Diagnostic={stage:'browser_binding'};res.setHeader('Referrer-Policy','no-referrer');
     try{
       attempt=consume(req);res.clearCookie(COOKIE,cookieOptions());checkSession(req,attempt);requireApple();
-      if(req.body.error)throw new FlowError(req.body.error==='user_cancelled_authorize'||req.body.error==='access_denied'?'apple_cancelled':'apple_failed');
+      diagnostic.stage='provider_callback';
+      if(req.body.error){diagnostic.upstreamError=providerError(req.body.error);throw new FlowError(req.body.error==='user_cancelled_authorize'||req.body.error==='access_denied'?'apple_cancelled':'apple_failed');}
+      diagnostic.stage='authorization_code';
       if(typeof req.body.code!=='string'||!req.body.code||req.body.code.length>4096)throw new FlowError('apple_failed');
-      const identity=await profile(req.body.code,attempt,req.body.user);checkSession(req,attempt);
+      const identity=await profile(req.body.code,attempt,req.body.user,diagnostic);checkSession(req,attempt);
+      diagnostic.stage='identity_store';
       const uid=connect(attempt,identity);
+      diagnostic.stage='session_create';
       destroySession(req,res,false);if(attempt.session_hash)run('DELETE FROM sessions WHERE token_hash=?',attempt.session_hash);
       createSession(res,uid);res.redirect(303,attempt.intent==='link'?'/account?apple=linked':attempt.next_path);
     }catch(error){
-      const query=new URLSearchParams({error:error instanceof FlowError?error.code:'apple_failed'});
+      const failure=error instanceof FlowError?error.code:'apple_failed';reportFailure(diagnostic,failure,error);
+      const query=new URLSearchParams({error:failure});
       if(attempt?.intent==='link')res.redirect(303,'/account?'+query);
       else{query.set('next',attempt?.next_path||'/');res.redirect(303,'/auth?'+query);}
     }

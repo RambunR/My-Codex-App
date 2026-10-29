@@ -19,7 +19,7 @@ const providerKeys=await generateKeyPair('RS256',{extractable:true});
 const wrongKeys=await generateKeyPair('RS256',{extractable:true});
 const clientKeys=await generateKeyPair('ES256',{extractable:true});
 const jwk={...await exportJWK(providerKeys.publicKey),kid:'apple-provider-test-key',alg:'RS256',use:'sig'};
-const codes=new Map<string,{token?:string;failure?:boolean}>();
+const codes=new Map<string,{token?:string;failure?:boolean;providerError?:string;errorDescription?:string;response?:unknown}>();
 let server:Server,base:string,exchanges=0;
 interface Attempt{url:URL;state:string;nonce:string;cookie:string;session:string}
 function cookie(response:Response,name:string){return response.headers.getSetCookie().find(value=>value.startsWith(name+'='))?.split(';')[0]||'';}
@@ -45,10 +45,11 @@ async function identityToken(attempt:Attempt,claims:JWTPayload={},wrongKey=false
   const now=Math.floor(Date.now()/1000);
   return new SignJWT({iss:issuer,aud:clientId,sub:'apple-subject-'+randomUUID(),email:randomUUID()+'@privaterelay.appleid.com',email_verified:'true',nonce:attempt.nonce,iat:now,exp:now+300,...claims}).setProtectedHeader({alg:'RS256',kid:jwk.kid}).sign(wrongKey?wrongKeys.privateKey:providerKeys.privateKey);
 }
-async function callback(attempt:Attempt,options:{claims?:JWTPayload;token?:string;wrongKey?:boolean;cookies?:string;state?:string;error?:string;failure?:boolean;user?:string}={}){
+async function callback(attempt:Attempt,options:{claims?:JWTPayload;token?:string;wrongKey?:boolean;cookies?:string;state?:string;error?:string;failure?:boolean;user?:string;code?:string;providerError?:string;errorDescription?:string;tokenResponse?:unknown}={}){
   const body=new URLSearchParams({state:options.state??attempt.state});
   if(options.error)body.set('error',options.error);
-  else{const code='apple-code-'+randomUUID();codes.set(code,{token:options.token??await identityToken(attempt,options.claims,options.wrongKey),failure:options.failure});body.set('code',code);}
+  else{const code=options.code??'apple-code-'+randomUUID();codes.set(code,{token:options.token??await identityToken(attempt,options.claims,options.wrongKey),failure:options.failure,providerError:options.providerError,errorDescription:options.errorDescription,response:options.tokenResponse});body.set('code',code);}
+  if(options.errorDescription)body.set('error_description',options.errorDescription);
   if(options.user)body.set('user',options.user);
   return originalFetch(base+'/api/auth/apple/callback',{redirect:'manual',method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded',Origin:issuer,'sec-fetch-site':'cross-site',Cookie:options.cookies??attempt.cookie},body});
 }
@@ -68,7 +69,8 @@ before(async()=>{
       const secret=await jwtVerify(body.get('client_secret')!,clientKeys.publicKey,{algorithms:['ES256'],issuer:teamId,subject:clientId,audience:issuer,requiredClaims:['iat','exp']});
       assert.equal(secret.protectedHeader.kid,keyId);assert.ok(secret.payload.exp!-secret.payload.iat!<=300);
       const code=body.get('code')||'',issued=codes.get(code);assert.ok(issued,'Only issued one-use codes can be exchanged');codes.delete(code);
-      if(issued.failure)return Response.json({error:'invalid_grant'},{status:400});
+      if(issued.failure||issued.providerError)return Response.json({error:issued.providerError||'invalid_grant',error_description:issued.errorDescription},{status:400});
+      if(issued.response!==undefined)return Response.json(issued.response);
       return Response.json({id_token:issued.token,access_token:'unused-test-access-token',refresh_token:'unused-test-refresh-token'});
     }
     return originalFetch(input,init);
@@ -164,4 +166,59 @@ test('unsafe return paths stay on site and concurrent Apple callbacks exchange a
   const body=new URLSearchParams({state:attempt.state,code});
   const send=()=>originalFetch(base+'/api/auth/apple/callback',{redirect:'manual',method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded',Origin:issuer,'sec-fetch-site':'cross-site',Cookie:attempt.cookie},body});
   const results=await Promise.all([send(),send()]);assert.equal(results.filter(response=>cookie(response,'drama_session')).length,1);assert.equal(results.filter(response=>location(response).searchParams.get('error')==='apple_expired').length,1);assert.equal(exchanges,before+1);
+});
+
+test('Apple failure diagnostics distinguish private keys, upstream rejection and identity tokens without logging secrets',async()=>{
+  const existing=await register('apple-diagnostics-fixture@example.test');const before=totalUsers();
+  const secretMarker='APPLE-DIAGNOSTIC-SECRET-SENTINEL',email='apple-diagnostic-private@example.test';
+  const captured:unknown[][]=[];const originalError=console.error;
+  console.error=(...values:unknown[])=>{captured.push(values);};
+  const events=()=>captured.map(values=>{assert.equal(values.length,1);assert.equal(typeof values[0],'string');return JSON.parse(values[0] as string) as Record<string,unknown>;});
+  const check=(stage:string,expected:Record<string,unknown>={})=>{
+    const rows=events();assert.equal(rows.length,1);const event=rows[0];assert.equal(event.event,'apple_auth_failure');assert.equal(event.stage,stage);assert.equal(event.failure,'apple_failed');
+    for(const[key,value]of Object.entries(expected))assert.equal(event[key],value);
+    const allowed=['event','stage','failure','upstream_status','upstream_error','error_code','error_name','key_format'];assert.ok(Object.keys(event).every(key=>allowed.includes(key)));
+    const raw=JSON.stringify(captured);for(const sentinel of [secretMarker,email,'unused-test-access-token','unused-test-refresh-token',password,'BEGIN PRIVATE KEY'])assert.equal(raw.includes(sentinel),false,'Diagnostics must not log private values');
+    captured.length=0;return event;
+  };
+  try{
+    const invalidKey=await start('/wallet',existing.session);const savedKey=config.applePrivateKey,previousExchanges=exchanges;
+    config.applePrivateKey=secretMarker+'-NOT-A-PRIVATE-KEY';
+    try{failure(await callback(invalidKey,{code:secretMarker+'-AUTHORIZATION-CODE'}),'apple_failed');}finally{config.applePrivateKey=savedKey;}
+    check('private_key',{error_name:'TypeError',key_format:'other'});assert.equal(exchanges,previousExchanges);
+    const jsonKey=await start('/wallet',existing.session);config.applePrivateKey=JSON.stringify(savedKey);
+    try{failure(await callback(jsonKey),'apple_failed');}finally{config.applePrivateKey=savedKey;}
+    check('private_key',{error_name:'TypeError',key_format:'json_string'});assert.equal(exchanges,previousExchanges);
+
+    for(const upstream of ['invalid_client','invalid_grant']){
+      const attempt=await start('/wallet',existing.session);
+      failure(await callback(attempt,{providerError:upstream,errorDescription:secretMarker+' '+email,code:secretMarker+'-AUTHORIZATION-CODE'}),'apple_failed');
+      check('token_exchange',{upstream_status:400,upstream_error:upstream});
+    }
+    const untrustedError=await start('/wallet',existing.session);
+    failure(await callback(untrustedError,{providerError:secretMarker,errorDescription:email}),'apple_failed');
+    assert.equal(check('token_exchange',{upstream_status:400}).upstream_error,undefined,'Unknown provider fields are omitted');
+
+    const malformedReply=await start('/wallet',existing.session);
+    failure(await callback(malformedReply,{tokenResponse:{access_token:secretMarker,refresh_token:email}}),'apple_failed');
+    check('id_token_parse',{upstream_status:200});
+
+    const wrongSignature=await start('/wallet',existing.session);
+    const token=await identityToken(wrongSignature,{email},true);
+    failure(await callback(wrongSignature,{token}),'apple_failed');
+    assert.equal(JSON.stringify(captured).includes(token),false,'Signed identity tokens must not enter diagnostics');
+    check('id_token_verify',{upstream_status:200,error_code:'ERR_JWS_SIGNATURE_VERIFICATION_FAILED'});
+
+    const providerCallback=await start('/wallet',existing.session);
+    failure(await callback(providerCallback,{error:'server_error',errorDescription:secretMarker+' '+email}),'apple_failed');
+    check('provider_callback',{upstream_error:'server_error'});
+    const unknownCallback=await start('/wallet',existing.session);
+    failure(await callback(unknownCallback,{error:secretMarker,errorDescription:email}),'apple_failed');
+    assert.equal(check('provider_callback').upstream_error,undefined);
+
+    const cancelled=await start('/wallet',existing.session);
+    failure(await callback(cancelled,{error:'access_denied'}),'apple_cancelled');assert.equal(captured.length,0);
+    failure(await callback(cancelled),'apple_expired');assert.equal(captured.length,0);
+    assert.equal(totalUsers(),before);
+  }finally{console.error=originalError;}
 });

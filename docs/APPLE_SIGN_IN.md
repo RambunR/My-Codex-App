@@ -56,6 +56,22 @@ After saving the bindings, `/api/config` should report `auth.apple: true`. Incom
 
 An Apple relay address is stored as the account's email when chosen by the viewer; the app does not infer or request their hidden personal address. To send mail to `@privaterelay.appleid.com` recipients, separately register and authenticate the sending domain/address in **Sign in with Apple for Email Communication**. Apple's [private relay guide](https://developer.apple.com/help/account/capabilities/configure-private-email-relay-service/) covers source registration and SPF/DKIM requirements. Configuring Cloudflare Email Sending or Resend alone does not configure Apple's relay allowlist.
 
+## Troubleshooting a failed callback
+
+An `invalid_client` page at Apple's authorization endpoint is different from returning to AIDramio with `error=apple_failed`. The latter can occur during key loading, code exchange or identity-token verification. The generic browser message does not identify which stage failed.
+
+The server records `apple_auth_failure` with a fixed `stage`, optional upstream HTTP status and allowlisted OAuth/JOSE error identifiers. `private_key` failures also identify the key format as `pkcs8_pem`, `json_string` or `other`. These classifications contain no key material. A PEM-shaped value still needs to be a valid P-256 private key.
+
+| Stage or error | What to check |
+| --- | --- |
+| `private_key` | `APPLE_PRIVATE_KEY` must contain the complete `.p8` PEM text, including BEGIN/END lines; a file path or JSON-quoted string is unsuitable. |
+| `token_exchange` with `invalid_client` | Team ID, key ID, the signing key's primary App ID association, Services ID and signed client assertion. |
+| `token_exchange` with `invalid_grant` | Start a fresh sign-in; authorization codes expire and are single use. A deliberately invalid diagnostic code is expected to be rejected. |
+| `id_token_parse` or `id_token_verify` | Apple's token/JWKS response and the allowlisted verification error. Keep signature, issuer, audience, nonce and expiry checks enabled. |
+| `identity_store` or `session_create` | Application persistence or session creation after verified identity. |
+
+Expected cancellation, expired attempts and account-collision redirects are not logged as generic failures. Diagnostics exclude callback contents, codes, state, nonce, claims, email, exception messages, tokens and private keys. When reporting an error, share only the diagnostic fields rather than complete request logs or credentials. See [Apple's response-error guidance](https://developer.apple.com/documentation/technotes/tn3107-resolving-sign-in-with-apple-response-errors).
+
 ## Implementation and validation
 
 Apple's authorization response uses an HTTPS **POST** with `response_mode=form_post`. A separate short-lived, HTTP-only, Secure, `SameSite=None` cookie binds that cross-site callback to the browser. The normal AIDramio session stays `SameSite=Lax`; for explicit linking the server checks that the original bound session still exists rather than assuming that Lax cookie will accompany Apple's cross-site POST. Logout, password reset or session rotation invalidates pending authenticated attempts.
