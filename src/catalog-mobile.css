@@ -1,0 +1,151 @@
+/* Phone catalogue: readable story information and controls that work by touch. */
+@media (max-width: 640px) {
+  .page.catalog-page .poster-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px 14px;
+  }
+
+  .page.home-page .poster-grid > .series-card:nth-child(n) { display: block; }
+  .catalog-page .series-card { min-width: 0; }
+  .catalog-page .series-card-info h3 {
+    font-size: 14px;
+    line-height: 1.45;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+  }
+  .catalog-page .series-card-info p {
+    font-size: 12px;
+    line-height: 1.5;
+    flex-wrap: wrap;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    color: #aaa3b1;
+  }
+  .catalog-page .series-card-info .series-engagement-compact {
+    font-size: 11px;
+    gap: 5px 10px;
+    line-height: 1.5;
+  }
+  .catalog-page .series-card-info .series-engagement-compact svg { width: 14px; height: 14px; }
+  .catalog-page .series-card .poster-save {
+    opacity: 1;
+    width: 44px;
+    height: 44px;
+    inset-inline-end: 6px;
+    top: 6px;
+    background: #17131dd9;
+    border: 1px solid #ffffff25;
+  }
+  .catalog-page .series-card .poster-save svg { width: 20px; height: 20px; }
+  .catalog-page .poster-badge { font-size: 9px; line-height: 1.4; padding: 4px 5px; max-width: calc(100% - 61px); overflow-wrap: anywhere; }
+  .catalog-page .poster-badge svg { width: 11px; height: 11px; flex-shrink: 0; }
+  .catalog-page .poster-film-title > strong { font-size: clamp(22px, 6vw, 28px); }
+  .catalog-page .poster-film-title > span,
+  .catalog-page .poster-film-title > i { display: none; }
+  .catalog-page .poster-episodes { font-size: 11px; padding: 4px 6px; }
+  .catalog-page .rank-number { font-size: 42px; }
+  .catalog-page .section-heading { flex-wrap: wrap; row-gap: 8px; }
+  .catalog-page .section-heading h2 { font-size: 22px; line-height: 1.3; }
+  .catalog-page .section-heading > a { font-size: 13px; min-height: 44px; align-items: center; }
+
+  .home-page .home-heading .eyebrow { font-size: 10px; line-height: 1.6; letter-spacing: 1px; }
+  .home-page .home-heading h1 { font-size: clamp(26px, 7vw, 32px); line-height: 1.25; }
+  .home-page .hero { height: auto; min-height: 440px; }
+  .home-page .hero-copy { height: auto; max-width: 100%; padding: 26px 20px 88px; }
+  .home-page .hero-copy h2 { font-size: clamp(34px, 9vw, 46px); max-width: 100%; overflow-wrap: anywhere; }
+  .home-page .hero-copy > p { font-size: 14px; line-height: 1.7; max-width: 100%; }
+  .home-page .spotlight { font-size: 11px; line-height: 1.5; margin-bottom: 24px; }
+  .home-page .hero-pills { font-size: 12px; line-height: 1.6; flex-wrap: wrap; }
+  .home-page .hero-art-title,
+  .home-page .hero-art-credit { display: none; }
+  .home-page .hero-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .home-page .hero-buttons .button { font-size: 14px; min-height: 48px; padding: 10px; line-height: 1.4; white-space: normal; text-align: center; }
+  .home-page .hero-buttons .button svg { flex-shrink: 0; }
+  .home-page .hero-free { font-size: 12px; line-height: 1.6; }
+  .home-page .hero-pagination { inset-inline: 20px; bottom: 16px; }
+  .home-page .hero-pagination > div { display: none; }
+  .home-page .hero-pagination > span { font-size: 12px; margin-inline-end: auto; }
+  .home-page .hero-pagination > button { width: 44px; height: 44px; min-width: 44px; }
+  .home-page .hero-pagination > button svg { width: 20px; height: 20px; }
+  .home-page .genre-bar { scroll-padding-inline: 19px; overscroll-behavior-inline: contain; }
+  .home-page .genre-bar > button,
+  .home-page .genre-bar > a { min-height: 44px; font-size: 14px; padding-inline: 16px; flex-shrink: 0; }
+  .home-page .story-banner p { font-size: 14px; line-height: 1.7; }
+  .home-page .story-banner .eyebrow { font-size: 11px; line-height: 1.5; }
+  .home-page .story-banner > .button { min-height: 44px; font-size: 14px; }
+  .home-page .world-banner { gap: 12px; }
+  .home-page .world-banner > div { min-width: 0; }
+  .home-page .world-banner .eyebrow { font-size: 10px; line-height: 1.7; overflow-wrap: anywhere; }
+  .home-page .world-banner h2 { font-size: 22px; line-height: 1.3; }
+  .home-page .world-banner p { font-size: 13px; line-height: 1.6; }
+  .home-page .world-banner .round-arrow { min-width: 44px; width: 44px; height: 44px; flex-shrink: 0; }
+
+  .browse-page .browse-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .browse-page .browse-search { grid-column: 1 / -1; min-width: 0; }
+  .browse-page .browse-search input { font-size: 16px; min-width: 0; min-height: 48px; }
+  .browse-page .browse-search .icon-button { min-width: 44px; min-height: 44px; }
+  .browse-page .filter-select { min-width: 0; padding-inline: 10px; }
+  .browse-page .filter-select:last-child { grid-column: 1 / -1; }
+  .browse-page .filter-select select { font-size: 16px; line-height: 1.4; min-height: 48px; width: 100%; max-width: 100%; min-width: 0; padding-block: 10px; }
+  .browse-page .filter-select > svg { width: 18px; height: 18px; flex-shrink: 0; }
+  .browse-page .results-toolbar { flex-wrap: wrap; font-size: 13px; gap: 8px 12px; }
+  .browse-page .results-toolbar > span { min-width: 0; overflow-wrap: anywhere; flex: 1 1 100%; }
+  .browse-page .results-toolbar > label { margin-inline-start: 0; min-width: 0; }
+  .browse-page .results-toolbar select { font-size: 16px; max-width: 180px; min-height: 44px; }
+  .browse-page .results-toolbar > button { font-size: 13px; min-height: 44px; margin-inline-start: auto; }
+
+  .detail-page .series-detail-hero { grid-template-columns: 112px minmax(0, 1fr); gap: 18px 16px; }
+  .detail-page .detail-cover { grid-column: 1; grid-row: 1 / span 2; align-self: start; }
+  .detail-page .detail-cover .poster-film-title strong { font-size: 23px; }
+  .detail-page .detail-info { display: contents; }
+  .detail-page .detail-info > * { min-width: 0; }
+  .detail-page .detail-genres { grid-column: 2; grid-row: 1; align-self: end; margin: 0; gap: 6px; }
+  .detail-page .detail-genres > a { min-height: 44px; display: inline-flex; align-items: center; padding: 8px; font-size: 12px; overflow-wrap: anywhere; }
+  .detail-page .creation-tag { font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+  .detail-page .creation-tag > svg { width: 14px; height: 14px; flex-shrink: 0; }
+  .detail-page .detail-info > h1 { grid-column: 2; grid-row: 2; font-size: clamp(27px, 7vw, 34px); line-height: 1.2; letter-spacing: -.6px; overflow-wrap: anywhere; }
+  .detail-page .detail-info > .detail-meta { grid-column: 1 / -1; grid-row: 3; margin: 0; font-size: 13px; gap: 10px 16px; }
+  .detail-page .detail-meta svg { width: 16px; height: 16px; }
+  .detail-page .detail-info > .series-engagement { grid-column: 1 / -1; grid-row: 4; margin: 0; font-size: 13px; gap: 8px 20px; }
+  .detail-page .detail-info > .series-engagement svg { width: 16px; height: 16px; }
+  .detail-page .detail-info > .detail-actions { grid-column: 1 / -1; grid-row: 5; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)) 48px; gap: 8px; margin: 0; }
+  .detail-page .detail-actions > .button.primary { grid-column: 1 / -1; font-size: 16px; }
+  .detail-page .detail-actions .button { min-height: 48px; min-width: 0; padding: 10px 8px; font-size: 13px; line-height: 1.4; white-space: normal; overflow-wrap: anywhere; }
+  .detail-page .detail-actions .button > svg { width: 18px; height: 18px; flex-shrink: 0; }
+  .detail-page .detail-actions > .icon-button { width: 48px; height: 48px; align-self: stretch; }
+  .detail-page .detail-actions > .icon-button > svg { width: 20px; height: 20px; }
+  .detail-page .detail-info > .detail-description { grid-column: 1 / -1; grid-row: 6; margin: 0; font-size: 14px; line-height: 1.8; max-width: none; display: block; -webkit-line-clamp: unset; overflow: visible; overflow-wrap: anywhere; }
+  .detail-page .creator-byline { grid-column: 1 / -1; grid-row: 7; margin: 0; font-size: 13px; gap: 10px; }
+  .detail-page .creator-byline > span { min-width: 0; overflow-wrap: anywhere; }
+  .detail-page .creator-byline .avatar-small { width: 32px; height: 32px; font-size: 11px; }
+  .detail-page .episodes-section .section-heading > .muted { max-width: none; font-size: 12px; line-height: 1.6; }
+  .detail-page .episode-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .detail-page .episode-tile { min-height: 86px; padding: 14px 12px; gap: 10px; }
+  .detail-page .episode-tile-num { font-size: 24px; min-width: 26px; }
+  .detail-page .episode-tile strong { font-size: 14px; line-height: 1.5; white-space: normal; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .detail-page .episode-tile small { font-size: 12px; gap: 7px; line-height: 1.5; }
+  .detail-page .episode-tile .episode-view-count { font-size: 11px; }
+  .detail-page .episode-tile .episode-view-count svg { width: 13px; height: 13px; }
+  .detail-page .episode-tile > svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+  .rankings-page .ranking-row { gap: 10px; align-items: start; padding-block: 18px; }
+  .rankings-page .ranking-position { min-width: 24px; font-size: 24px; }
+  .rankings-page .ranking-row > img { width: 62px; height: 93px; flex-shrink: 0; }
+  .rankings-page .ranking-text { min-width: 0; }
+  .rankings-page .ranking-text h2 { font-size: 18px; line-height: 1.4; overflow-wrap: anywhere; }
+  .rankings-page .ranking-text .eyebrow { font-size: 10px; line-height: 1.6; letter-spacing: .2px; }
+  .rankings-page .ranking-text p { font-size: 12px; line-height: 1.7; }
+  .rankings-page .ranking-text > span { font-size: 12px; line-height: 1.6; }
+  .rankings-page .ranking-text .series-engagement { font-size: 11px; }
+  .rankings-page .ranking-row > .round-arrow { min-width: 44px; width: 44px; height: 44px; align-self: center; }
+  .library-page .tab-bar { gap: 20px; flex-wrap: wrap; }
+  .library-page .tab-bar > button { min-height: 44px; font-size: 14px; padding-block: 10px; }
+}
+
+@media (max-width: 420px) {
+  .detail-page .episode-grid { grid-template-columns: minmax(0, 1fr); }
+}

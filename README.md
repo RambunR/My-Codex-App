@@ -26,7 +26,9 @@ After successful publication, the studio opens **Explore → Newest** with the s
 
 Stripe payment testing uses **the same [main website](https://aidramio.jimmy-tsoi2001.workers.dev)**, Google/email accounts, studio and uploads. Wallet **Add funds** and publisher activation open Stripe-hosted **test** Checkout, with a visible test-payment notice. Test balances, activation, paid unlocks and earnings are stored separately from real financial records; no test earnings can be withdrawn. See [Stripe setup and test instructions](docs/STRIPE_SETUP.md). The earlier separate sandbox is no longer the user-facing test workflow.
 
-Screenshots: [viewer on desktop](docs/screenshots/viewer.png) · [publisher on mobile](docs/screenshots/publisher-mobile.png).
+Phone viewing uses readable two-column story cards, touch-sized controls, header search, fixed bottom navigation, native sharing when available, and portrait/landscape episode controls. Phone form inputs use 16px text. Creator/admin code downloads when those routes are opened. See [phone usability checks](docs/MOBILE_UX.md), including the rapid-filter and long-title regressions. The public operator is **HK NovaXR Production**, with contact **contactus@hknovaxrproduction.com** in the footer and Help, Terms and Privacy pages.
+
+Screenshots: [viewer on desktop](docs/screenshots/viewer.png) · [phone discovery](docs/screenshots/mobile-home.png) · [phone series details](docs/screenshots/mobile-series.png) · [publisher on mobile](docs/screenshots/publisher-mobile.png).
 
 ## Deploy to Cloudflare
 

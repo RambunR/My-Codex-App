@@ -1,0 +1,48 @@
+/* Keep episode controls readable and reachable on narrow or rotated phones. */
+@media (max-width:640px), (max-width:960px) and (max-height:500px){
+  .watch-page .watch-heading{gap:12px;min-width:0;align-items:center;font-size:12px}
+  .watch-page .watch-heading .back-link{display:block;min-width:0;max-width:none;flex:1;min-height:44px;font-size:13px;text-align:start;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .watch-page .watch-heading>span{max-width:45%;flex-shrink:0;text-align:end;line-height:1.5}
+  .watch-page .video-player.player-message{min-height:360px}
+  .watch-page .player-lock{overflow-y:auto;overscroll-behavior:contain;justify-content:flex-start;justify-content:safe center;padding:36px 20px 24px}
+  .watch-page .player-lock>*{flex-shrink:0;max-width:100%}
+  .watch-page .player-lock>.eyebrow{font-size:11px}
+  .watch-page .player-lock h2{overflow-wrap:anywhere}
+  .watch-page .player-lock p{font-size:14px;line-height:1.7}
+  .watch-page .player-lock .button{min-height:44px;font-size:14px;white-space:normal;text-align:center;overflow-wrap:anywhere}
+  .watch-page .player-lock>span:last-child{font-size:12px;line-height:1.5}
+  .watch-page .sample-video-label{font-size:10px;line-height:1.4}
+  .watch-page .player-controls{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr) minmax(0,1fr);gap:8px;padding:12px 16px}
+  .watch-page .player-controls>.button{min-width:0;min-height:44px;padding:10px 8px;font-size:14px;gap:5px;white-space:normal;text-align:center}
+  .watch-page .player-controls>.button>span{min-width:0;overflow-wrap:anywhere}
+  .watch-page .player-controls>.button>svg{flex-shrink:0}
+  .watch-page .player-controls>span{min-width:0;font-size:12px;line-height:1.4}
+  .watch-page .player-controls strong{max-width:100%;font-size:13px;line-height:1.5}
+  .watch-page .watch-series-intro>.eyebrow{font-size:11px;letter-spacing:.08em}
+  .watch-page .watch-series-intro>p{font-size:14px;line-height:1.75}
+  .watch-page .watch-sidebar .detail-meta{font-size:12px;line-height:1.5}
+  .watch-page .watch-episode-title{gap:12px;align-items:start}
+  .watch-page .watch-episode-title h3{font-size:16px}
+  .watch-page .watch-episode-title>span{font-size:12px;line-height:1.5;text-align:end}
+  .watch-page .watch-episode-grid>a{min-width:44px;min-height:56px;font-size:15px;padding:6px 3px}
+  .watch-page .watch-episode-grid>a>small{max-width:100%;font-size:10px;line-height:1.3;text-align:center;overflow-wrap:anywhere}
+  .watch-page .watch-creator small{font-size:11px}
+  .watch-page .watch-creator strong{font-size:14px;line-height:1.5;overflow-wrap:anywhere}
+  .watch-page .watch-wallet>span{font-size:12px}
+  .watch-page .watch-wallet strong{font-size:16px}
+}
+
+@media (max-width:360px){
+  .watch-page .watch-episode-grid{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .watch-page .player-controls{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .watch-page .player-controls>span{grid-column:1/-1;grid-row:1}
+  .watch-page .player-controls>.button:first-child{grid-column:1;grid-row:2}
+  .watch-page .player-controls>.button:last-child{grid-column:2;grid-row:2}
+}
+
+@media (orientation:landscape) and (max-width:960px) and (max-height:500px){
+  .watch-page .video-player:not(.player-message){max-height:240px;max-height:max(180px,calc(100svh - 160px))}
+  .watch-page .video-player:not(.player-message)>video{max-height:inherit}
+}
+
+[dir=rtl] .watch-page .player-controls>.button>svg{transform:scaleX(-1)}
