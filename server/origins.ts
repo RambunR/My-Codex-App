@@ -2,10 +2,11 @@ import type {Request,Response,NextFunction} from 'express';
 import {config} from './config.js';
 import {assert} from './errors.js';
 
-// Identity cookies, registered provider callbacks and financial site metadata
-// remain bound to the existing API origin when the public website moves.
+// Browser/API locations and the stable Stripe financial identity can move
+// independently, preserving pending Checkout metadata during hostname changes.
 export const apiOrigin=()=>new URL(config.appUrl).origin;
 export const publicAppUrl=()=>new URL(config.publicUrl||config.appUrl).origin;
+export const stripeSiteOrigin=()=>new URL(config.stripeSiteOrigin||config.appUrl).origin;
 export function trustedOrigins(){return new Set([apiOrigin(),publicAppUrl()]);}
 
 export function publicRedirect(path:string){

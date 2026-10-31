@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import Stripe from 'stripe';
 import { z, ZodError } from 'zod';
 import { config } from './config.js';
-import {apiUrl,publicAppUrl,trustedOrigins,credentialedCors} from './origins.js';
+import {apiUrl,publicAppUrl,stripeSiteOrigin,trustedOrigins,credentialedCors} from './origins.js';
 import { registerGoogleAuth,googleEnabled } from './google.js';
 import {registerAppleAuth,appleEnabled} from './apple.js';
 import {registerEmailAuth,emailAuthEnabled,sendRegistrationVerification} from './email-auth.js';
@@ -71,7 +71,7 @@ export function createApp() {
     if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
       const session = event.data.object;
       if(!stripeModeMatches(session.livemode)){res.json({received:true,ignored:true});return;}
-      if(session.metadata?.site&&session.metadata.site!==new URL(config.appUrl).origin){res.json({received:true,ignored:true});return;}
+      if(session.metadata?.site&&session.metadata.site!==stripeSiteOrigin()){res.json({received:true,ignored:true});return;}
       if (session.payment_status === 'paid' && session.metadata?.paymentId) {
         if(!one(`SELECT id FROM ${paymentTable()} WHERE id=?`,session.metadata.paymentId)){res.json({received:true,ignored:true});return;}
         settlePayment(session.metadata.paymentId, { amount: session.amount_total!, currency: session.currency!, session: session.id,livemode:session.livemode });

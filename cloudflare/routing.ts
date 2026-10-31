@@ -3,9 +3,22 @@ export function canonicalApiRedirect(request:Request,env:{APP_URL?:string;PUBLIC
   if(!env.APP_URL||!env.PUBLIC_APP_URL)return null;
   const url=new URL(request.url);
   if(!url.pathname.startsWith('/api/'))return null;
+  // Provider deliveries must reach signature verification without an HTTP redirect.
+  if(url.pathname==='/api/payments/webhook'&&request.method==='POST')return null;
   const destination=new URL(env.APP_URL);
   if(url.origin===destination.origin)return null;
   destination.pathname=url.pathname;
   destination.search=url.search;
   return new Response(null,{status:307,headers:{Location:destination.href,'Cache-Control':'no-store','Referrer-Policy':'no-referrer'}});
+}
+
+/** Aliases follow the configured public site; cookies stay on its exact origin. */
+export function canonicalPageRedirect(request:Request,env:{PUBLIC_APP_URL?:string}):Response|null{
+  if(!env.PUBLIC_APP_URL||!['GET','HEAD'].includes(request.method))return null;
+  const url=new URL(request.url);
+  if(url.pathname==='/api'||url.pathname.startsWith('/api/'))return null;
+  const destination=new URL(env.PUBLIC_APP_URL);
+  if(url.origin===destination.origin)return null;
+  destination.pathname=url.pathname;destination.search=url.search;
+  return new Response(null,{status:308,headers:{Location:destination.href,'Cache-Control':'no-store','Referrer-Policy':'no-referrer'}});
 }

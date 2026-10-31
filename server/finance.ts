@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import Stripe from 'stripe';
 import { config } from './config.js';
-import {publicAppUrl} from './origins.js';
+import {publicAppUrl,stripeSiteOrigin} from './origins.js';
 import { one, run, transaction } from './db.js';
 import { AppError,assert } from './errors.js';
 import { ACTIVATION_HKD_CENTS,MIN_WALLET_FUNDING_CENTS,MAX_WALLET_FUNDING_CENTS } from '../shared/config.js';
@@ -126,7 +126,7 @@ export async function createCheckout(userId: string, kind: 'funding' | 'activati
       run(`UPDATE ${paymentTable()} SET status='expired' WHERE id=? AND status='pending'`,id);continue;
     }
     try{
-      const session=await stripe!.checkout.sessions.create({mode:'payment',payment_method_types:['card'],client_reference_id:id,metadata:{app:'aidramio',site:new URL(config.appUrl).origin,financialMode:config.stripeTestMode?'test':'default',paymentId:id,userId},
+      const session=await stripe!.checkout.sessions.create({mode:'payment',payment_method_types:['card'],client_reference_id:id,metadata:{app:'aidramio',site:stripeSiteOrigin(),financialMode:config.stripeTestMode?'test':'default',paymentId:id,userId},
         line_items:kind==='activation'&&config.stripeActivationPriceId?[{price:config.stripeActivationPriceId,quantity:1}]:[{price_data:{currency,unit_amount:amount,...(kind==='funding'&&config.stripeWalletProductId?{product:config.stripeWalletProductId}:{product_data:{name:kind==='activation'?'Dramio Pass':'LingYing wallet credit'}})},quantity:1}],
         success_url:`${publicAppUrl()}/${kind==='activation'?'studio':'wallet'}?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url:`${publicAppUrl()}/${kind==='activation'?'studio':'wallet'}?checkout=cancelled`,

@@ -51,7 +51,8 @@
     "EMAIL_PROVIDER": "cloudflare",
     "CF_EMAIL_ACCOUNT_ID": "95040c4f244233138195b80657887486",
     "MAIL_FROM": "LingYing <accounts@hknovaxrproduction.com>",
-    "PUBLIC_APP_URL": "https://lingying.jimmy-tsoi2001.workers.dev"
+    "PUBLIC_APP_URL": "https://lingying.jimmy-tsoi2001.workers.dev",
+    "STRIPE_SITE_ORIGIN": "https://aidramio.jimmy-tsoi2001.workers.dev"
   },
   "observability": {
     "enabled": true
@@ -66,5 +67,17 @@
       "src",
       "public"
     ]
-  }
+  },
+  "routes": [
+    {
+      "pattern": "lingyingdrama.com",
+      "custom_domain": true,
+      "zone_id": "ae6b34326f28faf55a6c7179d57bcba7"
+    },
+    {
+      "pattern": "www.lingyingdrama.com",
+      "custom_domain": true,
+      "zone_id": "ae6b34326f28faf55a6c7179d57bcba7"
+    }
+  ]
 }

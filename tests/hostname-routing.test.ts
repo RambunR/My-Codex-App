@@ -1,8 +1,8 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import gateway from '../cloudflare/legacy-gateway';
-import {canonicalApiRedirect} from '../cloudflare/routing';
-import {API_SITE_ORIGIN,PUBLIC_SITE_ORIGIN} from '../shared/site-origins';
+import {canonicalApiRedirect,canonicalPageRedirect} from '../cloudflare/routing';
+import {LEGACY_API_SITE_ORIGIN as API_SITE_ORIGIN,PUBLIC_SITE_ORIGIN} from '../shared/site-origins';
 
 test('legacy pages redirect to the public site without allowing the path or query to select a host',async()=>{
   for(const path of ['/','/studio/series/abc?view=stats','//attacker.example/wallet?next=https://attacker.example','/auth?mode=verify']){
@@ -52,4 +52,34 @@ test('public API requests use a method-preserving redirect to the stable API ori
   assert.equal(canonicalApiRedirect(new Request(API_SITE_ORIGIN+'/api/auth/google/start'),env),null);
   assert.equal(canonicalApiRedirect(new Request(PUBLIC_SITE_ORIGIN+'/studio'),env),null);
   assert.equal(canonicalApiRedirect(request,{APP_URL:API_SITE_ORIGIN}),null);
+});
+
+test('signed webhook deliveries reach the handler directly on either domain during migration',async()=>{
+  const env={APP_URL:'https://lingyingdrama.com',PUBLIC_APP_URL:'https://lingyingdrama.com'};
+  for(const origin of [API_SITE_ORIGIN,env.APP_URL]){
+    const request=new Request(origin+'/api/payments/webhook',{method:'POST',headers:{'Stripe-Signature':'local-proof'},body:'fixture raw body'});
+    assert.equal(canonicalApiRedirect(request,env),null);
+    assert.equal(canonicalPageRedirect(request,env),null);
+    assert.equal(await request.text(),'fixture raw body');
+  }
+});
+
+test('custom domain aliases can redirect safely before and after the primary-origin switch',()=>{
+  for(const [from,to] of [['https://lingyingdrama.com',PUBLIC_SITE_ORIGIN],[PUBLIC_SITE_ORIGIN,'https://lingyingdrama.com'],['https://www.lingyingdrama.com','https://lingyingdrama.com']]){
+    for(const path of ['/wallet?checkout=success&session_id=fixture','//other.example/path?next=https://other.example']){
+      const response=canonicalPageRedirect(new Request(from+path),{PUBLIC_APP_URL:to})!;
+      assert.equal(response.status,308);
+      const result=new URL(response.headers.get('location')!);
+      assert.equal(result.origin,to);assert.equal(result.pathname,new URL(from+path).pathname);assert.equal(result.search,new URL(from+path).search);
+      assert.equal(response.headers.get('cache-control'),'no-store');
+    }
+  }
+});
+
+test('canonical page routing leaves the primary site, API requests, and writes unchanged',()=>{
+  const env={PUBLIC_APP_URL:'https://lingyingdrama.com'};
+  assert.equal(canonicalPageRedirect(new Request(env.PUBLIC_APP_URL+'/account'),env),null);
+  assert.equal(canonicalPageRedirect(new Request(API_SITE_ORIGIN+'/api/auth/google/callback'),env),null);
+  assert.equal(canonicalPageRedirect(new Request(API_SITE_ORIGIN+'/auth',{method:'POST'}),env),null);
+  assert.equal(canonicalPageRedirect(new Request(API_SITE_ORIGIN+'/auth'),{}),null);
 });
