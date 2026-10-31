@@ -3,6 +3,7 @@ import type {Express,Request,Response} from 'express';
 import {createRemoteJWKSet,importPKCS8,jwtVerify,SignJWT} from 'jose';
 import {z} from 'zod';
 import {config} from './config.js';
+import {publicRedirect} from './origins.js';
 import {one,run,transaction} from './db.js';
 import {assert} from './errors.js';
 import {createSession,destroySession,rateLimit,requireAuth,verifyPassword} from './auth.js';
@@ -174,12 +175,12 @@ export function registerAppleAuth(app:Express){
       const uid=connect(attempt,identity);
       diagnostic.stage='session_create';
       destroySession(req,res,false);if(attempt.session_hash)run('DELETE FROM sessions WHERE token_hash=?',attempt.session_hash);
-      createSession(res,uid);res.redirect(303,attempt.intent==='link'?'/account?apple=linked':attempt.next_path);
+      createSession(res,uid);res.redirect(303,publicRedirect(attempt.intent==='link'?'/account?apple=linked':attempt.next_path));
     }catch(error){
       const failure=error instanceof FlowError?error.code:'apple_failed';reportFailure(diagnostic,failure,error);
       const query=new URLSearchParams({error:failure});
-      if(attempt?.intent==='link')res.redirect(303,'/account?'+query);
-      else{query.set('next',attempt?.next_path||'/');res.redirect(303,'/auth?'+query);}
+      if(attempt?.intent==='link')res.redirect(303,publicRedirect('/account?'+query));
+      else{query.set('next',attempt?.next_path||'/');res.redirect(303,publicRedirect('/auth?'+query));}
     }
   });
 }

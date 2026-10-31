@@ -5,7 +5,7 @@
 .auth-availability{font-size:11px;line-height:1.8;color:var(--muted);margin:10px 0 18px;overflow-wrap:anywhere}
 .auth-provider-options>.auth-availability{font-size:10px;text-align:center;margin-bottom:0}
 .auth-recovery-links{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:13px 22px;margin-top:21px;font-size:11px;line-height:1.8}
-.auth-recovery-links>a{color:#ffc1b4;text-decoration:underline;text-underline-offset:3px;overflow-wrap:anywhere}
+.auth-recovery-links>a{color:var(--accent-soft,#e7c9ff);text-decoration:underline;text-underline-offset:3px;overflow-wrap:anywhere}
 .auth-recovery-links>a:hover{color:#fff}
 .auth-recovery-panel>h1{overflow-wrap:anywhere}
 .auth-recovery-panel>p{margin-bottom:28px}

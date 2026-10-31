@@ -8,7 +8,7 @@
 .series-like-button{max-width:100%;white-space:normal}
 .series-like-button>svg{flex-shrink:0}
 .series-like-button>span{font-size:.9em;opacity:.8;font-variant-numeric:tabular-nums}
-.series-like-button.is-liked{border-color:#ff7055!important;color:#ff8c76!important;background:rgba(255,112,85,.08)!important}
+.series-like-button.is-liked{border-color:var(--accent-pink,#ed9bdb)!important;color:var(--accent-pink,#ed9bdb)!important;background:#ed9bdb14!important}
 .episode-tile .episode-view-count{display:flex;align-items:center;gap:5px;margin-top:5px;color:var(--muted,#a7a4ad);font-variant-numeric:tabular-nums}
 .ranking-text>.series-engagement{margin-top:8px}
 @media(max-width:700px){

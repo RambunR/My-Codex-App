@@ -1,7 +1,7 @@
 import type {DurableObjectStorage,R2Bucket,Fetcher,DurableObjectNamespace} from '@cloudflare/workers-types';
 export interface Env {
   APP:DurableObjectNamespace; MEDIA:R2Bucket; ASSETS:Fetcher;
-  ENVIRONMENT?:string; APP_URL?:string; PAYMENTS_MODE?:string; USD_TO_HKD?:string;
+  ENVIRONMENT?:string; APP_URL?:string; PUBLIC_APP_URL?:string; PAYMENTS_MODE?:string; USD_TO_HKD?:string;
   STRIPE_SECRET_KEY?:string; STRIPE_WEBHOOK_SECRET?:string; BOOTSTRAP_TOKEN?:string;
   STRIPE_ACTIVATION_PRICE_ID?:string; STRIPE_WALLET_PRODUCT_ID?:string;
   STRIPE_TEST_MODE?:string;

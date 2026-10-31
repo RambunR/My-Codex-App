@@ -1,7 +1,7 @@
 import { useEffect,useState,type FormEvent } from 'react';
 import { Link,useLocation,useNavigate,useSearchParams } from 'react-router-dom';
 import { ArrowUpRight,ArrowRight,Eye,EyeOff,Mail,LockKeyhole,Sparkles,Wallet,Plus,ArrowDownLeft,ArrowUpRight as ArrowOut,Check,ShieldCheck,Clapperboard,Globe2,LogOut,Download,UserRound,ChevronDown,Film } from 'lucide-react';
-import { api,post,useApi,ApiError } from '../api';
+import { api,apiUrl,post,useApi,ApiError } from '../api';
 import { useApp } from '../context';
 import { useI18n,type Key } from '../i18n';
 import { AuthGate,Avatar,Brand,Button,Empty,ErrorState,Loading,PageTitle,Modal } from '../ui';
@@ -72,8 +72,8 @@ function SignInAuth(){
   const register=params.get('mode')==='register';const[show,setShow]=useState(false);const[busy,setBusy]=useState(false);const[error,setError]=useState('');
   const[name,setName]=useState('');const[email,setEmail]=useState('');const[password,setPassword]=useState('');const[terms,setTerms]=useState(false);const next=safeNext(params.get('next'));
   const callbackError=params.get('error');const oauthError=callbackError?t(googleErrorKeys[callbackError]||'googleFailed'):'';
-  const googleUrl='/api/auth/google/start?'+new URLSearchParams({next,language:locale}).toString();
-  const appleUrl='/api/auth/apple/start?'+new URLSearchParams({next,language:locale}).toString();
+  const googleUrl=apiUrl('/api/auth/google/start?'+new URLSearchParams({next,language:locale}).toString());
+  const appleUrl=apiUrl('/api/auth/apple/start?'+new URLSearchParams({next,language:locale}).toString());
   const recoveryLink=(mode:string)=>'/auth?'+new URLSearchParams({mode,next}).toString();
   useEffect(()=>{if(user){if(callbackError)toast(t(googleErrorKeys[callbackError]||'googleFailed'),true);navigate(next,{replace:true});}},[user]);
   const submit=async(e:FormEvent)=>{e.preventDefault();if(register&&!terms){setError(t('termsRequired'));return;}setBusy(true);setError('');if(callbackError){const p=new URLSearchParams(params);p.delete('error');setParams(p,{replace:true});}try{const d=await post(`/api/auth/${register?'register':'login'}`,{name,email,password,language:locale});setUser(d.user);toast(`${t('welcome')}, ${d.user.name}`);navigate(next,{replace:true});}catch(e){setError((e as Error).message);}finally{setBusy(false);}};

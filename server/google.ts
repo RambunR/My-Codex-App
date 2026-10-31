@@ -3,6 +3,7 @@ import type {Express,Request,Response} from 'express';
 import {createRemoteJWKSet,jwtVerify} from 'jose';
 import {z} from 'zod';
 import {config} from './config.js';
+import {publicRedirect} from './origins.js';
 import {one,run,transaction} from './db.js';
 import {assert} from './errors.js';
 import {createSession,destroySession,rateLimit,requireAuth,verifyPassword} from './auth.js';
@@ -136,12 +137,12 @@ export function registerGoogleAuth(app:Express){
       const uid=connect(attempt,profile);
       markEmailVerified(uid,profile.email);
       destroySession(req,res,false);createSession(res,uid);
-      res.redirect(303,attempt.intent==='link'?'/account?google=linked':attempt.next_path);
+      res.redirect(303,publicRedirect(attempt.intent==='link'?'/account?google=linked':attempt.next_path));
     }catch(error){
       const reason=error instanceof FlowError?error.code:'google_failed';
       const query=new URLSearchParams({error:reason});
-      if(attempt?.intent==='link')res.redirect(303,'/account?'+query.toString());
-      else{query.set('next',attempt?.next_path||'/');res.redirect(303,'/auth?'+query.toString());}
+      if(attempt?.intent==='link')res.redirect(303,publicRedirect('/account?'+query.toString()));
+      else{query.set('next',attempt?.next_path||'/');res.redirect(303,publicRedirect('/auth?'+query.toString()));}
     }
   });
 }

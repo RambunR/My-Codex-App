@@ -1,4 +1,5 @@
 import {config} from './config.js';
+import {publicAppUrl} from './origins.js';
 import {z} from 'zod';
 
 type MailKind='reset'|'verify';
@@ -34,7 +35,7 @@ export function mailEnabled(){
 export async function sendAccountEmail(email:string,kind:MailKind,token:string,requestId:string){
   if(!mailEnabled())throw new Error('Account email delivery is unavailable.');
   // The deployment's trusted origin determines every link, never a request Host.
-  const url=new URL('/auth',config.appUrl);
+  const url=new URL('/auth',publicAppUrl());
   url.search=new URLSearchParams({mode:kind==='reset'?'reset':'verify'}).toString();
   // Fragments never reach Worker access logs or HTTP Referer headers.
   url.hash=new URLSearchParams({token}).toString();

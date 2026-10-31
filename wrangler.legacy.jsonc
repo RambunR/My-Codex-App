@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "aidramio",
+  "main": "cloudflare/legacy-gateway.ts",
+  "account_id": "95040c4f244233138195b80657887486",
+  "compatibility_date": "2025-09-01",
+  "workers_dev": true,
+  "services": [{"binding": "LINGYING", "service": "lingying"}],
+  "observability": {"enabled": false}
+}

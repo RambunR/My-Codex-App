@@ -14,6 +14,7 @@ import {configure,config} from './config';
 import {initializeDatabase,one,run,transaction} from './db';
 import {DEMO_CATALOG} from '../shared/catalog';
 import {DEMO_PREVIEW_BYTES} from './preview-meta';
+import {canonicalApiRedirect} from './routing';
 
 let listening=false;
 export class AIDramioApp {
@@ -55,6 +56,7 @@ export default {
   async fetch(request:Request,env:Env){
     const url=new URL(request.url);
     if(env.ENVIRONMENT==='sandbox'&&url.origin!==env.APP_URL)return new Response('This payment sandbox is available only on its isolated origin.',{status:403});
+    const canonical=canonicalApiRedirect(request,env);if(canonical)return canonical;
     if(url.pathname.startsWith('/api/'))return env.APP.get(env.APP.idFromName('platform')).fetch(request as any) as unknown as Promise<Response>;
     const response=await env.ASSETS.fetch(request as any) as unknown as Response;
     if(url.pathname==='/auth'){

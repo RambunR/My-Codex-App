@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import Stripe from 'stripe';
 import { z, ZodError } from 'zod';
 import { config } from './config.js';
+import {apiUrl,publicAppUrl,trustedOrigins,credentialedCors} from './origins.js';
 import { registerGoogleAuth,googleEnabled } from './google.js';
 import {registerAppleAuth,appleEnabled} from './apple.js';
 import {registerEmailAuth,emailAuthEnabled,sendRegistrationVerification} from './email-auth.js';
@@ -37,7 +38,7 @@ const catalogSelect = `SELECT s.*,u.name AS creator_name,COALESCE(sp.published_a
  FROM series s JOIN users u ON u.id=s.creator_id LEFT JOIN series_publications sp ON sp.series_id=s.id`;
 function serializeSeries(s: Record<string, any>, userId?: string) {
   const { cover_key, cover_bytes, ...safe } = s;
-  return { ...safe, genres: JSON.parse(s.genres), cover: cover_key.startsWith('public:') ? cover_key.slice(7) : cover_key ? `/api/series/${s.id}/cover` : '/images/placeholder.svg',
+  return { ...safe, genres: JSON.parse(s.genres), cover: cover_key.startsWith('public:') ? cover_key.slice(7) : cover_key ? apiUrl(`/api/series/${s.id}/cover`) : '/images/placeholder.svg',
     likes:Number(s.likes??one('SELECT COUNT(*) AS n FROM series_likes WHERE series_id=?',s.id)!.n),
     liked:!!(userId&&one('SELECT 1 FROM series_likes WHERE user_id=? AND series_id=?',userId,s.id)),
     saved: !!(userId && one('SELECT 1 FROM saves WHERE user_id=? AND series_id=?', userId, s.id)) };
@@ -60,6 +61,7 @@ export function createApp() {
   app.disable('x-powered-by');
   if (process.env.TRUST_PROXY === 'true') app.set('trust proxy', 1);
   app.use((req, res, next) => { res.setHeader('X-Content-Type-Options','nosniff'); res.setHeader('Referrer-Policy',req.path==='/auth'||req.path.startsWith('/api/auth/')?'no-referrer':'strict-origin-when-cross-origin'); res.setHeader('X-Frame-Options','DENY'); if(req.path==='/auth')res.setHeader('Cache-Control','no-store'); next(); });
+  app.use('/api',credentialedCors);
   app.post('/api/payments/webhook', express.raw({ type: 'application/json', limit: '1mb' }), async (req, res) => {
     assert(config.payments === 'stripe' && stripe && paymentsReady(), 503, 'PAYMENTS_UNAVAILABLE', 'Webhook is not configured.');
     let event;
@@ -87,7 +89,7 @@ export function createApp() {
     // Apple's cross-site form_post is authenticated by its one-use state,
     // browser binding and verified identity token in the dedicated handler.
     if (!['GET','HEAD','OPTIONS'].includes(req.method)&&!(req.method==='POST'&&req.path==='/auth/apple/callback')) {
-      const origin = req.headers.origin; const allowed = new Set([new URL(config.appUrl).origin]);
+      const origin = req.headers.origin; const allowed = trustedOrigins();
       if (!config.production && req.headers.host) allowed.add(`${req.protocol}://${req.headers.host}`);
       assert(!origin || allowed.has(origin), 403, 'INVALID_ORIGIN', 'This request origin is not allowed.');
       assert(req.headers['sec-fetch-site'] !== 'cross-site', 403, 'INVALID_ORIGIN', 'This request origin is not allowed.');
@@ -230,7 +232,7 @@ export function createApp() {
       processed=await prepareCover(req.file.path);await putObject(processed.path,key,'image/webp');saved=true;
       const old=transaction(()=>{const s=ownSeries(req);const u=getUser(req.user!.id)!;assert(u.used_bytes-s.cover_bytes+processed!.bytes<=u.quota_bytes,413,'QUOTA_EXCEEDED','This cover exceeds your storage allowance.');run('UPDATE users SET used_bytes=used_bytes-?+? WHERE id=?',s.cover_bytes,processed!.bytes,u.id);run('UPDATE series SET cover_key=?,cover_bytes=? WHERE id=?',key,processed!.bytes,s.id);return s.cover_key;});
       saved=false;
-      if(old)deleteObject(old).catch(error=>console.error('Old cover cleanup failed',error));res.json({cover:`/api/series/${id(req)}/cover`,user:getUser(req.user!.id)});
+      if(old)deleteObject(old).catch(error=>console.error('Old cover cleanup failed',error));res.json({cover:apiUrl(`/api/series/${id(req)}/cover`),user:getUser(req.user!.id)});
     } catch(error) { if(saved)await deleteObject(key);throw error; }
     finally {await removeTempFile(req.file.path);if(processed)await removeTempFile(processed.path);}
   });
@@ -277,7 +279,7 @@ export function createApp() {
     assert(stripe && config.payments==='stripe'&&paymentsReady(),503,'PAYMENTS_UNAVAILABLE','Payout onboarding is not configured yet.');
     let account=req.user!.stripe_account_id;
     if(!account){const created=await stripe.accounts.create({type:'express',email:req.user!.email,capabilities:{transfers:{requested:true}},metadata:{userId:req.user!.id}});account=created.id;run('UPDATE users SET stripe_account_id=? WHERE id=?',account,req.user!.id);}
-    const link=await stripe.accountLinks.create({account,refresh_url:`${config.appUrl}/studio?connect=retry`,return_url:`${config.appUrl}/studio?connect=done`,type:'account_onboarding'});res.json({url:link.url});
+    const link=await stripe.accountLinks.create({account,refresh_url:`${publicAppUrl()}/studio?connect=retry`,return_url:`${publicAppUrl()}/studio?connect=done`,type:'account_onboarding'});res.json({url:link.url});
   });
   app.post('/api/studio/withdrawals', requirePublisher, async (req,res) => {
     assert(!stripeTestPayments(),503,'TEST_PAYOUTS_DISABLED','Payouts are unavailable during Stripe test payments.');

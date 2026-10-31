@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "aidramio",
+  "name": "lingying",
   "main": "cloudflare/worker.ts",
   "account_id": "95040c4f244233138195b80657887486",
   "compatibility_date": "2025-09-01",
@@ -50,7 +50,8 @@
     "SEED_CATALOG": "true",
     "EMAIL_PROVIDER": "cloudflare",
     "CF_EMAIL_ACCOUNT_ID": "95040c4f244233138195b80657887486",
-    "MAIL_FROM": "LingYing <accounts@hknovaxrproduction.com>"
+    "MAIL_FROM": "LingYing <accounts@hknovaxrproduction.com>",
+    "PUBLIC_APP_URL": "https://lingying.jimmy-tsoi2001.workers.dev"
   },
   "observability": {
     "enabled": true

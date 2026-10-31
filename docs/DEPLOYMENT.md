@@ -2,14 +2,16 @@
 
 First published and verified on **26 October 2026, Hong Kong time**. Updated on **28 October 2026** with Apple authentication and email-recovery controls prepared for provider configuration, retaining Google registration/sign-in, the brand icons and explicit Stripe test payments on this same website.
 
-- Site: https://aidramio.jimmy-tsoi2001.workers.dev
-- Dashboard: https://dash.cloudflare.com/95040c4f244233138195b80657887486/workers/services/view/aidramio/production
+- Site: https://lingying.jimmy-tsoi2001.workers.dev
+- Stable API/OAuth/webhook origin: https://aidramio.jimmy-tsoi2001.workers.dev (compatibility gateway).
+- Dashboard: https://dash.cloudflare.com/95040c4f244233138195b80657887486/workers/services/view/lingying/production
 - Account: Jimmy.tsoi2001@gmail.com's Account (`95040c4f244233138195b80657887486`), explicitly confirmed by the user.
-- New Worker: `aidramio`.
+- Main Worker: `lingying`, renamed in place on 31 October 2026; stable Worker ID `bab19a0d39cb45bab68f525e17a95603`.
+- Compatibility Worker: `aidramio`, forwarding only API traffic through a service binding to `lingying`, with old page URLs redirecting to the new site.
 - New private R2 media bucket: `aidramio-media-887486`; managed public access verified disabled.
 - Database: SQLite-backed `AIDramioApp` Durable Object, bound as `APP`.
 - Google authentication code release: `8363714d-c672-4685-9950-f3aeb6731fb1` (historical; see the Cloudflare dashboard for the latest branding deployment).
-- Current LingYing icon: https://aidramio.jimmy-tsoi2001.workers.dev/lingying-icon.png (purple–pink origami phoenix, concept 05; 1254 × 1254 PNG). The previous AIDramio wordmark remains at `/aidramio-logo.png` as a historical asset.
+- Current LingYing icon: https://lingying.jimmy-tsoi2001.workers.dev/lingying-icon.png (purple–pink origami phoenix, concept 05; 1254 × 1254 PNG). The previous AIDramio wordmark remains at `/aidramio-logo.png` as a historical asset.
 
 The Worker serves the complete frontend and API. The production database starts with free, labelled sample previews and no default administrator login or development wallet credits. Existing Cloudflare applications and buckets were preserved. No account plan was upgraded.
 
