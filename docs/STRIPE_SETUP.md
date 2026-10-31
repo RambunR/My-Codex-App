@@ -81,6 +81,8 @@ Check `/api/config` for `paymentsMode: "stripe"`, `paymentsReady: true`, `paymen
 
 ## Later: accept real money
 
+For the exact Dashboard and secure Worker Secret steps, see [live Stripe setup](STRIPE_LIVE_SETUP.md). The current test notice stays truthful until the deployed credentials and mode are switched together.
+
 A domain change does not authorize this step. Keep test mode while finishing the separate release work:
 
 1. Resolve the refund/dispute reconciliation and other release blockers in [the production-readiness report](PRODUCTION_READINESS.md). Complete Stripe's actual business/bank setup and confirm card/currency/country support.
