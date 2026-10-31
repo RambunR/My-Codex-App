@@ -137,6 +137,10 @@ Run one application instance for the initial SQLite/local-media deployment. Mult
 
 Back up both the SQLite database and media. Use SQLite's backup API while the service is running rather than copying just the main `.sqlite` file and ignoring its WAL. A simple consistent backup can be made with Python's `sqlite3.Connection.backup`. Test restoration separately. Use HTTPS and set `APP_URL` correctly; production session cookies require HTTPS. Set `TRUST_PROXY=true` only behind one trusted reverse proxy.
 
+## Production readiness
+
+The 31 October 2026 audit confirms hosted Stripe **test** wallet funding and Dramio Pass purchases, with isolated account/session/upload/browser coverage. The site is **not ready for real-money launch**: refund/dispute reconciliation, recovery-email delivery, live creator payout verification and final provider checks remain. See [the production-readiness report](docs/PRODUCTION_READINESS.md) for evidence, media corrections and validation limits.
+
 ## Validation
 
 ```bash

@@ -63,7 +63,10 @@ try{
   console.log('PASS: Cloudflare Google authorization, private browser binding, durable OAuth state, cancellation and replay protection.');
   const series=(await request('/api/series')).data.series;assert.equal(series.length,20);
   const sample=(await request('/api/series/'+series[0].id)).data;assert.ok(sample.episodes.every(e=>e.unlocked),'Public samples must all be free.');
-  const sampleVideo=await fetch(base+`/api/episodes/${sample.episodes[0].id}/stream`);assert.equal(sampleVideo.status,200);assert.equal((await sampleVideo.arrayBuffer()).byteLength,1037034);
+  const previewUrl=base+`/api/episodes/${sample.episodes[0].id}/stream`;
+  const sampleVideo=await fetch(previewUrl,{headers:{Origin:base}});assert.equal(sampleVideo.status,200);assert.equal(sampleVideo.redirected,false);assert.equal(sampleVideo.headers.get('access-control-allow-origin'),base);assert.equal(sampleVideo.headers.get('access-control-allow-credentials'),'true');assert.equal(sampleVideo.headers.get('cache-control'),'private, no-store');assert.equal((await sampleVideo.arrayBuffer()).byteLength,1037034);
+  const previewRange=await fetch(previewUrl,{headers:{Origin:base,Range:'bytes=0-31'}});assert.equal(previewRange.status,206);assert.equal(previewRange.redirected,false);assert.equal(previewRange.headers.get('content-range'),'bytes 0-31/1037034');assert.equal((await previewRange.arrayBuffer()).byteLength,32);
+  const previewHead=await fetch(previewUrl,{method:'HEAD',headers:{Origin:base,Range:'bytes=0-31'}});assert.equal(previewHead.status,206);assert.equal(previewHead.headers.get('content-length'),'32');assert.equal((await previewHead.arrayBuffer()).byteLength,0);
   console.log('PASS: Cloudflare runtime, public catalogue, and free sample playback.');
 
   await request('/api/admin/bootstrap',{email:'admin@example.test',name:'Local Admin',password},'',403);
