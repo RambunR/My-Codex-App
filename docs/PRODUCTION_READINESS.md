@@ -44,3 +44,15 @@ No existing customer balances, payouts, credentials, media, account records or p
 ## Actual Stripe test Checkout
 
 Using one isolated live-site audit account and the official Stripe 4242 test card, the Wallet Add funds flow opened a `cs_test_` Checkout session, completed a US$5 test payment, returned to the new public website and credited exactly US$5. Reload retained one funding payment and one funding ledger entry. This establishes hosted test Checkout plus application settlement/reconciliation; a success return alone is never treated as proof, and independently observing the provider webhook delivery is a separate check. The externally hosted wallet product still uses the earlier AIDramio name (cosmetic). The separate HK$88 Dramio Pass hosted test purchase also completed: Account displayed Active / Test pass, quota was 5 GiB, the USD wallet stayed at US$5, and reload did not create a duplicate activation. Independent provider webhook delivery remains unverified because the return page can reconcile Checkout. No real card or funds were used.
+
+## Published corrections and final verification
+
+The media corrections were committed as `e2323395f6456df875d1367b1bf5a1c50b84b62a` and deployed to the existing `lingying` Worker as version `db4b7f85-7680-46f4-a227-dbbacef8bbe9` on 31 October 2026.
+
+- The final suite passed **113 backend checks**, including **15 Cloudflare media regressions**, both TypeScript builds, and the enhanced local Cloudflare persistence/upload/payment/media smoke.
+- A real Chromium video using credentialed CORS on the live public origin loaded 12-second, 720×1280 sample metadata and played beyond 1.77 seconds without errors. Its media response was a direct API 206 with the exact permitted public origin, credentials and Content-Range; there were no redirects.
+- Live full GET returned 1,037,034 bytes; HEAD returned the expected length without a body; partial Range returned 206 with exactly 1,024 bytes; invalid range returned 416. Private/no-store and CORS were retained. These checks did not generate analytics writes or touch customer accounts.
+- Post-deployment database health passed. Worker variables, all eight encrypted secret names, the original SQLite namespace and media bucket were unchanged. Stripe remains in test mode, and recovery-email availability remains false.
+- The production-dependency npm audit reported **zero known advisories** at audit time. The scan covers npm advisories, rather than every infrastructure or application risk.
+
+The fixed playback and demonstrated audio-duration defects are no longer listed as unresolved release blockers. Financial reconciliation, email delivery, real creator disbursement, provider sign-in/webhook verification and operator content controls still require work before the real-money launch.
