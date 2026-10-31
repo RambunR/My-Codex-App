@@ -2,7 +2,7 @@
 
 The configured primary website and browser API are **https://lingyingdrama.com**. `https://www.lingyingdrama.com` is an alias that redirects to the canonical domain. Cloudflare zone: `ae6b34326f28faf55a6c7179d57bcba7`.
 
-The owner explicitly requested direct-domain operation before the external provider settings were completed. The former staging redirect to `workers.dev` is being retired. Deployment and live verification must confirm the actual public behavior; changing this document does not register provider callbacks or establish a successful provider sign-in.
+The custom domain serves the website directly. Main version `4113e958-d73c-455c-97c5-6579e373306a` and compatibility gateway version `1c55b37d-33dc-428b-b461-c5799308d438` deployed successfully. Live HTTP and browser checks confirmed that the apex, its API and application navigation stay on `lingyingdrama.com`; `www` and old addresses redirect toward it. Provider configuration and completed consent/payment delivery are verified separately.
 
 Both domain routes attach to the existing `lingying` Worker, preserving stable Worker ID `bab19a0d39cb45bab68f525e17a95603`, SQLite namespace `69f8c140ca6840ad8761ba5977fbde53`, private bucket `aidramio-media-887486`, the existing Durable Object class/migration, and encrypted provider credentials. No additional application or Pages project is required.
 
@@ -14,9 +14,9 @@ Both domain routes attach to the existing `lingying` Worker, preserving stable W
 
 Cloudflare assets use `run_worker_first: true` so canonical routing applies to homepages, SPA routes and existing files. Signed POST deliveries to `/api/payments/webhook` reach signature verification directly without an HTTP redirect. Stripe test mode, test catalogue IDs and encrypted credentials remain unchanged by this hostname move.
 
-## Pending Google and Apple setup
+## Google and Apple verification
 
-The latest public authorization checks rejected the new callback URLs: Google returned `redirect_uri_mismatch`; Apple returned `invalid_request` with an invalid redirect URL reason. Both old-URL controls reached provider login pages. These checks did not complete a real sign-in or alter provider configuration.
+After the owner reported saving all three provider settings, public checks at 10:00 UTC on 31 October 2026 found that **Google accepts the new callback and reaches its login page**; its old callback now reports `redirect_uri_mismatch`. **Apple still rejects the new callback with `invalid_request` and an invalid web redirect URL reason**, while its old callback remains accepted. Both actual app-issued callback URLs and cancellation return locations use `lingyingdrama.com`. No real consent or identity creation was performed; successful URL acceptance is not proof of completed sign-in.
 
 Keep the same OAuth client IDs, Apple Services ID and signing key to preserve existing identity/account associations. Add the new entries alongside old ones:
 
@@ -29,6 +29,8 @@ Use only the domain in Apple's domain field and a full HTTPS URL in its return-U
 ## Move the existing Stripe test webhook to this domain
 
 The current integration remains **Stripe test mode**. This domain change does not enable live charges or creator payouts.
+
+The owner reports the existing Stripe destination updated to the custom domain. The public handler is reachable directly and rejects unsigned requests with HTTP 400 `INVALID_SIGNATURE`, as expected. There is no Stripe API read credential or connected Stripe tool available here, so the Dashboard endpoint URL, selected events, enabled status and signed delivery history have not been independently inspected. The catalogue's saved old URL is historical, not evidence that the owner's Dashboard change failed.
 
 1. Open [Stripe Dashboard → Webhooks](https://dashboard.stripe.com/webhooks), using the **same test environment/Sandbox currently connected to LingYing**.
 2. In **Workbench → Webhooks / Event destinations**, open the existing active destination whose endpoint URL is `https://aidramio.jimmy-tsoi2001.workers.dev/api/payments/webhook`.
@@ -64,4 +66,6 @@ Other applications, purchased domains, email DNS and storage must remain untouch
 
 ## Validation status
 
-The preceding staged change passed 120 backend checks, eight focused routing checks, 25 browser journeys, ten secure same-origin browser scenarios and three explicitly labelled local-demo payment scenarios. These are historical test results for the staging change, not proof that the external providers have accepted the new domain. The direct-domain switch must be checked again for canonical routing, same-origin sign-in/session behavior, uploads/media, preserved financial identity and live custom-domain TLS. Record the final deployment and public verification separately; complete provider acceptance and signed webhook delivery checks after the owner saves the provider settings.
+The direct-domain change passed 122 backend tests, 25 browser journeys, the Cloudflare integration/persistence suite and 27 live HTTP routing checks. Public sample media returned a direct 206 response with the exact custom-domain CORS origin. Namespace, bucket, eight secret bindings, unrelated settings and the 21-series catalogue were preserved.
+
+Six live browser checks verified an existing audit account's sign-in, Secure/HttpOnly/SameSite=Lax custom-domain cookie, unchanged test wallet/pass/quota, reload, logout and mobile navigation. All 34 observed API requests used the custom domain. A follow-up fresh guest-browser trace after a report of old-host navigation observed 29 custom-domain requests, no `workers.dev` requests, and no hostname changes through Explore, Wallet, Sign-in and reload. The reported jump remains unreproduced; cached/restored user-browser navigation is a hypothesis rather than a proven cause. Native service-worker activation and automatic `www` browser redirect follow were limited by Chromium's execution-proxy CA trust; server redirect targets and deployed worker/manifest source were inspected without bypassing TLS. No new payments, uploads or creator payouts were performed by these domain checks.

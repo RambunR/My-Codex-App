@@ -4,6 +4,8 @@ Use **[LingYing](https://lingyingdrama.com)** for payment testing. Wallet **Add 
 
 Keep **`PAYMENTS_MODE=stripe`** and **`STRIPE_TEST_MODE=true`**. Connecting a purchased domain does not enable live payments. Real charges, Stripe Connect and creator withdrawals remain unavailable in this mode.
 
+On 31 October 2026 the owner reported saving the custom-domain webhook URL. The public endpoint is reachable directly and rejects unsigned requests. Its actual Dashboard configuration and signed delivery remain independently unverified because this workspace has no Stripe API read credential or connected Stripe tool. The old URL in the saved catalogue is historical metadata, not a fresh observation of Stripe's settings.
+
 ## Move the existing Stripe test webhook to the domain
 
 This is the required Stripe Dashboard change for the domain migration. The application already has its test API key, products, prices and endpoint signing secret; those do not need recreating merely because its website address changed.
