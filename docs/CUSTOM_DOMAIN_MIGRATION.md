@@ -8,6 +8,8 @@ The domain routes are attached while `APP_URL` and `PUBLIC_APP_URL` retain the w
 
 `STRIPE_SITE_ORIGIN` is explicitly pinned to the original `https://aidramio.jimmy-tsoi2001.workers.dev` logical financial identity. This value does not need to be a browsable website after retirement. Pending Checkout metadata remains valid. Signed POST deliveries to `/api/payments/webhook` reach the handler without an HTTP redirect on either host.
 
+Cloudflare assets must use `run_worker_first: true`: otherwise the asset service bypasses canonical routing for the homepage, SPA routes and existing files. The runtime smoke checks GET and HEAD redirects for those paths before testing the primary site's normal flows.
+
 ## Provider updates
 
 Keep the same OAuth client IDs, Apple Services ID and signing key to preserve existing external identity/account associations. Add the new entries before removing old ones:
@@ -15,6 +17,14 @@ Keep the same OAuth client IDs, Apple Services ID and signing key to preserve ex
 - Google: `https://lingyingdrama.com/api/auth/google/callback`.
 - Apple domain: `lingyingdrama.com`; return URL: `https://lingyingdrama.com/api/auth/apple/callback`.
 - Stripe: after custom-domain HTTPS and its webhook handler are reachable, edit the existing **test** webhook endpoint URL to `https://lingyingdrama.com/api/payments/webhook`; preserve its signing secret and Snapshot event selections. This migration does not enable live payments.
+
+### Owner setup steps
+
+1. Open [Google Auth Platform → Clients](https://console.cloud.google.com/auth/clients), select the existing website project and Web application client, and add `https://lingyingdrama.com/api/auth/google/callback` under **Authorized redirect URIs**. If configuring JavaScript origins, add `https://lingyingdrama.com` without a path. Save. Keep the existing credentials and old callback entries.
+2. Open the [existing Apple Services ID](https://developer.apple.com/account/resources/identifiers/serviceId/edit/XSTKUY7NAY), confirm identifier `com.hknovaxrproduction.aidramio.web`, then **Sign in with Apple → Configure**. Keep primary App ID `com.hknovaxrproduction.aidramio`. Add `lingyingdrama.com` to **Domains and Subdomains** and `https://lingyingdrama.com/api/auth/apple/callback` to **Return URLs**, alongside the old entries, using commas between entries. Choose **Next/Done → Continue → Save** as shown by Apple's current form. Do not put an app name or bundle ID into the URL fields, or replace the signing key.
+3. Open [Stripe Webhooks](https://dashboard.stripe.com/webhooks) in the same test environment used by the website. In the existing webhook endpoint (or **Workbench → Webhooks → Event destinations**), choose **Edit destination/endpoint** and change only its endpoint URL to `https://lingyingdrama.com/api/payments/webhook`. Preserve its events, API version, payload type and signing secret. Save. Do not create a new endpoint or enable live payments for this move.
+
+After these settings are saved, confirm completion so the website's primary origins can move together. Callback registration can be checked without completing a real sign-in; full sign-in and signed webhook delivery still need their own verification.
 
 ## Final primary-origin switch
 

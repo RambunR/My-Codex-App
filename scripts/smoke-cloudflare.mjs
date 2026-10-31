@@ -12,10 +12,10 @@ const port=Number(process.env.CLOUDFLARE_TEST_PORT||8789),base=`http://127.0.0.1
 const bootstrap=randomBytes(32).toString('hex');
 const password='LocalSmokePassword123!';
 let child,logs='';
-async function start(production=false,testStripe=false){
+async function start(production=false,testStripe=false,publicOrigin=base){
   logs='';
   const args=['node_modules/wrangler/bin/wrangler.js','dev','--local','--port',String(port),'--local-upstream',new URL(base).host,'--upstream-protocol','http','--inspector-port',String(port+400),'--persist-to',path.join(dir,'state'),
-    '--var',`ENVIRONMENT:${production?'production':'development'}`,'--var',`PAYMENTS_MODE:${testStripe?'stripe':production?'disabled':'demo'}`,'--var',`STRIPE_TEST_MODE:${testStripe}`,'--var',`APP_URL:${base}`,'--var',`PUBLIC_APP_URL:${base}`,'--var',`STRIPE_SITE_ORIGIN:${base}`,'--var',`BOOTSTRAP_TOKEN:${bootstrap}`];
+    '--var',`ENVIRONMENT:${production?'production':'development'}`,'--var',`PAYMENTS_MODE:${testStripe?'stripe':production?'disabled':'demo'}`,'--var',`STRIPE_TEST_MODE:${testStripe}`,'--var',`APP_URL:${base}`,'--var',`PUBLIC_APP_URL:${publicOrigin}`,'--var',`STRIPE_SITE_ORIGIN:${base}`,'--var',`BOOTSTRAP_TOKEN:${bootstrap}`];
   if(!production||testStripe)args.push('--var','GOOGLE_CLIENT_ID:local-test.apps.googleusercontent.com','--var','GOOGLE_CLIENT_SECRET:local-test-only-google-secret');
   if(testStripe)args.push('--var','STRIPE_SECRET_KEY:rk_test_local_cloudflare_fixture_only','--var','STRIPE_WEBHOOK_SECRET:whsec_local_cloudflare_fixture_only');
   child=spawn(process.execPath,args,{env:{...process.env,XDG_CONFIG_HOME:path.join(dir,'config'),WRANGLER_SEND_METRICS:'false',WRANGLER_LOG_PATH:path.join(dir,'wrangler.log')},stdio:['ignore','pipe','pipe']});
@@ -44,6 +44,19 @@ async function upload(route,bytes,name,cookie,fields={},field='video',status=201
   const r=await fetch(base+route,{method:'POST',headers:{Cookie:cookie},body:form});const data=await r.json();assert.equal(r.status,status,`${route}: ${JSON.stringify(data)}`);return data;
 }
 try{
+  const primary='https://primary.example';
+  await start(false,false,primary);
+  for(const route of ['/','/browse?sort=newest','/account','/manifest.webmanifest']){
+    for(const method of ['GET','HEAD']){
+      const response=await fetch(base+route,{method,redirect:'manual'});
+      assert.equal(response.status,308,`${method} ${route}: assets must not bypass canonical routing`);
+      assert.equal(response.headers.get('location'),primary+route);
+      assert.equal(response.headers.get('cache-control'),'no-store');
+      await response.body?.cancel();
+    }
+  }
+  console.log('PASS: Cloudflare canonical redirects run before SPA and static asset serving on alias hosts.');
+  await stop();
   await start();
   const cfg=(await request('/api/config')).data;assert.equal(cfg.runtime,'cloudflare');assert.equal(cfg.paymentsMode,'demo');assert.equal(cfg.auth.google,true);
   assert.equal(cfg.auth.apple,false);assert.equal(cfg.auth.email,false);
