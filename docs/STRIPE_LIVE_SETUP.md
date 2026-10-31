@@ -2,9 +2,13 @@
 
 This guide configures live card Checkout on **https://lingyingdrama.com**, using the existing Cloudflare Worker **`lingying`** and the existing Stripe account. It does not create another website, charge a card, fund an application wallet, or send a creator payout. Keep API keys and webhook signing secrets out of chat, screenshots, Git and frontend code.
 
-The owner has requested activation and confirmed that live API/webhook Secrets were saved. The current release target is live card Checkout with creator payouts paused; deployment and independent live verification are pending. No card charge, real wallet credit or creator transfer is authorized as a configuration check.
+Live card Checkout is enabled on the existing website as of **31 October 2026, 19:39 Hong Kong time (11:39 UTC)**. Public configuration confirms `paymentsMode: "stripe"`, `paymentsConfigured: true`, `paymentsReady: true`, `paymentsTestMode: false`, `payoutsEnabled: false` and `paymentSetup: {"status":"ready"}`. Health and database checks pass. The in-Worker helper verified the expected live Stripe account, charge capability and one enabled live Snapshot endpoint with all seven required subscriptions; no additional manual event selection is needed for this verified destination.
+
+The no-cost live check passed: exactly **one unpaid US$5 live Checkout Session** opened on `checkout.stripe.com` and displayed **US$5.00**. No card fields were entered, payment method/confirmation requests sent, or Pay button pressed. Owner cancellation expired the same Session, leaving the real wallet at **US$0** with **no funding ledger entry**. A real Stripe-signed `checkout.session.expired` receipt arrived directly at **`lingyingdrama.com`** at **19:40:49 Hong Kong time (11:40:49 UTC)** on 31 October 2026. This proves live Session creation, hosted amount display, owner cancellation and live signed delivery without a charge; it does not establish completed paid settlement. No charge, real wallet credit or creator transfer was performed.
 
 The test-payment notice reflects the server's payment configuration. Hiding the notice does not enable real payments: the live API key, live endpoint signing secret and application mode must agree.
+
+The setup steps below are a reference for initial configuration or credential rotation. Do not re-enter verified credentials, create another endpoint or repeat the subscription change for the deployment already verified above.
 
 ## 1. Open the correct Stripe environment
 
@@ -100,7 +104,7 @@ While **`PAYMENTS_MODE=disabled`**, set the following ordinary text variables on
 | `STRIPE_ACTIVATION_PRICE_ID` | Empty string, unless a verified matching live price is configured |
 | `STRIPE_WALLET_PRODUCT_ID` | Empty string, unless a verified matching live product is configured |
 
-**Clear both optional test catalogue IDs.** The current IDs belong to test mode and cannot be used with a live key. Keeping these two variables as empty strings also overrides their previous configured values. No Stripe Dashboard product creation is required: without optional catalogue IDs, the server supplies a one-time **HK$88 Dramio Pass** line item and an exact **USD wallet-credit** line item for the amount the viewer selected, with a **US$5 minimum**. They are not subscriptions.
+**Keep both optional test catalogue IDs cleared.** The historical catalogue IDs belong to test mode and cannot be used with a live key. Keeping these two variables as empty strings also overrides their previous configured values. No Stripe Dashboard product creation is required: without optional catalogue IDs, the server supplies a one-time **HK$88 Dramio Pass** line item and an exact **USD wallet-credit** line item for the amount the viewer selected, with a **US$5 minimum**. They are not subscriptions.
 
 If you prefer saved live products, create them in the Live environment and use only their live IDs. The Dramio Pass price must be active, one-time, **HKD 8,800 cents**; the wallet uses its selected USD amount rather than a fixed US$5 price. Do not copy the test product/price IDs into these fields.
 
@@ -147,4 +151,10 @@ Creator payouts are deliberately paused by **`PAYOUTS_ENABLED=false`**, independ
 - [Checkout fulfillment](https://docs.stripe.com/checkout/fulfillment?ui=full-page)
 - [Cloudflare Worker Secrets](https://developers.cloudflare.com/workers/configuration/secrets/)
 
-Prepared 31 October 2026. Configuration instructions are not evidence that live credentials, signed delivery or real-money settlement have been verified.
+## Deployment and verification evidence
+
+Main Worker version **`bf98a60f-719a-49aa-9354-4c7b26fca18a`**, source commit **`220e122355255feab5845f3bb96daa208c2cfd2d`**, deployed on 31 October 2026. All **161 backend checks** passed, including the 15 readiness/Stripe SDK checks. **29 distinct browser journeys** passed across the complete existing suite and four new targeted journeys. Cloudflare integration/persistence checks passed, including a signed unmapped refund hold surviving a SQL restart. Independent security review reproduced and fixed three financial issues before deployment.
+
+Actual public configuration and in-Worker Stripe account/endpoint verification passed as described above. The no-cost browser check separately verified a single live US$5 Session, hosted amount display, owner expiry and actual signed expiration delivery to the custom domain. The test-payment notice was absent on desktop and a 390px phone viewport. The existing audit account retained its identity; its historical test US$5/pass were not converted to live funds/pass. All 21 series and the existing uploaded series remained available. The final run recorded no page, application/provider-console or transport errors; deliberately suppressed third-party telemetry/instrumentation warnings are recorded separately.
+
+The first harness overblocked a read-only hosted Checkout GET; correcting the test and resuming the **same** Session produced the final evidence. Exactly one Session was created across both runs. No payment submission, charge, live wallet funding or payout occurred. **Paid live settlement, paid-refund behavior and processing fees were not exercised.** The complete paid creator service remains outside this release: payouts are paused, refund/dispute resolution requires manual review, and other limits remain in [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md).
