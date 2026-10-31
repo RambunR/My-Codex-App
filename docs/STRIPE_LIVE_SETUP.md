@@ -136,6 +136,20 @@ After the release's risk-hold handling and payout pause are implemented and chec
 
 If a live credential or delivery problem appears, pause new Checkout with **`PAYMENTS_MODE=disabled`** while diagnosing. Properly configured signed webhook processing, existing-Session reconciliation and owner unpaid cancellation remain available while new Checkout is paused, so pending transactions and risk events are not discarded. Preserve real payment records/balances and valid credentials. Do not switch customers back into test finances to make an error disappear.
 
+## Checkout messages
+
+New Sessions display **LingYing · HK NovaXR Production** at the top of Checkout. This per-Session display name does not rename the Stripe account's registered business name on receipts or legal text.
+
+For a US$25 wallet top-up, the English copy is:
+
+- Item description: “Receive US$25.00 in LingYing wallet credit to unlock paid drama episodes.” The amount follows the validated USD amount chosen by the viewer.
+- Near the payment button: “One-time top-up. No subscription. Your wallet will be credited after payment is confirmed.”
+- Below the payment button: “Need help? Contact contactus@hknovaxrproduction.com”
+
+The website sends its selected interface language with the Checkout request. The server validates it against the 21 app locales; older clients fall back to the account profile language and then English. Custom messages are translated for all 21 locales. Stripe's native controls use its supported locale; Hindi, Arabic, Bengali, Urdu and Tamil custom messages remain translated while Stripe's built-in controls fall back to English.
+
+The current inline wallet product includes the dynamic description. If an operator configures a saved wallet product ID later, its catalogue description is retained while the localized payment/support messages still apply. Dramio Pass shares the branding/support text, without wallet-credit or top-up copy. Existing open Sessions retain their original text; start a new Checkout to see updated messages. No amount, fee, wallet entitlement or payment-mode setting is changed by this wording.
+
 ## Test records and creator payouts
 
 Test wallets, passes, purchases and earnings remain in separate `test_*` financial tables. **They must never be copied or converted into real balances, live Dramio Pass ownership or payable creator earnings.** After the live switch, users see their existing real financial state; test-only balances/pass status may therefore no longer appear active. Their accounts, profiles and uploaded media remain intact.

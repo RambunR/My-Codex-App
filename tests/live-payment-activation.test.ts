@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
-import {randomUUID} from 'node:crypto';
+import {createHash,randomBytes,randomUUID} from 'node:crypto';
 import type {Server} from 'node:http';
 
 // No Stripe network calls: all provider operations exercised below are mocked.
@@ -11,6 +11,7 @@ const dir=await mkdtemp(path.join(tmpdir(),'lingying-live-payment-activation-'))
 process.env.DATA_DIR=dir;process.env.NODE_ENV='test';process.env.SEED_DEMO='false';
 process.env.PAYMENTS_MODE='stripe';process.env.STRIPE_TEST_MODE='false';
 process.env.PAYOUTS_ENABLED='false';
+process.env.STRIPE_AUTO_CONFIGURE_WEBHOOK='false';
 process.env.STRIPE_SECRET_KEY='sk_live_activation_fixture_only';
 process.env.STRIPE_WEBHOOK_SECRET='whsec_activation_fixture_only';
 const {config}=await import('../server/config');
@@ -30,6 +31,12 @@ async function viewer(){
   const result=await request('/api/auth/register',{name:'Live setup fixture',email:randomUUID()+'@live-activation.test',password:'LiveActivationFixture123!'},'',201);
   return{id:result.data.user.id,cookie:result.cookie};
 }
+function localizedViewer(language='en'){
+  const id=randomUUID(),token=randomBytes(32).toString('hex');
+  run('INSERT INTO users (id,email,name,password_hash,language) VALUES (?,?,?,?,?)',id,id+'@checkout-locale.test','Checkout locale fixture','fixture-only-no-password-signin',language);
+  run('INSERT INTO sessions (token_hash,user_id,expires_at) VALUES (?,?,?)',createHash('sha256').update(token).digest('hex'),id,Date.now()+60*60*1000);
+  return{id,cookie:'drama_session='+token};
+}
 function pending(userId:string){
   const id=randomUUID(),session='cs_live_fixture_'+randomUUID().replaceAll('-','');
   run('INSERT INTO payments (id,user_id,kind,amount_cents,currency,provider,provider_session) VALUES (?,?,?,?,?,?,?)',id,userId,'funding',500,'usd','stripe',session);
@@ -39,6 +46,14 @@ function session(payment:ReturnType<typeof pending>,overrides:Record<string,unkn
   return{id:payment.session,object:'checkout.session',livemode:true,status:'open',payment_status:'unpaid',amount_total:500,currency:'usd',client_reference_id:payment.id,payment_intent:'pi_fixture_'+payment.id.replaceAll('-',''),
     metadata:{app:'aidramio',paymentId:payment.id,userId:payment.userId,site:identity,financialMode:'default'},...overrides};
 }
+function captureCheckoutCalls(){
+  const calls:any[]=[];
+  const created=mock.method(finance.stripe!.checkout.sessions,'create',async(params:any):Promise<any>=>{
+    calls.push(params);return{id:'cs_live_messaging_'+randomUUID().replaceAll('-',''),object:'checkout.session',livemode:true,status:'open',payment_status:'unpaid',url:'https://checkout.stripe.com/local-messaging-fixture',client_reference_id:params.client_reference_id,
+      amount_total:params.line_items[0].price_data?.unit_amount,currency:params.line_items[0].price_data?.currency,metadata:params.metadata,payment_intent:'pi_messaging_'+randomUUID().replaceAll('-','')};
+  });
+  return{calls,created};
+}
 
 before(async()=>{
   const {createApp,errorHandler}=await import('../server/app');
@@ -47,7 +62,7 @@ before(async()=>{
 });
 beforeEach(()=>{
   mock.restoreAll();config.production=true;config.sandbox=false;config.appUrl=site;config.publicUrl=site;config.stripeSiteOrigin=identity;
-  config.payments='stripe';config.stripeTestMode=false;config.payoutsEnabled=false;
+  config.payments='stripe';config.stripeTestMode=false;config.payoutsEnabled=false;config.stripeAutoConfigureWebhook=false;
   config.stripeKey='sk_live_activation_fixture_only';config.stripeWebhook='whsec_activation_fixture_only';
   config.stripeActivationPriceId='';config.stripeWalletProductId='';config.mailProvider='disabled';
   mock.method(globalThis,'fetch',async(input:string|URL|Request,init?:RequestInit)=>{
@@ -87,11 +102,84 @@ test('inline live Checkout retains exact USD/HKD prices, trusted linkage and cus
       assert.equal(call.payment_intent_data.metadata.userId,user.id);assert.equal(call.payment_intent_data.metadata.site,identity);
       assert.equal(call.success_url,site+`/${where}?checkout=success&session_id={CHECKOUT_SESSION_ID}`);
       assert.equal(call.cancel_url,site+`/${where}?checkout=cancelled`);
+      assert.equal(call.branding_settings.display_name,'LingYing · HK NovaXR Production');
+      if(kind==='activation'){
+        assert.equal(call.custom_text.submit,undefined,'Dramio Pass Checkout must not inherit wallet top-up instructions.');
+        assert.equal(call.line_items[0].price_data.product_data.description,undefined);
+        assert.match(call.custom_text.after_submit.message,/contactus@hknovaxrproduction\.com/);
+      }
       const payment=one('SELECT * FROM payments WHERE id=?',result.data.paymentId)!;assert.equal(payment.status,'pending');
       assert.equal(payment.amount_cents,kind==='funding'?2345:8800);
     }
     assert.equal(one('SELECT wallet_micros FROM users WHERE id=?',user.id)!.wallet_micros,0);
     assert.equal(one('SELECT publisher_active FROM users WHERE id=?',user.id)!.publisher_active,0);
+    assert.equal(one('SELECT COUNT(*) AS n FROM ledger WHERE user_id=?',user.id)!.n,0);
+  }finally{created.mock.restore();}
+});
+
+test('wallet Checkout uses the selected interface language over the profile while preserving exact credit and trusted pricing',async()=>{
+  const user=localizedViewer('fr'),{calls,created}=captureCheckoutCalls();
+  try{
+    for(const [language,stripeLocale,script]of [
+      ['zh-TW','zh-TW',/錢包/],
+      ['zh-CN','zh',/钱包/],
+      ['es','es-419',/monedero/],
+      ['bn','en',/[\u0980-\u09ff]/],
+    ]as const){
+      const result=await request('/api/payments/checkout',{kind:'funding',amount_cents:2345,language},user.cookie);
+      const call=calls.at(-1),line=call.line_items[0].price_data;
+      assert.equal(call.locale,stripeLocale);assert.equal(call.branding_settings.display_name,'LingYing · HK NovaXR Production');
+      assert.equal(line.currency,'usd');assert.equal(line.unit_amount,2345);
+      assert.match(line.product_data.description,/US\$23\.45/);assert.match(line.product_data.description,script);
+      assert.match(call.custom_text.submit.message,script);
+      assert.match(call.custom_text.after_submit.message,/contactus@hknovaxrproduction\.com/);
+      assert.equal(call.metadata.paymentId,result.data.paymentId);assert.equal(call.payment_intent_data.metadata.paymentId,result.data.paymentId);
+      assert.equal(one('SELECT amount_cents FROM payments WHERE id=?',result.data.paymentId)!.amount_cents,2345);
+    }
+    assert.equal(one('SELECT wallet_micros FROM users WHERE id=?',user.id)!.wallet_micros,0);
+    assert.equal(one('SELECT COUNT(*) AS n FROM ledger WHERE user_id=?',user.id)!.n,0);
+  }finally{created.mock.restore();}
+});
+
+test('omitted Checkout language follows a supported profile and falls back to English for a legacy unsupported profile',async()=>{
+  const spanish=localizedViewer('es'),legacy=localizedViewer('unsupported-profile-locale'),{calls,created}=captureCheckoutCalls();
+  try{
+    await request('/api/payments/checkout',{kind:'funding',amount_cents:500},spanish.cookie);
+    const spanishCall=calls.at(-1);assert.equal(spanishCall.locale,'es-419');
+    assert.match(spanishCall.line_items[0].price_data.product_data.description,/US\$5\.00/);
+    assert.match(spanishCall.custom_text.submit.message,/monedero/);
+    await request('/api/payments/checkout',{kind:'funding',amount_cents:500},legacy.cookie);
+    const fallback=calls.at(-1);assert.equal(fallback.locale,'en');
+    assert.match(fallback.line_items[0].price_data.product_data.description,/wallet credit/);
+    assert.match(fallback.custom_text.submit.message,/No subscription/);
+  }finally{created.mock.restore();}
+});
+
+test('a configured wallet product retains localized instructions without overriding its saved product data',async()=>{
+  const user=localizedViewer('en'),{calls,created}=captureCheckoutCalls();config.stripeWalletProductId='prod_live_messaging_fixture';
+  try{
+    await request('/api/payments/checkout',{kind:'funding',amount_cents:1007,language:'ja'},user.cookie);
+    const call=calls[0],line=call.line_items[0].price_data;
+    assert.equal(call.locale,'ja');assert.equal(line.product,'prod_live_messaging_fixture');assert.equal(line.product_data,undefined);
+    assert.equal(line.currency,'usd');assert.equal(line.unit_amount,1007);
+    assert.match(call.custom_text.submit.message,/ウォレット/);assert.match(call.custom_text.after_submit.message,/contactus@hknovaxrproduction\.com/);
+    assert.equal(call.branding_settings.display_name,'LingYing · HK NovaXR Production');
+    assert.equal(one('SELECT wallet_micros FROM users WHERE id=?',user.id)!.wallet_micros,0);
+  }finally{created.mock.restore();}
+});
+
+test('unsupported or injected language is rejected before Checkout and client fields cannot replace wallet copy or currency',async()=>{
+  const user=localizedViewer('en'),{calls,created}=captureCheckoutCalls();
+  try{
+    for(const language of ['xx','en-US','<script>alert(1)</script>','zh-TW\r\nhttps://untrusted.example.test',{locale:'zh-TW'}]){
+      const response=await request('/api/payments/checkout',{kind:'funding',amount_cents:500,language},user.cookie,400);assert.equal(response.data.error.code,'VALIDATION');
+    }
+    await request('/api/payments/checkout',{kind:'funding',amount_cents:499,language:'en'},user.cookie,400);
+    assert.equal(calls.length,0);assert.equal(one('SELECT COUNT(*) AS n FROM payments WHERE user_id=?',user.id)!.n,0);
+    await request('/api/payments/checkout',{kind:'funding',amount_cents:500,language:'en',currency:'hkd',custom_text:{submit:{message:'UNTRUSTED CLIENT COPY'}},branding_settings:{display_name:'UNTRUSTED CLIENT NAME'}},user.cookie);
+    const call=calls[0];assert.equal(call.line_items[0].price_data.currency,'usd');assert.equal(call.line_items[0].price_data.unit_amount,500);
+    assert.equal(call.branding_settings.display_name,'LingYing · HK NovaXR Production');assert.doesNotMatch(call.custom_text.submit.message,/UNTRUSTED/);
+    assert.equal(one('SELECT wallet_micros FROM users WHERE id=?',user.id)!.wallet_micros,0);
     assert.equal(one('SELECT COUNT(*) AS n FROM ledger WHERE user_id=?',user.id)!.n,0);
   }finally{created.mock.restore();}
 });

@@ -4,12 +4,14 @@ import { config } from './config.js';
 import {publicAppUrl,stripeSiteOrigin} from './origins.js';
 import { one, run, transaction } from './db.js';
 import { AppError,assert } from './errors.js';
-import { ACTIVATION_HKD_CENTS,MIN_WALLET_FUNDING_CENTS,MAX_WALLET_FUNDING_CENTS } from '../shared/config.js';
+import { ACTIVATION_HKD_CENTS,MIN_WALLET_FUNDING_CENTS,MAX_WALLET_FUNDING_CENTS,LANGUAGES } from '../shared/config.js';
+import {checkoutCopy} from '../shared/checkout-copy.js';
 import { paymentTable,purchaseTable,ledgerTable,financeAccount,accountTable,accountIdColumn,hasEpisodePurchase } from './payment-state.js';
 import {assertPaymentAccountClear,assertPaymentPayoutsClear,recordPaymentLink} from './payment-risk.js';
 import {ensureStripeWebhookReady,stripeWebhookReadiness,resetStripeReadiness} from './stripe-readiness.js';
 
 export let stripe = config.stripeKey ? new Stripe(config.stripeKey, {httpClient:Stripe.createFetchHttpClient()}) : null;
+const stripeLocales:Record<string,Stripe.Checkout.SessionCreateParams.Locale>={en:'en','zh-TW':'zh-TW','zh-CN':'zh',ja:'ja',ko:'ko',id:'id','pt-BR':'pt-BR',es:'es-419',vi:'vi',th:'th',fil:'fil',tr:'tr',ru:'ru',fr:'fr',de:'de',ms:'ms'};
 export function configureStripe(){stripe=config.stripeKey?new Stripe(config.stripeKey,{httpClient:Stripe.createFetchHttpClient()}):null;resetStripeReadiness();}
 export function stripeModeMatches(livemode:unknown){return typeof livemode==='boolean'&&livemode===/^(sk|rk)_live_/.test(config.stripeKey);}
 export function stripeTestPayments(){return config.stripeTestMode||config.sandbox||config.payments==='stripe'&&/^(sk|rk)_test_/.test(config.stripeKey);}
@@ -94,7 +96,7 @@ export function requestWithdrawal(userId: string, amountCents: number, note = ''
     return id;
   });
 }
-export async function createCheckout(userId: string, kind: 'funding' | 'activation', cents: number) {
+export async function createCheckout(userId: string, kind: 'funding' | 'activation', cents: number, languageCode?:string) {
   if(config.payments==='stripe'&&stripeConfigured())await ensureStripeWebhookReady(stripe);
   assert(paymentsReady(),503,'PAYMENTS_UNAVAILABLE','Payments are not configured yet. Please try again later.');
   assertPaymentAccountClear(userId);
@@ -113,6 +115,12 @@ export async function createCheckout(userId: string, kind: 'funding' | 'activati
     }
   }
   const currency=kind==='activation'?'hkd':'usd',amount=kind==='activation'?ACTIVATION_HKD_CENTS:cents;
+  const requestedLanguage=languageCode||one('SELECT language FROM users WHERE id=?',userId)?.language||'en';
+  const checkoutLanguage=LANGUAGES.some(language=>language.code===requestedLanguage)?requestedLanguage:'en';
+  // Custom messages cover every app language. Stripe's own controls use its
+  // supported locale, with English for languages its hosted UI does not offer.
+  const locale=stripeLocales[checkoutLanguage]||'en';
+  const messages=checkoutCopy(checkoutLanguage,kind==='funding'?amount:0);
   for(let attempt=0;attempt<3;attempt++){
     const payment=transaction(()=>{
       if(kind==='activation'){
@@ -139,8 +147,10 @@ export async function createCheckout(userId: string, kind: 'funding' | 'activati
     }
     try{
       const metadata={app:'aidramio',site:stripeSiteOrigin(),financialMode:config.stripeTestMode?'test':'default',paymentId:id,userId};
-      const session=await stripe!.checkout.sessions.create({mode:'payment',payment_method_types:['card'],client_reference_id:id,metadata,payment_intent_data:{metadata},
-        line_items:kind==='activation'&&config.stripeActivationPriceId?[{price:config.stripeActivationPriceId,quantity:1}]:[{price_data:{currency,unit_amount:amount,...(kind==='funding'&&config.stripeWalletProductId?{product:config.stripeWalletProductId}:{product_data:{name:kind==='activation'?'Dramio Pass':'LingYing wallet credit'}})},quantity:1}],
+      const session=await stripe!.checkout.sessions.create({mode:'payment',payment_method_types:['card'],client_reference_id:id,metadata,payment_intent_data:{metadata},locale,
+        branding_settings:{display_name:'LingYing · HK NovaXR Production'},
+        custom_text:{after_submit:{message:messages.afterSubmit},...(kind==='funding'?{submit:{message:messages.submit}}:{})},
+        line_items:kind==='activation'&&config.stripeActivationPriceId?[{price:config.stripeActivationPriceId,quantity:1}]:[{price_data:{currency,unit_amount:amount,...(kind==='funding'&&config.stripeWalletProductId?{product:config.stripeWalletProductId}:{product_data:{name:kind==='activation'?'Dramio Pass':'LingYing wallet credit',...(kind==='funding'?{description:messages.description}:{})}})},quantity:1}],
         success_url:`${publicAppUrl()}/${kind==='activation'?'studio':'wallet'}?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url:`${publicAppUrl()}/${kind==='activation'?'studio':'wallet'}?checkout=cancelled`,
       },{idempotencyKey:`checkout:${id}`});

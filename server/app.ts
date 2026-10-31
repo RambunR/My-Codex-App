@@ -207,8 +207,8 @@ export function createApp() {
   });
   app.get('/api/wallet', requireAuth, (req,res) => res.json({ user: getUser(req.user!.id), ledger: all(`SELECT * FROM ${ledgerTable()} WHERE user_id=? ORDER BY created_at DESC,rowid DESC LIMIT 100`,req.user!.id), payments: all(`SELECT id,kind,amount_cents,currency,status,created_at FROM ${paymentTable()} WHERE user_id=? ORDER BY created_at DESC LIMIT 30`,req.user!.id) }));
   app.post('/api/payments/checkout', requireAuth, rateLimit('checkout',20,60_000), async (req,res) => {
-    const body=z.discriminatedUnion('kind',[z.object({kind:z.literal('activation')}),z.object({kind:z.literal('funding'),amount_cents:z.number().int().min(MIN_WALLET_FUNDING_CENTS).max(MAX_WALLET_FUNDING_CENTS)})]).parse(req.body);
-    res.json(await createCheckout(req.user!.id,body.kind,body.kind==='funding'?body.amount_cents:8800));
+    const body=z.discriminatedUnion('kind',[z.object({kind:z.literal('activation')}),z.object({kind:z.literal('funding'),amount_cents:z.number().int().min(MIN_WALLET_FUNDING_CENTS).max(MAX_WALLET_FUNDING_CENTS)})]).and(z.object({language:language.optional()})).parse(req.body);
+    res.json(await createCheckout(req.user!.id,body.kind,body.kind==='funding'?body.amount_cents:8800,body.language));
   });
   app.post('/api/payments/:id/cancel',requireAuth,rateLimit('checkout-cancel',30,60_000),async(req,res)=>{
     res.json(await cancelCheckout(req.user!.id,id(req)));
