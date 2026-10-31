@@ -55,3 +55,7 @@ Gran Dillama and Llamigos are directed by **Pablo Vazquez** according to their o
 - A free-to-watch short on YouTube, TikTok, another drama app, or an archive is **not** by itself permission to download and republish. No modern Chinese short-drama catalogue was cleared in this research.
 
 Choose content before importing; this report does not select or publish films on the owner's behalf.
+
+## Prepared local package
+
+`LingYing-CC-BY-Starter-Episodes.zip` contains three MP4s plus README, attribution and media-validation files, totalling 44.77 MiB. Llama Drama is 90.024 seconds / 7.37 MiB, Gran Dillama is 146.083 seconds / 18.37 MiB, and Llamigos is 150.101 seconds / 19.20 MiB. All three are 1280×720 H.264 with the original AAC audio copied unchanged. Complete picture sequences and end credits remain; frame counts, audio hashes, full decoding and ZIP integrity checks passed. Each episode meets the existing 180-second and 75 MiB upload limits. This downloadable artifact is provided in the task response, rather than added to Git source or published as website content. Extract it and upload the three videos yourself, retaining the supplied attribution in the public synopsis.
