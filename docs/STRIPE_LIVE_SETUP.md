@@ -150,6 +150,8 @@ The website sends its selected interface language with the Checkout request. The
 
 The current inline wallet product includes the dynamic description. If an operator configures a saved wallet product ID later, its catalogue description is retained while the localized payment/support messages still apply. Dramio Pass shares the branding/support text, without wallet-credit or top-up copy. Existing open Sessions retain their original text; start a new Checkout to see updated messages. No amount, fee, wallet entitlement or payment-mode setting is changed by this wording.
 
+Verified on 1 November 2026 (Hong Kong time): source `ae566a5d1a0bbc936e651bdb4086e979cd923c96` deployed as main Worker version `6b906651-1004-4e3c-9bb1-5a288e2c35dc`. All 165 backend tests, 30 browser scenarios, the Cloudflare integration suite and both TypeScript builds passed. One live US$25 Checkout visibly displayed the header, exact credit description, confirmation message and support email. It was expired without card entry or payment submission; the wallet stayed zero with no funding entry. Its signed live expiration receipt reached the custom domain at 01:32:46 Hong Kong time. No charge was made, and no second Session was created for this copy check.
+
 ## Test records and creator payouts
 
 Test wallets, passes, purchases and earnings remain in separate `test_*` financial tables. **They must never be copied or converted into real balances, live Dramio Pass ownership or payable creator earnings.** After the live switch, users see their existing real financial state; test-only balances/pass status may therefore no longer appear active. Their accounts, profiles and uploaded media remain intact.
