@@ -1,45 +1,67 @@
 # LingYing custom domain
 
-Target domain: **https://lingyingdrama.com**, Cloudflare zone `ae6b34326f28faf55a6c7179d57bcba7`. `www.lingyingdrama.com` is an alias. Both attach to the existing `lingying` Worker, preserving stable Worker ID `bab19a0d39cb45bab68f525e17a95603`, SQLite namespace, private media bucket and encrypted provider credentials.
+The configured primary website and browser API are **https://lingyingdrama.com**. `https://www.lingyingdrama.com` is an alias that redirects to the canonical domain. Cloudflare zone: `ae6b34326f28faf55a6c7179d57bcba7`.
 
-## Staged connection
+The owner explicitly requested direct-domain operation before the external provider settings were completed. The former staging redirect to `workers.dev` is being retired. Deployment and live verification must confirm the actual public behavior; changing this document does not register provider callbacks or establish a successful provider sign-in.
 
-The domain routes are attached while `APP_URL` and `PUBLIC_APP_URL` retain the working `workers.dev` origins. Canonical page routing forwards the new domain to the working public site during provider setup; it does not expose a cross-site cookie dependency as a broken login form. The current API/session/callback endpoints stay functional.
+Both domain routes attach to the existing `lingying` Worker, preserving stable Worker ID `bab19a0d39cb45bab68f525e17a95603`, SQLite namespace `69f8c140ca6840ad8761ba5977fbde53`, private bucket `aidramio-media-887486`, the existing Durable Object class/migration, and encrypted provider credentials. No additional application or Pages project is required.
 
-`STRIPE_SITE_ORIGIN` is explicitly pinned to the original `https://aidramio.jimmy-tsoi2001.workers.dev` logical financial identity. This value does not need to be a browsable website after retirement. Pending Checkout metadata remains valid. Signed POST deliveries to `/api/payments/webhook` reach the handler without an HTTP redirect on either host.
+## Website and API configuration
 
-Cloudflare assets must use `run_worker_first: true`: otherwise the asset service bypasses canonical routing for the homepage, SPA routes and existing files. The runtime smoke checks GET and HEAD redirects for those paths before testing the primary site's normal flows.
+`APP_URL` and `PUBLIC_APP_URL` are both `https://lingyingdrama.com`. The frontend `PUBLIC_SITE_ORIGIN` and `API_SITE_ORIGIN` defaults use the custom domain too. The website and browser API share one origin: host-only Secure/HttpOnly/SameSite cookies remain secure without relying on cross-site cookie access to `workers.dev`. Existing users sign in once on the new domain; the same account IDs, wallets, purchases, publisher state, media and analytics remain in the original database.
 
-## Provider updates
+`STRIPE_SITE_ORIGIN` stays pinned to `https://aidramio.jimmy-tsoi2001.workers.dev` as an **internal logical financial identity**. It is not a customer-facing API endpoint and does not need to remain a browsable website after retirement. Keeping that value preserves existing and pending Checkout metadata while success/cancellation links and customer API calls use the custom domain.
 
-Keep the same OAuth client IDs, Apple Services ID and signing key to preserve existing external identity/account associations. Add the new entries before removing old ones:
+Cloudflare assets use `run_worker_first: true` so canonical routing applies to homepages, SPA routes and existing files. Signed POST deliveries to `/api/payments/webhook` reach signature verification directly without an HTTP redirect. Stripe test mode, test catalogue IDs and encrypted credentials remain unchanged by this hostname move.
 
-- Google: `https://lingyingdrama.com/api/auth/google/callback`.
-- Apple domain: `lingyingdrama.com`; return URL: `https://lingyingdrama.com/api/auth/apple/callback`.
-- Stripe: after custom-domain HTTPS and its webhook handler are reachable, edit the existing **test** webhook endpoint URL to `https://lingyingdrama.com/api/payments/webhook`; preserve its signing secret and Snapshot event selections. This migration does not enable live payments.
+## Pending Google and Apple setup
 
-### Owner setup steps
+The latest public authorization checks rejected the new callback URLs: Google returned `redirect_uri_mismatch`; Apple returned `invalid_request` with an invalid redirect URL reason. Both old-URL controls reached provider login pages. These checks did not complete a real sign-in or alter provider configuration.
 
-1. Open [Google Auth Platform → Clients](https://console.cloud.google.com/auth/clients), select the existing website project and Web application client, and add `https://lingyingdrama.com/api/auth/google/callback` under **Authorized redirect URIs**. If configuring JavaScript origins, add `https://lingyingdrama.com` without a path. Save. Keep the existing credentials and old callback entries.
-2. Open the [existing Apple Services ID](https://developer.apple.com/account/resources/identifiers/serviceId/edit/XSTKUY7NAY), confirm identifier `com.hknovaxrproduction.aidramio.web`, then **Sign in with Apple → Configure**. Keep primary App ID `com.hknovaxrproduction.aidramio`. Add `lingyingdrama.com` to **Domains and Subdomains** and `https://lingyingdrama.com/api/auth/apple/callback` to **Return URLs**, alongside the old entries, using commas between entries. Choose **Next/Done → Continue → Save** as shown by Apple's current form. Do not put an app name or bundle ID into the URL fields, or replace the signing key.
-3. Open [Stripe Webhooks](https://dashboard.stripe.com/webhooks) in the same test environment used by the website. In the existing webhook endpoint (or **Workbench → Webhooks → Event destinations**), choose **Edit destination/endpoint** and change only its endpoint URL to `https://lingyingdrama.com/api/payments/webhook`. Preserve its events, API version, payload type and signing secret. Save. Do not create a new endpoint or enable live payments for this move.
+Keep the same OAuth client IDs, Apple Services ID and signing key to preserve existing identity/account associations. Add the new entries alongside old ones:
 
-After these settings are saved, confirm completion so the website's primary origins can move together. Callback registration can be checked without completing a real sign-in; full sign-in and signed webhook delivery still need their own verification.
+1. Open [Google Auth Platform → Clients](https://console.cloud.google.com/auth/clients), select the existing website project and Web application client, and add `https://lingyingdrama.com/api/auth/google/callback` under **Authorized redirect URIs**. If configuring JavaScript origins, add `https://lingyingdrama.com` without a path. Save.
+2. Open the [existing Apple Services ID](https://developer.apple.com/account/resources/identifiers/serviceId/edit/XSTKUY7NAY), confirm identifier `com.hknovaxrproduction.aidramio.web`, then **Sign in with Apple → Configure**. Keep primary App ID `com.hknovaxrproduction.aidramio`. Add `lingyingdrama.com` to **Domains and Subdomains** and `https://lingyingdrama.com/api/auth/apple/callback` to **Return URLs**, alongside the old entries, using commas between entries. Choose **Next/Done → Continue → Save** as shown by Apple's current form.
+3. Recheck public callback acceptance, then complete a real sign-in and returning-account check for each provider. Credential presence is not a completed sign-in test.
 
-## Final primary-origin switch
+Use only the domain in Apple's domain field and a full HTTPS URL in its return-URL field. Existing provider client IDs, signing key and Worker secrets do not need replacement for these registration updates.
 
-After new provider registrations are confirmed, change `APP_URL` and `PUBLIC_APP_URL` together to `https://lingyingdrama.com`. Set the frontend `PUBLIC_SITE_ORIGIN` and `API_SITE_ORIGIN` defaults to `CUSTOM_SITE_ORIGIN`; retain the separate legacy constants for compatibility routing. Leave `STRIPE_SITE_ORIGIN` pinned to its current value. Deploy both the main Worker and compatibility gateway before retiring any alias, so old page redirects target the current domain.
+## Move the existing Stripe test webhook to this domain
 
-The `.com` UI and API must share one origin. Reusing the old API through cross-site requests would withhold SameSite=Lax cookies and fail mutation protection. Existing users sign in once on the new domain; account IDs, wallets, purchases, publisher state, media and analytics remain in the same database. Cookies are not widened across registrable domains.
+The current integration remains **Stripe test mode**. This domain change does not enable live charges or creator payouts.
 
-Old page redirects preserve path and query for existing bookmarks and in-flight Checkout returns. Stripe Sessions created before migration cannot have their return URLs updated by this integration and normally expire within 24 hours. Keep compatibility routes while those flows complete.
+1. Open [Stripe Dashboard → Webhooks](https://dashboard.stripe.com/webhooks), using the **same test environment/Sandbox currently connected to LingYing**.
+2. In **Workbench → Webhooks / Event destinations**, open the existing active destination whose endpoint URL is `https://aidramio.jimmy-tsoi2001.workers.dev/api/payments/webhook`.
+3. Choose **Edit destination/endpoint** and change its endpoint URL to:
 
-## Address cleanup
+   ```text
+   https://lingyingdrama.com/api/payments/webhook
+   ```
 
-The `lingying` Worker is the application serving the purchased domain, so deleting it would delete the running website. Retire its `workers.dev` and preview addresses only after the domain and in-flight flows are validated. Delete the `aidramio` gateway only after Google/Apple callbacks and Stripe webhook delivery have moved successfully. Its legacy metadata label and the media bucket/class names do not require customer-data migrations or deletion.
+4. Keep **Snapshot** payloads, events on the existing Stripe account, and the existing API version. Preserve these four event selections:
 
-Other existing Workers, purchased domains, email DNS and storage must remain untouched. Old sandbox removal is a separate retirement decision because its Worker owns an isolated test database.
+   ```text
+   checkout.session.completed
+   checkout.session.async_payment_succeeded
+   checkout.session.async_payment_failed
+   checkout.session.expired
+   ```
 
-## Validation
+5. Save the same destination so its endpoint identity and signing secret remain unchanged. The existing `STRIPE_WEBHOOK_SECRET` on the **lingying** Worker continues to match it. Existing API keys, products/prices and client credentials do not need replacement for this URL edit.
+6. Inspect a test delivery in Stripe Workbench and confirm a direct HTTP 2xx response at the new URL. A website Checkout return may reconcile payment server-side, so that return alone does not independently prove webhook delivery. A synthetic or unrelated event must not create arbitrary wallet credit.
 
-The staged change passed 120 backend tests, eight focused routing tests, 25 browser journeys, ten secure same-origin browser scenarios and three separately labelled development-demo payment scenarios. It preserves the distinction between local demo confirmations and real provider verification. The local Cloudflare integration suite additionally checks persisted sessions, uploads, ranges and financial separation. Actual custom-domain TLS and provider acceptance are checked after provisioning and owner registration updates.
+Preserve `STRIPE_SITE_ORIGIN`, `STRIPE_TEST_MODE=true` and the current test keys/catalogue during this move. Keep signing secrets in Cloudflare Secrets. Live-mode setup is a separate release decision after the production-readiness blockers are addressed.
+
+## Temporary compatibility and old-address cleanup
+
+Old `lingying.jimmy-tsoi2001.workers.dev` and `aidramio.jimmy-tsoi2001.workers.dev` addresses are temporary compatibility routes, not the primary customer website or API. Old page redirects preserve path and query for existing bookmarks and in-flight Checkout returns; the gateway also continues forwarding signed legacy webhook deliveries while the destination is moved.
+
+Stripe Sessions created before migration retain their original return URLs and normally expire within 24 hours. Old-host browser sessions and OAuth binding cookies do not transfer to the new domain. Users sign in once on the custom domain; an OAuth attempt started on the old host may need restarting. Old callback addresses now redirect to the custom origin, and retaining the gateway does not supply a cross-host OAuth handoff or make an unregistered new callback work. The gateway remains for old links, raw webhook deliveries and old Checkout return URLs while those dependencies are retired.
+
+The `lingying` Worker is the application serving the purchased domain: deleting it would delete the running website. Retire its old `workers.dev` and preview aliases after domain, provider and in-flight-flow checks. Delete the `aidramio` gateway only after its callback/webhook/return-link dependencies are gone. Internal financial metadata, bucket names and the existing class name are data identifiers, not duplicate websites requiring deletion.
+
+Other applications, purchased domains, email DNS and storage must remain untouched. Old sandbox removal remains a separate retirement decision because that Worker owns an isolated test database.
+
+## Validation status
+
+The preceding staged change passed 120 backend checks, eight focused routing checks, 25 browser journeys, ten secure same-origin browser scenarios and three explicitly labelled local-demo payment scenarios. These are historical test results for the staging change, not proof that the external providers have accepted the new domain. The direct-domain switch must be checked again for canonical routing, same-origin sign-in/session behavior, uploads/media, preserved financial identity and live custom-domain TLS. Record the final deployment and public verification separately; complete provider acceptance and signed webhook delivery checks after the owner saves the provider settings.

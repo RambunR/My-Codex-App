@@ -38,7 +38,7 @@
   ],
   "vars": {
     "ENVIRONMENT": "production",
-    "APP_URL": "https://aidramio.jimmy-tsoi2001.workers.dev",
+    "APP_URL": "https://lingyingdrama.com",
     "PAYMENTS_MODE": "stripe",
     "STRIPE_TEST_MODE": "true",
     "STRIPE_ACTIVATION_PRICE_ID": "price_1UV7jBJ6Er233b9cr0ahOada",
@@ -48,7 +48,7 @@
     "EMAIL_PROVIDER": "cloudflare",
     "CF_EMAIL_ACCOUNT_ID": "95040c4f244233138195b80657887486",
     "MAIL_FROM": "LingYing <accounts@hknovaxrproduction.com>",
-    "PUBLIC_APP_URL": "https://lingying.jimmy-tsoi2001.workers.dev",
+    "PUBLIC_APP_URL": "https://lingyingdrama.com",
     "STRIPE_SITE_ORIGIN": "https://aidramio.jimmy-tsoi2001.workers.dev"
   },
   "observability": {
