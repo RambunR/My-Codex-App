@@ -9,7 +9,7 @@ import { LANGUAGES,type Series } from '../shared/config';
 import { brandName } from './brand';
 import './social.css';
 
-export function Brand({small=false}:{small?:boolean}){const{locale,t}=useI18n();const name=brandName(locale);const split=locale.startsWith('zh')?1:4;return <Link to="/" className={`brand ${small?'brand-small':''}`} aria-label={`${name} · ${t('discover')}`}><img className="brand-image" src="/brand-mark.png" alt="" width="36" height="36"/><span lang={locale.startsWith('zh')?locale:'en'} dir="ltr"><b>{name.slice(0,split)}</b>{name.slice(split)}<span className="brand-dot">.</span></span></Link>;}
+export function Brand({small=false}:{small?:boolean}){const{locale,t}=useI18n();const name=brandName(locale);const split=locale.startsWith('zh')?1:4;return <Link to="/" className={`brand ${small?'brand-small':''}`} aria-label={`${name} · ${t('discover')}`}><img className="brand-image" src="/brand-mark.png?v=lingying-phoenix-05-v1" alt="" width="36" height="36"/><span lang={locale.startsWith('zh')?locale:'en'} dir="ltr"><b>{name.slice(0,split)}</b>{name.slice(split)}<span className="brand-dot">.</span></span></Link>;}
 export function Modal({open,onClose,title,children,wide=false}:{open:boolean;onClose:()=>void;title:string;children:ReactNode;wide?:boolean}){
   const{t}=useI18n();
   const ref=useRef<HTMLDivElement>(null);const onCloseRef=useRef(onClose);onCloseRef.current=onClose;

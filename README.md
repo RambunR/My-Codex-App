@@ -14,7 +14,7 @@ Apple registration/sign-in and account linking are implemented; activation requi
 
 Previous brand PNG (historical wordmark): [transparent AIDramio logo](public/aidramio-logo.png), also served at `/aidramio-logo.png`.
 
-The coral play symbol is retained for LingYing and used for the website header, browser favicon, Apple touch icon and installed-app icons.
+LingYing’s current icon is the operator-selected purple–pink origami phoenix (concept 05): [download the full-resolution PNG](public/lingying-icon.png), also served at `/lingying-icon.png`. It supplies the header mark, browser favicon, Apple touch icon, and installed-app icons; Android has a separate padded maskable variant.
 
 Upload test files: [download 10 numbered test episodes](https://aidramio.jimmy-tsoi2001.workers.dev/downloads/dramio-test-episodes.zip). Unzip the archive and select its `Dramio_Test_Episodes` folder in the studio folder uploader. Each MP4 is 10 seconds, 720×1280, H.264 with silent AAC audio, and shows a white episode number on black. All ten were created with FFmpeg without an AI video model; each is approximately 21 KB.
 

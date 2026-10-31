@@ -9,7 +9,7 @@ First published and verified on **26 October 2026, Hong Kong time**. Updated on 
 - New private R2 media bucket: `aidramio-media-887486`; managed public access verified disabled.
 - Database: SQLite-backed `AIDramioApp` Durable Object, bound as `APP`.
 - Google authentication code release: `8363714d-c672-4685-9950-f3aeb6731fb1` (historical; see the Cloudflare dashboard for the latest branding deployment).
-- Brand logo: https://aidramio.jimmy-tsoi2001.workers.dev/aidramio-logo.png (transparent PNG, 1254 × 1254, 389 KiB).
+- Current LingYing icon: https://aidramio.jimmy-tsoi2001.workers.dev/lingying-icon.png (purple–pink origami phoenix, concept 05; 1254 × 1254 PNG). The previous AIDramio wordmark remains at `/aidramio-logo.png` as a historical asset.
 
 The Worker serves the complete frontend and API. The production database starts with free, labelled sample previews and no default administrator login or development wallet credits. Existing Cloudflare applications and buckets were preserved. No account plan was upgraded.
 
