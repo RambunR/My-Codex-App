@@ -65,6 +65,8 @@ Local demo accounts all use **`DemoPass123!`**:
 
 You can also register a new account, activate publishing through the HK$88 test checkout, create a series, upload a real folder, and test purchases using another account. Demo accounts and demo payments are prohibited by the production startup checks.
 
+Owner uploads display **LingYingDrama Offical**. The [Content administration guide](docs/CONTENT_ADMIN.md) explains private episode review, audited takedown/restore, metadata corrections, and uploading your own series. [Free licensed starter films](docs/LICENSED_STARTER_FILMS.md) lists three complete short animations with official download and commercial-reuse permissions.
+
 ## Implemented workflows
 
 - Browse, search, genre and spoken-language filters, rankings based on recorded views, series pages, likes, saves, watch history, and a vertical player with next-episode navigation. Public series cards/details show views and likes; episode tiles show recorded views.

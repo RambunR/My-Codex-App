@@ -162,6 +162,58 @@ try{
   assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.quota_bytes,10*1024**3);
   console.log('PASS: concurrent purchases debit once, exact fractional-cent 70/30 split, payout minimum/approval, storage approval.');
 
+  const adminSeriesPath='/api/admin/series?'+new URLSearchParams({q:body.title,status:'all',page:'1',limit:'5'});
+  await request(adminSeriesPath,undefined,viewer,403);
+  await request(adminSeriesPath,undefined,publisher,403);
+  const managed=(await request(adminSeriesPath,undefined,admin)).data;
+  assert.equal(managed.total,1);assert.equal(managed.series[0].id,sid);assert.equal(managed.series[0].paid_unlocks,1);assert.equal(managed.series[0].taken_down,false);
+  const moderationFinance=async()=>{
+    const [viewerWallet,publisherWallet,report]=await Promise.all([
+      request('/api/wallet',undefined,viewer),request('/api/wallet',undefined,publisher),request('/api/admin',undefined,admin),
+    ]);
+    const balances=user=>({wallet:user.wallet_micros,earnings:user.earnings_micros,publisher_active:user.publisher_active,quota:user.quota_bytes,used:user.used_bytes});
+    return{viewer:{balances:balances(viewerWallet.data.user),ledger:viewerWallet.data.ledger,payments:viewerWallet.data.payments},publisher:{balances:balances(publisherWallet.data.user),ledger:publisherWallet.data.ledger,payments:publisherWallet.data.payments},sales:report.data.stats.sales,withdrawals:report.data.withdrawals};
+  };
+  const beforeModerationFinance=await moderationFinance();
+  const moderationPath=`/api/admin/series/${sid}/moderation`;
+  await request(moderationPath,{action:'takedown',reason:'Local runtime review of a series with an existing paid viewer.'},publisher,403);
+  const removed=(await request(moderationPath,{action:'takedown',reason:'Local runtime review of a series with an existing paid viewer.'},admin)).data;
+  assert.equal(removed.taken_down,true);assert.equal(removed.alreadyApplied,false);
+  assert.equal((await request(newestPath)).data.series.some(series=>series.id===sid),false);
+  for(const identity of ['',viewer,publisher,admin]){
+    await request(`/api/series/${sid}`,undefined,identity,404);
+    await request(`/api/series/${sid}/cover`,undefined,identity,404);
+    await request(`/api/episodes/${first.id}/stream`,undefined,identity,404);
+    await request(`/api/episodes/${second.id}/stream`,undefined,identity,404);
+  }
+  await request(`/api/episodes/${second.id}/unlock`,{},viewer,404);
+  await request(`/api/episodes/${first.id}/unlock`,{},publisher,404);
+  await request(`/api/episodes/${first.id}/playback`,{},guestPlayback.cookie,404);
+  await request(`/api/playback/${guestPlayback.data.sessionId}`,{watchedMs:3300},guestPlayback.cookie,404,'PUT');
+  await request(`/api/studio/series/${sid}/status`,{status:'published'},publisher,423);
+  await request(`/api/studio/series/${sid}`,undefined,viewer,403);
+  const privateEditor=(await request(`/api/studio/series/${sid}`,undefined,admin)).data;
+  assert.equal(privateEditor.series.taken_down,true);assert.equal(privateEditor.series.status,'published');assert.equal(privateEditor.episodes.length,2);assert.equal(privateEditor.series.views,1);
+  assert.equal((await request(`/api/studio/series/${sid}`,undefined,publisher)).data.series.taken_down,true);
+  const privateCover=await fetch(base+`/api/studio/series/${sid}/cover`,{headers:{Cookie:admin}});
+  assert.equal(privateCover.status,200);assert.equal(privateCover.headers.get('cache-control'),'private, no-store');assert.deepEqual(Buffer.from(await privateCover.arrayBuffer()),cover);
+  await request(`/api/admin/episodes/${second.id}/stream`,undefined,viewer,403);
+  const reviewStream=await fetch(base+`/api/admin/episodes/${second.id}/stream`,{headers:{Cookie:admin,Range:'bytes=0-15'}});
+  assert.equal(reviewStream.status,206);assert.equal(reviewStream.headers.get('cache-control'),'private, no-store');assert.equal((await reviewStream.arrayBuffer()).byteLength,16);
+  const reviewedDetails={...body,description:body.description+' Metadata verified during a local administrative review.'};
+  await request(`/api/studio/series/${sid}`,reviewedDetails,admin,200,'PATCH');
+  const reviewedEditor=(await request(`/api/studio/series/${sid}`,undefined,admin)).data;
+  assert.equal(reviewedEditor.series.description,reviewedDetails.description);assert.equal(reviewedEditor.series.taken_down,true);assert.equal(reviewedEditor.series.views,1);
+  await request(moderationPath,{action:'restore',reason:'Local runtime review completed; retain existing purchases and media.'},admin);
+  const moderationAudit=(await request(moderationPath,undefined,admin)).data.events;
+  assert.deepEqual(moderationAudit.map(event=>event.action),['restore','metadata','takedown']);
+  assert.equal(moderationAudit[1].snapshot.after.description,reviewedDetails.description);
+  assert.equal((await request(`/api/series/${sid}`,undefined,viewer)).data.episodes.find(episode=>episode.id===second.id).unlocked,true);
+  const restoredPaid=await fetch(base+`/api/episodes/${second.id}/stream`,{headers:{Cookie:viewer,Range:'bytes=0-15'}});
+  assert.equal(restoredPaid.status,206);assert.equal((await restoredPaid.arrayBuffer()).byteLength,16);
+  assert.deepEqual(await moderationFinance(),beforeModerationFinance);
+  console.log('PASS: Cloudflare SQL moderation hides purchased content, preserves private admin review and audit history, blocks publisher republication, and restores access without changing money.');
+
   await stop();await start(true,true);
   const stripeTest=(await request('/api/config')).data;
   assert.equal(stripeTest.paymentsMode,'stripe');assert.equal(stripeTest.paymentsTestMode,true);assert.equal(stripeTest.paymentsReady,true);assert.equal(stripeTest.sandbox,false);assert.equal(stripeTest.uploadsEnabled,true);assert.equal(stripeTest.auth.google,true);
@@ -195,6 +247,9 @@ try{
   const retainedNewest=(await request(newestPath)).data.series;assert.equal(retainedNewest[0].id,sid);assert.equal(retainedNewest[0].published_at,publishedAt);
   const resumedGuest=(await request(`/api/episodes/${first.id}/playback`,{},guestPlayback.cookie)).data;assert.equal(resumedGuest.sessionId,guestPlayback.data.sessionId);assert.equal(resumedGuest.viewCounted,true);
   const retainedAnalytics=(await request(`/api/studio/series/${sid}/analytics?period=7d`,undefined,publisher)).data;assert.equal(retainedAnalytics.totals.views,1);assert.equal(retainedAnalytics.totals.avgWatchSeconds,3.2);assert.equal(retainedAnalytics.totals.paidViewers,1);assert.equal(retainedAnalytics.episodes.find(episode=>episode.id===second.id).paidViewers,1);
+  const retainedModerationAudit=(await request(moderationPath,undefined,admin)).data.events;
+  assert.deepEqual(retainedModerationAudit,moderationAudit);
+  assert.equal((await request(`/api/studio/series/${sid}`,undefined,admin)).data.series.taken_down,false);
   await request('/api/auth/google/start',undefined,'',503);
   assert.equal((await request('/api/auth/me',undefined,viewer)).data.user.wallet_micros,4_990_000);
   assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.earnings_micros,507_000);

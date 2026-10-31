@@ -1,8 +1,10 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { LANGUAGES, type Locale } from '../shared/config';
 import { additionalMessages,googleAuthEnglish,googleAuthMessages,walletFundingEnglish,walletFundingMessages,sandboxEnglish,sandboxMessages,stripeTestingEnglish,stripeTestingMessages,analyticsEnglish,analyticsMessages,dramioPassEnglish,dramioPassMessages,editorValidationEnglish,editorValidationMessages,accountAuthEnglish,accountAuthMessages,livePaymentEnglish,livePaymentMessages } from './localeExtras';
+import {contentAdminEnglish,contentAdminMessages} from './content-admin-locales';
 
 const en = {
+  ...contentAdminEnglish,
   ...googleAuthEnglish,
   ...walletFundingEnglish,
   ...sandboxEnglish,
@@ -140,6 +142,7 @@ for(const language of LANGUAGES){if(!dramioPassMessages[language.code])throw new
 for(const language of LANGUAGES){if(!editorValidationMessages[language.code])throw new Error(`Editor validation translations missing: ${language.code}`);Object.assign(dictionaries[language.code],editorValidationMessages[language.code]);}
 for(const language of LANGUAGES){if(!accountAuthMessages[language.code])throw new Error(`Account authentication translations missing: ${language.code}`);Object.assign(dictionaries[language.code],accountAuthMessages[language.code]);}
 for(const language of LANGUAGES){if(!livePaymentMessages[language.code])throw new Error(`Live payment translations missing: ${language.code}`);Object.assign(dictionaries[language.code],livePaymentMessages[language.code]);}
+for(const language of LANGUAGES){if(!contentAdminMessages[language.code])throw new Error(`Content admin translations missing: ${language.code}`);Object.assign(dictionaries[language.code],contentAdminMessages[language.code]);}
 // Shared scripts are deliberately kept in their chosen script; traditional and simplified Chinese are independent locales.
 const I18nContext=createContext<{locale:Locale;setLocale:(l:Locale)=>void;t:(key:Key)=>string}>({locale:'en',setLocale:()=>{},t:k=>en[k]});
 export const baseMessages=en;

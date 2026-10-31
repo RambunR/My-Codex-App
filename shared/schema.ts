@@ -11,6 +11,10 @@ CREATE TABLE IF NOT EXISTS users (
  quota_bytes INTEGER NOT NULL DEFAULT 5368709120 CHECK(quota_bytes >= 0), used_bytes INTEGER NOT NULL DEFAULT 0 CHECK(used_bytes >= 0),
  stripe_account_id TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS platform_owner_access_events (
+ id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), previous_role TEXT NOT NULL,
+ promoted_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 CREATE TABLE IF NOT EXISTS sessions (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS oauth_identities (
  provider TEXT NOT NULL CHECK(provider='google'), subject TEXT NOT NULL,
@@ -42,6 +46,19 @@ CREATE TABLE IF NOT EXISTS episodes (
 CREATE TABLE IF NOT EXISTS series_publications (
  series_id TEXT PRIMARY KEY REFERENCES series(id) ON DELETE CASCADE, published_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS series_moderation (
+ series_id TEXT PRIMARY KEY REFERENCES series(id) ON DELETE CASCADE,
+ taken_down INTEGER NOT NULL DEFAULT 0 CHECK(taken_down IN (0,1)), reason TEXT NOT NULL,
+ actor_id TEXT NOT NULL REFERENCES users(id),
+ created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS series_moderation_events (
+ id TEXT PRIMARY KEY, series_id TEXT NOT NULL REFERENCES series(id), actor_id TEXT NOT NULL REFERENCES users(id),
+ action TEXT NOT NULL CHECK(action IN ('takedown','restore','metadata')), reason TEXT NOT NULL,
+ snapshot_json TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS series_moderation_visibility ON series_moderation(taken_down,series_id);
+CREATE INDEX IF NOT EXISTS series_moderation_audit ON series_moderation_events(series_id,created_at);
 CREATE TABLE IF NOT EXISTS purchases (
  id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), episode_id TEXT NOT NULL REFERENCES episodes(id),
  price_micros INTEGER NOT NULL, creator_micros INTEGER NOT NULL, platform_micros INTEGER NOT NULL,

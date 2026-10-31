@@ -14,7 +14,9 @@ import { AppError, assert } from './errors.js';
 import { readSession, requireAuth, requirePublisher, requireAdmin, hashPassword, verifyPassword, createSession, destroySession, getUser, rateLimit } from './auth.js';
 import { prepareVideo, prepareCover, putObject, deleteObject, serveObject, removeTempFile } from './storage.js';
 import { createCheckout, cancelCheckout, settlePayment, unlockEpisode, requestWithdrawal,returnWithdrawalFunds, addLedger, stripe,paymentsReady,stripeConfigured,stripeModeMatches,stripeTestPayments,assertPayoutsEnabled } from './finance.js';
-import {processRiskEvent,recordPaymentLink,adminPaymentReviews,resolvePaymentReview} from './payment-risk.js';
+import {processRiskEvent,recordPaymentLink,adminPaymentReviews,resolvePaymentReview,assertPaymentAccountClear} from './payment-risk.js';
+import {ensurePlatformOwnerAccess,creatorDisplayName} from './owner.js';
+import {publicSeriesAllowedSql,assertSeriesAvailable,assertSeriesWritable,moderationState,setSeriesModeration,recordSeriesMetadataEdit,adminModerationEvents,listAdminSeries} from './moderation.js';
 import {ensureStripeWebhookReady,stripeWebhookReadiness} from './stripe-readiness.js';
 import { paymentTable,purchaseTable,ledgerTable,hasEpisodePurchase,usingTestPaymentState } from './payment-state.js';
 import { startPlayback,recordPlayback,readSeriesAnalytics } from './analytics.js';
@@ -30,17 +32,22 @@ const seriesSchema = z.object({ title: z.string().trim().min(SERIES_LIMITS.title
 });
 function ownSeries(req: Request, seriesId = id(req)) {
   const s = one('SELECT * FROM series WHERE id=?', seriesId);
-  assert(s, 404, 'NOT_FOUND', 'Series not found.'); assert(s.creator_id === req.user!.id, 403, 'FORBIDDEN', 'This series belongs to another publisher.'); return s;
+  assert(s, 404, 'NOT_FOUND', 'Series not found.'); assert(s.creator_id === req.user!.id || req.user!.role==='admin', 403, 'FORBIDDEN', 'This series belongs to another publisher.'); return s;
 }
+function writableSeries(req:Request,seriesId=id(req)){
+  const s=ownSeries(req,seriesId);if(req.user!.role!=='admin')assertSeriesWritable(seriesId);return s;
+}
+function ownerStorage(series:Record<string,any>){return one<{quota_bytes:number;used_bytes:number}>('SELECT quota_bytes,used_bytes FROM users WHERE id=?',series.creator_id)!;}
 const catalogSelect = `SELECT s.*,u.name AS creator_name,COALESCE(sp.published_at,s.created_at) AS published_at,
  (SELECT id FROM episodes e WHERE e.series_id=s.id ORDER BY number LIMIT 1) AS first_episode_id,
  (SELECT COUNT(*) FROM episodes e WHERE e.series_id=s.id) AS episode_count,
  (SELECT COUNT(*) FROM saves sv WHERE sv.series_id=s.id) AS saves,
  (SELECT COUNT(*) FROM series_likes sl WHERE sl.series_id=s.id) AS likes
  FROM series s JOIN users u ON u.id=s.creator_id LEFT JOIN series_publications sp ON sp.series_id=s.id`;
-function serializeSeries(s: Record<string, any>, userId?: string) {
+function serializeSeries(s: Record<string, any>, userId?: string, privateView=false) {
   const { cover_key, cover_bytes, ...safe } = s;
-  return { ...safe, genres: JSON.parse(s.genres), cover: cover_key.startsWith('public:') ? cover_key.slice(7) : cover_key ? apiUrl(`/api/series/${s.id}/cover`) : '/images/placeholder.svg',
+  return { ...safe,creator_name:creatorDisplayName(s.creator_id,s.creator_name||''),genres: JSON.parse(s.genres),cover: cover_key?.startsWith('public:') ? cover_key.slice(7) : cover_key ? apiUrl(`/api/${privateView?'studio/series':'series'}/${s.id}/cover`) : '/images/placeholder.svg',
+    ...(privateView?{taken_down:moderationState(s.id).taken_down,moderation_reason:moderationState(s.id).reason}:{}),
     likes:Number(s.likes??one('SELECT COUNT(*) AS n FROM series_likes WHERE series_id=?',s.id)!.n),
     liked:!!(userId&&one('SELECT 1 FROM series_likes WHERE user_id=? AND series_id=?',userId,s.id)),
     saved: !!(userId && one('SELECT 1 FROM saves WHERE user_id=? AND series_id=?', userId, s.id)) };
@@ -59,6 +66,7 @@ function playbackViewer(req:Request,res:Response,create=false):string|undefined 
 }
 
 export function createApp() {
+  ensurePlatformOwnerAccess();
   const app = express();
   app.disable('x-powered-by');
   if (process.env.TRUST_PROXY === 'true') app.set('trust proxy', 1);
@@ -141,8 +149,8 @@ export function createApp() {
   });
   app.get('/api/series', (req,res) => {
     const query = z.object({ q: z.string().max(120).optional(), language: language.optional(), genre: z.enum(GENRES).optional(), sort: z.enum(['popular','new','saved']).optional(), saved: z.enum(['true']).optional(), creation: z.enum(['human','ai-assisted','ai-generated']).optional() }).parse(req.query);
-    const conditions = ["s.status='published'"]; const params: any[] = [];
-    if (query.q) { conditions.push('(s.title LIKE ? OR s.description LIKE ? OR u.name LIKE ?)'); params.push(`%${query.q}%`,`%${query.q}%`,`%${query.q}%`); }
+    const conditions = ["s.status='published'",publicSeriesAllowedSql('s')]; const params: any[] = [];
+    if (query.q) { conditions.push('(s.title LIKE ? OR s.description LIKE ? OR (CASE WHEN s.creator_id=? THEN ? ELSE u.name END) LIKE ?)'); params.push(`%${query.q}%`,`%${query.q}%`,config.platformOwnerUserId,config.officialCreatorName,`%${query.q}%`); }
     if (query.language) { conditions.push('s.language=?'); params.push(query.language); }
     if (query.genre) { conditions.push('s.genres LIKE ?'); params.push(`%"${query.genre}"%`); }
     if (query.creation) { conditions.push('s.creation_type=?'); params.push(query.creation); }
@@ -151,16 +159,17 @@ export function createApp() {
     res.json({ series: all(`${catalogSelect} WHERE ${conditions.join(' AND ')} ORDER BY ${order} LIMIT 150`, ...params).map(s => serializeSeries(s,req.user?.id)) });
   });
   app.get('/api/series/:id', (req,res) => {
-    const s = one(`${catalogSelect} WHERE s.id=?`,id(req)); assert(s && (s.status === 'published' || s.creator_id === req.user?.id),404,'NOT_FOUND','Series not found.');
+    assertSeriesAvailable(id(req),{viewerId:req.user?.id,allowOwnerPreview:true});
+    const s = one(`${catalogSelect} WHERE s.id=?`,id(req))!;
     const episodes = all('SELECT e.id,e.series_id,e.title,e.number,e.duration,e.bytes,(SELECT COUNT(*) FROM playback_sessions p WHERE p.episode_id=e.id AND p.counted_view=1) AS views FROM episodes e WHERE e.series_id=? ORDER BY e.number',id(req)).map(e => ({...e,free:e.number <= s.free_episodes,unlocked:canWatch(req.user?.id,{...e,...{free_episodes:s.free_episodes,creator_id:s.creator_id}})}));
     res.json({ series: serializeSeries(s,req.user?.id), episodes });
   });
   app.get('/api/series/:id/cover', async (req,res) => {
-    const s = one('SELECT cover_key,status,creator_id FROM series WHERE id=?',id(req)); assert(s?.cover_key && (s.status === 'published' || s.creator_id === req.user?.id),404,'NOT_FOUND','Cover not found.');
+    const s=assertSeriesAvailable(id(req),{viewerId:req.user?.id,allowOwnerPreview:true});assert(s.cover_key,404,'NOT_FOUND','Cover not found.');
     if (s.cover_key.startsWith('public:')) { res.redirect(s.cover_key.slice(7)); return; } await serveObject(s.cover_key,req,res,'image/webp');
   });
   app.post('/api/series/:id/save', requireAuth, (req,res) => {
-    assert(one("SELECT id FROM series WHERE id=? AND status='published'",id(req)),404,'NOT_FOUND','Series not found.');
+    assertSeriesAvailable(id(req));
     const saved = one('SELECT 1 FROM saves WHERE user_id=? AND series_id=?',req.user!.id,id(req));
     if (saved) run('DELETE FROM saves WHERE user_id=? AND series_id=?',req.user!.id,id(req)); else run('INSERT INTO saves VALUES (?,?)',req.user!.id,id(req));
     res.json({ saved: !saved });
@@ -168,7 +177,7 @@ export function createApp() {
   app.put('/api/series/:id/like', requireAuth, rateLimit('like',120,60_000), (req,res)=>{
     const {liked}=z.object({liked:z.boolean()}).parse(req.body);
     const result=transaction(()=>{
-      assert(one("SELECT id FROM series WHERE id=? AND status='published'",id(req)),404,'NOT_FOUND','Series not found.');
+      assertSeriesAvailable(id(req));
       if(liked)run('INSERT OR IGNORE INTO series_likes (user_id,series_id) VALUES (?,?)',req.user!.id,id(req));
       else run('DELETE FROM series_likes WHERE user_id=? AND series_id=?',req.user!.id,id(req));
       return{liked,likes:one('SELECT COUNT(*) AS n FROM series_likes WHERE series_id=?',id(req))!.n};
@@ -176,12 +185,12 @@ export function createApp() {
     res.json(result);
   });
   app.get('/api/episodes/:id/stream', async (req,res) => {
-    const e = episodeRow(id(req)); assert(e && (e.status === 'published' || e.creator_id === req.user?.id),404,'NOT_FOUND','Episode not found.');
+    const e = episodeRow(id(req));assert(e,404,'NOT_FOUND','Episode not found.');assertSeriesAvailable(e.series_id,{viewerId:req.user?.id,allowOwnerPreview:true});
     assert(canWatch(req.user?.id,e),403,'EPISODE_LOCKED','Unlock this episode to watch.');
     await serveObject(e.storage_key,req,res,'video/mp4');
   });
   app.post('/api/episodes/:id/playback', rateLimit('playback-start',90,60_000), (req,res)=>{
-    const e=episodeRow(id(req));assert(e&&(e.status==='published'||e.creator_id===req.user?.id),404,'NOT_FOUND','Episode not found.');
+    const e=episodeRow(id(req));assert(e,404,'NOT_FOUND','Episode not found.');assertSeriesAvailable(e.series_id,{viewerId:req.user?.id,allowOwnerPreview:true});
     assert(canWatch(req.user?.id,e),403,'EPISODE_LOCKED','Unlock this episode to watch.');
     if(e.creator_id===req.user?.id){res.json({excluded:true});return;}
     res.json(startPlayback(e.id,playbackViewer(req,res,true)!));
@@ -190,19 +199,19 @@ export function createApp() {
     const {watchedMs}=z.object({watchedMs:z.number().int().min(0).max(180_000)}).parse(req.body);
     const viewer=playbackViewer(req,res);assert(viewer,404,'NOT_FOUND','Playback session not found.');
     const session=one('SELECT episode_id FROM playback_sessions WHERE id=? AND viewer_key=?',id(req),viewer);assert(session,404,'NOT_FOUND','Playback session not found.');
-    const e=episodeRow(session.episode_id);assert(e&&e.status==='published'&&canWatch(req.user?.id,e),403,'EPISODE_LOCKED','This episode is unavailable.');
+    const e=episodeRow(session.episode_id);assert(e,404,'NOT_FOUND','Episode not found.');assertSeriesAvailable(e.series_id);assert(canWatch(req.user?.id,e),403,'EPISODE_LOCKED','This episode is unavailable.');
     res.json(recordPlayback(id(req),viewer,watchedMs));
   });
   app.post('/api/episodes/:id/unlock', requireAuth, (req,res) => res.json({ ...unlockEpisode(req.user!.id,id(req)), user: getUser(req.user!.id) }));
   app.post('/api/episodes/:id/progress', requireAuth, (req,res) => {
-    const e = episodeRow(id(req)); assert(e && canWatch(req.user!.id,e),403,'EPISODE_LOCKED','Unlock this episode to watch.');
+    const e = episodeRow(id(req));assert(e,404,'NOT_FOUND','Episode not found.');assertSeriesAvailable(e.series_id,{viewerId:req.user?.id,allowOwnerPreview:true});assert(canWatch(req.user!.id,e),403,'EPISODE_LOCKED','Unlock this episode to watch.');
     const { seconds } = z.object({ seconds: z.number().min(0).max(180) }).parse(req.body);
     run("INSERT INTO progress (user_id,episode_id,seconds) VALUES (?,?,?) ON CONFLICT(user_id,episode_id) DO UPDATE SET seconds=excluded.seconds,updated_at=datetime('now')",req.user!.id,id(req),Math.min(seconds,e.duration)); res.json({ ok:true });
   });
   app.get('/api/history', requireAuth, (req,res) => {
     const rows=all(`SELECT s.*,u.name AS creator_name,e.id AS episode_id,e.number AS episode_number,e.duration,p.seconds,p.updated_at AS watched_at,
       (SELECT COUNT(*) FROM episodes ep WHERE ep.series_id=s.id) AS episode_count,(SELECT COUNT(*) FROM saves sv WHERE sv.series_id=s.id) AS saves
-      FROM progress p JOIN episodes e ON e.id=p.episode_id JOIN series s ON s.id=e.series_id JOIN users u ON u.id=s.creator_id WHERE p.user_id=? AND s.status='published' ORDER BY p.updated_at DESC LIMIT 50`,req.user!.id);
+      FROM progress p JOIN episodes e ON e.id=p.episode_id JOIN series s ON s.id=e.series_id JOIN users u ON u.id=s.creator_id WHERE p.user_id=? AND s.status='published' AND ${publicSeriesAllowedSql('s')} ORDER BY p.updated_at DESC LIMIT 50`,req.user!.id);
     const seen=new Set(); res.json({ history: rows.filter(s=>{if(seen.has(s.id))return false;seen.add(s.id);return true;}).map(s=>serializeSeries(s,req.user!.id)) });
   });
   app.get('/api/wallet', requireAuth, (req,res) => res.json({ user: getUser(req.user!.id), ledger: all(`SELECT * FROM ${ledgerTable()} WHERE user_id=? ORDER BY created_at DESC,rowid DESC LIMIT 100`,req.user!.id), payments: all(`SELECT id,kind,amount_cents,currency,status,created_at FROM ${paymentTable()} WHERE user_id=? ORDER BY created_at DESC LIMIT 30`,req.user!.id) }));
@@ -235,13 +244,23 @@ export function createApp() {
     res.json({ paid:session.payment_status==='paid',user:getUser(req.user!.id) });
   });
   app.get('/api/studio', requireAuth, (req,res) => {
-    const user=req.user!;res.json({ user:getUser(user.id),series:all(`${catalogSelect} WHERE s.creator_id=? ORDER BY s.created_at DESC`,user.id).map(s=>serializeSeries(s,user.id)),
+    const user=req.user!;res.json({ user:getUser(user.id),series:all(`${catalogSelect} WHERE s.creator_id=? ORDER BY s.created_at DESC`,user.id).map(s=>serializeSeries(s,user.id,true)),
       stats:one(`SELECT COUNT(*) AS sales,COALESCE(SUM(p.creator_micros),0) AS lifetime_micros FROM ${purchaseTable()} p JOIN episodes e ON e.id=p.episode_id JOIN series s ON s.id=e.series_id WHERE s.creator_id=?`,user.id),
       withdrawals:stripeTestPayments()?[]:all('SELECT * FROM withdrawals WHERE user_id=? ORDER BY created_at DESC',user.id), storageRequests:all('SELECT * FROM storage_requests WHERE user_id=? ORDER BY created_at DESC',user.id) });
   });
+  app.get('/api/studio/series/:id',requireAuth,(req,res)=>{
+    ownSeries(req);const s=one(`${catalogSelect} WHERE s.id=?`,id(req))!;
+    const episodes=all('SELECT id,series_id,title,number,duration,bytes FROM episodes WHERE series_id=? ORDER BY number',s.id);
+    res.setHeader('Cache-Control','private, no-store');res.json({series:serializeSeries(s,req.user!.id,true),episodes,owner_storage:ownerStorage(s)});
+  });
+  app.get('/api/studio/series/:id/cover',requireAuth,async(req,res)=>{
+    const s=ownSeries(req);assert(s.cover_key,404,'NOT_FOUND','Cover not found.');res.setHeader('Cache-Control','private, no-store');
+    if(s.cover_key.startsWith('public:')){res.redirect(s.cover_key.slice(7));return;}await serveObject(s.cover_key,req,res,'image/webp');
+  });
   app.get('/api/studio/series/:id/analytics',requirePublisher,(req,res)=>{
+    const s=ownSeries(req);
     const query=z.object({period:z.enum(['7d','30d','90d','all']).optional(),start:z.string().max(10).optional(),end:z.string().max(10).optional()}).parse(req.query);
-    res.json(readSeriesAnalytics(req.user!.id,id(req),query));
+    res.json(readSeriesAnalytics(s.creator_id,id(req),query));
   });
   app.post('/api/studio/series', requirePublisher, (req,res) => {
     const b=seriesSchema.parse(req.body);const seriesId=crypto.randomUUID();
@@ -249,44 +268,47 @@ export function createApp() {
     res.status(201).json({ id:seriesId });
   });
   app.patch('/api/studio/series/:id', requirePublisher, (req,res) => {
-    ownSeries(req);const b=seriesSchema.parse(req.body);
-    run("UPDATE series SET title=?,description=?,language=?,genres=?,creation_type=?,price_cents=?,free_episodes=?,updated_at=datetime('now') WHERE id=?",b.title,b.description,b.language,JSON.stringify(b.genres),b.creation_type,b.price_cents,b.free_episodes,id(req));res.json({ok:true});
+    const b=seriesSchema.parse(req.body);
+    transaction(()=>{const before=writableSeries(req);
+      run("UPDATE series SET title=?,description=?,language=?,genres=?,creation_type=?,price_cents=?,free_episodes=?,updated_at=datetime('now') WHERE id=?",b.title,b.description,b.language,JSON.stringify(b.genres),b.creation_type,b.price_cents,b.free_episodes,id(req));
+      if(req.user!.role==='admin')recordSeriesMetadataEdit(req.user!.id,id(req),'Administrator updated series details.',{before:{title:before.title,description:before.description,language:before.language,genres:JSON.parse(before.genres),creation_type:before.creation_type,price_cents:before.price_cents,free_episodes:before.free_episodes},after:b});
+    });res.json({ok:true});
   });
-  app.post('/api/studio/series/:id/cover', requirePublisher, (req,_res,next)=>{assert(!config.sandbox,403,'SANDBOX_UPLOAD_DISABLED','Uploads are disabled on the payment-test site. Use its sample episodes to test wallet purchases.');ownSeries(req);next();}, coverUpload.single('cover'), async (req,res) => {
+  app.post('/api/studio/series/:id/cover', requirePublisher, (req,_res,next)=>{assert(!config.sandbox,403,'SANDBOX_UPLOAD_DISABLED','Uploads are disabled on the payment-test site. Use its sample episodes to test wallet purchases.');const s=writableSeries(req);assertPaymentAccountClear(s.creator_id);next();}, coverUpload.single('cover'), async (req,res) => {
     assert(req.file,400,'FILE_REQUIRED','Choose a cover image.'); let processed: {path:string;bytes:number}|undefined;const key=`covers/${crypto.randomUUID()}.webp`;let saved=false;
     try {
       processed=await prepareCover(req.file.path);await putObject(processed.path,key,'image/webp');saved=true;
-      const old=transaction(()=>{const s=ownSeries(req);const u=getUser(req.user!.id)!;assert(u.used_bytes-s.cover_bytes+processed!.bytes<=u.quota_bytes,413,'QUOTA_EXCEEDED','This cover exceeds your storage allowance.');run('UPDATE users SET used_bytes=used_bytes-?+? WHERE id=?',s.cover_bytes,processed!.bytes,u.id);run('UPDATE series SET cover_key=?,cover_bytes=? WHERE id=?',key,processed!.bytes,s.id);return s.cover_key;});
+      const old=transaction(()=>{const s=writableSeries(req);assertPaymentAccountClear(s.creator_id);const u=ownerStorage(s);assert(u.used_bytes-s.cover_bytes+processed!.bytes<=u.quota_bytes,413,'QUOTA_EXCEEDED','This cover exceeds your storage allowance.');run('UPDATE users SET used_bytes=used_bytes-?+? WHERE id=?',s.cover_bytes,processed!.bytes,s.creator_id);run('UPDATE series SET cover_key=?,cover_bytes=? WHERE id=?',key,processed!.bytes,s.id);return s.cover_key;});
       saved=false;
-      if(old)deleteObject(old).catch(error=>console.error('Old cover cleanup failed',error));res.json({cover:apiUrl(`/api/series/${id(req)}/cover`),user:getUser(req.user!.id)});
+      if(old)deleteObject(old).catch(error=>console.error('Old cover cleanup failed',error));res.json({cover:apiUrl(`/api/studio/series/${id(req)}/cover`),user:getUser(req.user!.id),owner_storage:ownerStorage(ownSeries(req))});
     } catch(error) { if(saved)await deleteObject(key);throw error; }
     finally {await removeTempFile(req.file.path);if(processed)await removeTempFile(processed.path);}
   });
-  app.post('/api/studio/series/:id/episodes', requirePublisher, rateLimit('upload',60,60_000), (req,_res,next)=>{assert(!config.sandbox,403,'SANDBOX_UPLOAD_DISABLED','Uploads are disabled on the payment-test site. Use its sample episodes to test wallet purchases.');ownSeries(req);next();}, upload.single('video'), async (req,res) => {
-    assert(req.file,400,'FILE_REQUIRED','Choose an episode video.');let processed:{path:string;bytes:number;duration:number}|undefined;const key=`videos/${req.user!.id}/${crypto.randomUUID()}.mp4`;let saved=false;
+  app.post('/api/studio/series/:id/episodes', requirePublisher, rateLimit('upload',60,60_000), (req,_res,next)=>{assert(!config.sandbox,403,'SANDBOX_UPLOAD_DISABLED','Uploads are disabled on the payment-test site. Use its sample episodes to test wallet purchases.');const s=writableSeries(req);assertPaymentAccountClear(s.creator_id);next();}, upload.single('video'), async (req,res) => {
+    assert(req.file,400,'FILE_REQUIRED','Choose an episode video.');const target=writableSeries(req);let processed:{path:string;bytes:number;duration:number}|undefined;const key=`videos/${target.creator_id}/${crypto.randomUUID()}.mp4`;let saved=false;
     try {
       const body=z.object({title:z.string().trim().min(1).max(120),number:z.coerce.number().int().min(1).max(1000)}).parse(req.body);
       assert(!one('SELECT id FROM episodes WHERE series_id=? AND number=?',id(req),body.number),409,'EPISODE_EXISTS','An episode with this number already exists.');
-      const u=getUser(req.user!.id)!;assert(u.used_bytes+req.file.size<=u.quota_bytes,413,'QUOTA_EXCEEDED','Not enough storage. Request an increase from your studio.');
+      const u=ownerStorage(target);assert(u.used_bytes+req.file.size<=u.quota_bytes,413,'QUOTA_EXCEEDED','Not enough storage. Request an increase from your studio.');
       processed=await prepareVideo(req.file.path);await putObject(processed.path,key,'video/mp4');saved=true;
-      const episodeId=transaction(()=>{ownSeries(req);const user=getUser(req.user!.id)!;assert(user.used_bytes+processed!.bytes<=user.quota_bytes,413,'QUOTA_EXCEEDED','Not enough storage. Request an increase.');
+      const episodeId=transaction(()=>{const s=writableSeries(req);assertPaymentAccountClear(s.creator_id);const user=ownerStorage(s);assert(user.used_bytes+processed!.bytes<=user.quota_bytes,413,'QUOTA_EXCEEDED','Not enough storage. Request an increase.');
         assert(!one('SELECT id FROM episodes WHERE series_id=? AND number=?',id(req),body.number),409,'EPISODE_EXISTS','An episode with this number already exists.');
-        const eid=crypto.randomUUID();run('INSERT INTO episodes (id,series_id,title,number,duration,bytes,storage_key,original_name) VALUES (?,?,?,?,?,?,?,?)',eid,id(req),body.title,body.number,processed!.duration,processed!.bytes,key,req.file!.originalname.slice(0,255));run('UPDATE users SET used_bytes=used_bytes+? WHERE id=?',processed!.bytes,user.id);return eid;});
-      res.status(201).json({id:episodeId,user:getUser(req.user!.id),duration:processed.duration,bytes:processed.bytes});
+        const eid=crypto.randomUUID();run('INSERT INTO episodes (id,series_id,title,number,duration,bytes,storage_key,original_name) VALUES (?,?,?,?,?,?,?,?)',eid,id(req),body.title,body.number,processed!.duration,processed!.bytes,key,req.file!.originalname.slice(0,255));run('UPDATE users SET used_bytes=used_bytes+? WHERE id=?',processed!.bytes,s.creator_id);return eid;});
+      res.status(201).json({id:episodeId,user:getUser(req.user!.id),owner_storage:ownerStorage(target),duration:processed.duration,bytes:processed.bytes});
     }catch(error){if(saved)await deleteObject(key);throw error;}
     finally{await removeTempFile(req.file.path);if(processed)await removeTempFile(processed.path);}
   });
   app.patch('/api/studio/episodes/:id', requirePublisher, (req,res) => {
-    const e=episodeRow(id(req));assert(e,404,'NOT_FOUND','Episode not found.');ownSeries(req,e.series_id);
+    const e=episodeRow(id(req));assert(e,404,'NOT_FOUND','Episode not found.');writableSeries(req,e.series_id);
     const b=z.object({title:z.string().trim().min(1).max(120),number:z.number().int().min(1).max(1000)}).parse(req.body);
     assert(!one('SELECT id FROM episodes WHERE series_id=? AND number=? AND id<>?',e.series_id,b.number,e.id),409,'EPISODE_EXISTS','This episode number is already in use.');run('UPDATE episodes SET title=?,number=? WHERE id=?',b.title,b.number,e.id);res.json({ok:true});
   });
   app.delete('/api/studio/episodes/:id', requirePublisher, async (req,res) => {
-    const e=transaction(()=>{const ep=episodeRow(id(req));assert(ep,404,'NOT_FOUND','Episode not found.');ownSeries(req,ep.series_id);assert(!one('SELECT id FROM purchases WHERE episode_id=? UNION ALL SELECT id FROM test_purchases WHERE episode_id=? LIMIT 1',ep.id,ep.id),409,'EPISODE_PURCHASED','Purchased episodes must remain available. Archive the series to stop new sales.');run('DELETE FROM episodes WHERE id=?',ep.id);run('UPDATE users SET used_bytes=MAX(0,used_bytes-?) WHERE id=?',ep.bytes,req.user!.id);return ep;});
-    await deleteObject(e.storage_key);res.json({ok:true,user:getUser(req.user!.id)});
+    const e=transaction(()=>{const ep=episodeRow(id(req));assert(ep,404,'NOT_FOUND','Episode not found.');writableSeries(req,ep.series_id);assert(!one('SELECT id FROM purchases WHERE episode_id=? UNION ALL SELECT id FROM test_purchases WHERE episode_id=? LIMIT 1',ep.id,ep.id),409,'EPISODE_PURCHASED','Purchased episodes must remain available. Archive the series to stop new sales.');run('DELETE FROM episodes WHERE id=?',ep.id);run('UPDATE users SET used_bytes=MAX(0,used_bytes-?) WHERE id=?',ep.bytes,ep.creator_id);return ep;});
+    await deleteObject(e.storage_key);res.json({ok:true,user:getUser(req.user!.id),owner_storage:ownerStorage(e)});
   });
   app.post('/api/studio/series/:id/status', requirePublisher, (req,res) => {
-    const s=ownSeries(req);const {status}=z.object({status:z.enum(['draft','published','archived'])}).parse(req.body);
+    const s=ownSeries(req);assertSeriesWritable(s.id);assertPaymentAccountClear(s.creator_id);const {status}=z.object({status:z.enum(['draft','published','archived'])}).parse(req.body);
     if(status==='published'){assert(s.cover_key,400,'COVER_REQUIRED','Add a cover before publishing.');assert(one('SELECT id FROM episodes WHERE series_id=?',s.id),400,'EPISODES_REQUIRED','Upload at least one episode before publishing.');}
     if(status!=='published')assert(!one('SELECT p.id FROM purchases p JOIN episodes e ON e.id=p.episode_id WHERE e.series_id=? UNION ALL SELECT p.id FROM test_purchases p JOIN episodes e ON e.id=p.episode_id WHERE e.series_id=? LIMIT 1',s.id,s.id),409,'HAS_PURCHASES','This series has paid viewers. Contact support before removing access.');
     transaction(()=>{
@@ -313,6 +335,22 @@ export function createApp() {
     if(config.payments==='stripe') {assert(stripe&&paymentsReady(),503,'PAYMENTS_UNAVAILABLE','Payouts are not configured yet.');assert(req.user!.stripe_account_id,400,'CONNECT_REQUIRED','Connect your payout account first.');const account=await stripe.accounts.retrieve(req.user!.stripe_account_id);assert(account.payouts_enabled,400,'CONNECT_REQUIRED','Complete your payout account verification first.');}
     else assert(config.payments==='demo' && !config.production,503,'PAYMENTS_UNAVAILABLE','Payouts are not configured yet.');
     res.status(201).json({id:requestWithdrawal(req.user!.id,b.amount_cents,b.note),user:getUser(req.user!.id)});
+  });
+  app.get('/api/admin/series',requireAdmin,(req,res)=>{
+    const filters=z.object({q:z.string().trim().max(120).optional(),status:z.enum(['all','draft','published','archived','taken_down']).optional(),page:z.coerce.number().int().min(1).max(100000).optional(),limit:z.coerce.number().int().min(1).max(50).optional()}).parse(req.query);
+    const result=listAdminSeries(req.user!.id,filters);res.setHeader('Cache-Control','private, no-store');res.json({...result,series:result.series.map(s=>serializeSeries(s,req.user!.id,true))});
+  });
+  app.get('/api/admin/series/:id/moderation',requireAdmin,(req,res)=>{
+    res.setHeader('Cache-Control','private, no-store');res.json({events:adminModerationEvents(req.user!.id,id(req))});
+  });
+  app.post('/api/admin/series/:id/moderation',requireAdmin,(req,res)=>{
+    const body=z.object({action:z.enum(['takedown','restore']),reason:z.string().trim().min(10).max(2000)}).parse(req.body);
+    res.json(setSeriesModeration(req.user!.id,id(req),body.action,body.reason));
+  });
+  app.get('/api/admin/episodes/:id/stream',requireAdmin,async(req,res)=>{
+    const episode=episodeRow(id(req));assert(episode,404,'NOT_FOUND','Episode not found.');
+    // Reviewing private media creates no purchase, playback session or counted view.
+    await serveObject(episode.storage_key,req,res,'video/mp4');
   });
   app.get('/api/admin', requireAdmin, (_req,res) => res.json({
     stats:{users:one('SELECT COUNT(*) AS n FROM users')!.n,publishers:one(`SELECT COUNT(*) AS n FROM users WHERE publisher_active=1${usingTestPaymentState()?' OR EXISTS(SELECT 1 FROM test_accounts t WHERE t.user_id=users.id AND t.publisher_active=1)':''}`)!.n,

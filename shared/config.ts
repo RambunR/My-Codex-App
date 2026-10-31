@@ -36,6 +36,7 @@ export interface User {
   id: string; name: string; email: string; role: 'viewer' | 'publisher' | 'admin'; publisher_active: number;
   wallet_micros: number; earnings_micros: number; quota_bytes: number; used_bytes: number; language: string;
   stripe_account_id?: string; connected?: boolean;
+  creator_display_name?: string;
   email_verified?: boolean;
   payment_review?: boolean;
   dramio_pass?: {active:boolean;test:boolean;purchased_at:string|null};
@@ -46,6 +47,7 @@ export interface Series {
   episode_count: number; views: number; saves: number; status: string; featured: number; created_at: string; published_at?: string;
   likes: number; liked: boolean;
   saved?: boolean; demo?: number; subtitle_languages?: string[]; first_episode_id?: string;
+  taken_down?: boolean; moderation_reason?: string; moderated_at?: string;
 }
 export interface Episode { id: string; series_id: string; title: string; number: number; duration: number; bytes: number; free: boolean; unlocked: boolean; cover?: string; views?: number }
 export const usd = (micros: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(micros / USD_MICROS);

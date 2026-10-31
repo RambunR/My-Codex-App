@@ -12,6 +12,8 @@ export const config = {
   appUrl: process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`,
   publicUrl: process.env.PUBLIC_APP_URL || '',
   stripeSiteOrigin: process.env.STRIPE_SITE_ORIGIN || '',
+  platformOwnerUserId: process.env.PLATFORM_OWNER_USER_ID || '',
+  officialCreatorName: process.env.OFFICIAL_CREATOR_NAME || 'LingYingDrama Offical',
   dataDir: path.resolve(process.env.DATA_DIR || './data'),
   payments: process.env.PAYMENTS_MODE || (process.env.NODE_ENV === 'production' ? 'disabled' : 'demo'),
   usdToHkd: Number(process.env.USD_TO_HKD || 7.8),

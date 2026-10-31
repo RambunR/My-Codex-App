@@ -3,6 +3,7 @@ import {one,all,run,transaction} from './db.js';
 import {assert} from './errors.js';
 import {config} from './config.js';
 import {purchaseTable,usingTestPaymentState} from './payment-state.js';
+import {seriesIsTakenDown} from './moderation.js';
 import type {AnalyticsMetrics,AnalyticsRange,AnalyticsRangeInput,PlaybackReceipt,SeriesAnalytics} from '../shared/analytics.js';
 
 const DAY=86_400_000,SESSION_WINDOW=30*60_000,MAX_HEARTBEAT_MS=15_000;
@@ -15,7 +16,8 @@ const validViewer=(viewerKey:string)=>assert(/^[a-f0-9]{64}$/.test(viewerKey),40
 export function startPlayback(episodeId:string,viewerKey:string,now=Date.now()):PlaybackReceipt {
   validViewer(viewerKey);
   return transaction(()=>{
-    assert(one('SELECT id FROM episodes WHERE id=?',episodeId),404,'NOT_FOUND','Episode not found.');
+    const episode=one<{series_id:string}>('SELECT series_id FROM episodes WHERE id=?',episodeId);
+    assert(episode&&!seriesIsTakenDown(episode.series_id),404,'NOT_FOUND','Episode not found.');
     const existing=one<PlaybackSession>('SELECT * FROM playback_sessions WHERE episode_id=? AND viewer_key=? AND started_at_ms>? ORDER BY started_at_ms DESC LIMIT 1',episodeId,viewerKey,now-SESSION_WINDOW);
     if(existing){run('UPDATE playback_sessions SET last_seen_ms=? WHERE id=?',now,existing.id);return receipt(existing);}
     const id=crypto.randomUUID();
@@ -34,6 +36,7 @@ export function recordPlayback(sessionId:string,viewerKey:string,cumulativeWatch
   return transaction(()=>{
     const session=one<PlaybackSession&{duration:number;series_id:string}>('SELECT p.*,e.duration,e.series_id FROM playback_sessions p JOIN episodes e ON e.id=p.episode_id WHERE p.id=? AND p.viewer_key=?',sessionId,viewerKey);
     assert(session,404,'NOT_FOUND','Playback session not found.');
+    assert(!seriesIsTakenDown(session.series_id),404,'NOT_FOUND','Playback session not found.');
     assert(now-session.started_at_ms<=SESSION_WINDOW,409,'PLAYBACK_EXPIRED','Restart playback to continue recording viewing activity.');
     const requested=Math.max(0,cumulativeWatchedMs-Math.max(session.reported_ms,session.watched_ms));
     const increase=Math.min(requested,Math.max(0,now-session.last_seen_ms),MAX_HEARTBEAT_MS);

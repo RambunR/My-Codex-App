@@ -8,6 +8,7 @@ import type { User } from '../shared/config.js';
 import {financeAccount,usingTestPaymentState,dramioPassState} from './payment-state.js';
 import {emailVerificationState} from './email-auth.js';
 import {assertPaymentAccountClear,paymentAccountReview} from './payment-risk.js';
+import {ensurePlatformOwnerAccess,creatorDisplayName} from './owner.js';
 
 const scrypt = promisify(crypto.scrypt);
 export async function hashPassword(password: string) {
@@ -25,11 +26,12 @@ declare global { namespace Express { interface Request { user?: User; } } }
 const digest = (token: string) => crypto.createHash('sha256').update(token).digest('hex');
 const publicFields = 'id,name,email,role,publisher_active,wallet_micros,earnings_micros,quota_bytes,used_bytes,language,stripe_account_id';
 export function getUser(id: string) {
+  if(id===config.platformOwnerUserId)ensurePlatformOwnerAccess();
   const user=one<User>(`SELECT ${publicFields} FROM users WHERE id=?`,id);
   if(!user)return user;
   const account=usingTestPaymentState()?financeAccount(id)!:undefined;
   const current=account?{...user,...account,role:user.role==='admin'?'admin':account.publisher_active?'publisher':user.role,stripe_account_id:undefined} as User:user;
-  return{...current,...emailVerificationState(id),payment_review:paymentAccountReview(id),dramio_pass:dramioPassState(id,!!user.publisher_active,!!current.publisher_active)};
+  return{...current,creator_display_name:creatorDisplayName(id,user.name),...emailVerificationState(id),payment_review:paymentAccountReview(id),dramio_pass:dramioPassState(id,!!user.publisher_active,!!current.publisher_active)};
 }
 export function readSession(req: Request, _res: Response, next: NextFunction) {
   const token = (req.headers.cookie || '').split(';').map(x => x.trim()).find(x => x.startsWith('drama_session='))?.split('=')[1];
@@ -54,7 +56,7 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction) { 
 export function requirePublisher(req: Request, _res: Response, next: NextFunction) {
   assert(req.user, 401, 'AUTH_REQUIRED', 'Sign in to continue.');
   if(!['GET','HEAD'].includes(req.method))assertPaymentAccountClear(req.user.id);
-  assert(req.user.publisher_active, 403, 'ACTIVATION_REQUIRED', 'Get Dramio Pass for HK$88 once before uploading.'); next();
+  assert(req.user.publisher_active||req.user.role==='admin', 403, 'ACTIVATION_REQUIRED', 'Get Dramio Pass for HK$88 once before uploading.'); next();
 }
 export function requireAdmin(req: Request, _res: Response, next: NextFunction) { assert(req.user?.role === 'admin', 403, 'FORBIDDEN', 'Administrator access required.'); next(); }
 const limits = new Map<string, { count: number; reset: number }>();
