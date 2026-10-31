@@ -17,7 +17,7 @@ Google OAuth code is deployed, both Google credentials are configured as Worker 
 
 Apple registration/sign-in/linking and email password reset/verification/resend are implemented with translated controls. Apple credentials and email delivery credentials are not configured yet: `auth.apple` and `auth.email` stay false, with explicit unavailable notices. Follow [APPLE_SIGN_IN.md](APPLE_SIGN_IN.md) to register the Services ID and configure four Apple secrets, and [EMAIL_AUTH.md](EMAIL_AUTH.md) to onboard the selected Cloudflare Email Sending domain and configure its scoped token, or use Resend instead. Existing accounts retain their sign-in, wallet, purchases and media; email verification is not a new access gate.
 
-The operator selected `hknovaxrproduction.com` for application email, using `AIDramio <accounts@hknovaxrproduction.com>`. The main Worker configuration selects that sender and Cloudflare delivery. Sending remains unavailable until domain onboarding and `CF_EMAIL_API_TOKEN` are completed; the current deployment token cannot read zone DNS or manage user API tokens. Existing DNS, subscriptions and the website URL are preserved.
+The operator selected `hknovaxrproduction.com` for application email, using `LingYing <accounts@hknovaxrproduction.com>`. The main Worker configuration selects that sender and Cloudflare delivery. Sending remains unavailable until domain onboarding and `CF_EMAIL_API_TOKEN` are completed; the current deployment token cannot read zone DNS or manage user API tokens. Existing DNS, subscriptions and the website URL are preserved.
 
 ## Update this application
 

@@ -8,7 +8,7 @@ The delivery integration supports [Cloudflare Email Service Sending](https://dev
 
 Cloudflare can send the application's recovery and verification emails. Its **Email Sending** service is different from inbound Email Routing forwarding and the earlier restricted `send_email` capability. Under the current Email Sending beta rules, sending to arbitrary public users requires a **Workers Paid** account and a sending domain using Cloudflare DNS. Free-tier sending is restricted to verified recipients and cannot support general public password recovery.
 
-The operator selected **`hknovaxrproduction.com`**, with sender **`AIDramio <accounts@hknovaxrproduction.com>`**. The tracked main configuration selects Cloudflare Email Sending and this sender, keeping the website at its existing `workers.dev` address. Buying another domain or creating a mailbox is unnecessary for sending.
+The operator selected **`hknovaxrproduction.com`**, with sender **`LingYing <accounts@hknovaxrproduction.com>`**. The tracked main configuration selects Cloudflare Email Sending and this sender, keeping the website at its existing `workers.dev` address. Buying another domain or creating a mailbox is unnecessary for sending.
 
 Domain selection is not delivery activation. The existing deployment credential cannot read this zone's DNS records, inspect its Email Sending onboarding or manage user/account API tokens; those API reads returned HTTP 403. No `CF_EMAIL_API_TOKEN` is installed. Sender-domain onboarding and the scoped Email Sending credential must be completed before `auth.email` can become true. Existing DNS/mail records have not been changed, and no subscription has been upgraded. Public DNS shows existing Google mail MX records and a DMARC record; retain those while onboarding outbound sending.
 
@@ -22,7 +22,7 @@ Domain selection is not delivery activation. The existing deployment credential 
    | `EMAIL_PROVIDER` | Variable | `cloudflare` |
    | `CF_EMAIL_ACCOUNT_ID` | Variable | `95040c4f244233138195b80657887486` for the existing Jimmy account |
    | `CF_EMAIL_API_TOKEN` | Secret | The token with Email Sending Edit permission |
-   | `MAIL_FROM` | Variable or Secret | `AIDramio <accounts@hknovaxrproduction.com>` after onboarding that domain |
+   | `MAIL_FROM` | Variable or Secret | `LingYing <accounts@hknovaxrproduction.com>` after onboarding that domain |
 
 5. Save/deploy the configuration and follow the testing steps below. If Cloudflare reports that the account is not entitled or the sender is not verified, complete provider onboarding before expecting messages to arrive. A HTTP 200 response alone does not establish delivery: the app also requires Cloudflare's successful result to list the requested recipient as delivered or queued, and rejects permanent bounces.
 
@@ -36,7 +36,7 @@ Domain selection is not delivery activation. The existing deployment credential 
    |---|---|---|
    | `EMAIL_PROVIDER` | Variable | `resend` |
    | `RESEND_API_KEY` | Secret | Your real email-sending API key |
-   | `MAIL_FROM` | Variable or Secret | For example, `AIDramio <accounts@mail.your-domain.example>` using the verified sender domain |
+   | `MAIL_FROM` | Variable or Secret | For example, `LingYing <accounts@mail.your-domain.example>` using the verified sender domain |
 
 4. Save/deploy the Worker configuration and follow the testing steps below. Check [Resend's current pricing](https://resend.com/pricing) and usage limits before selecting a plan. This integration does not claim a particular account has free delivery or unlimited messages.
 
@@ -63,7 +63,7 @@ Do not paste API keys into chat, Git, the browser frontend, or tracked Wrangler 
 - Reset links expire in **30 minutes**. Verification links expire in **24 hours**. Only random proof hashes are stored. Links place the proof in a URL fragment, such as `/auth?mode=reset#token=…`, so it does not reach HTTP access logs. The browser removes it promptly and submits it only when the user explicitly confirms; opening a link does not consume it through a GET request.
 - Successful reset consumes its proof atomically, hashes the new password, verifies the proven account email, and invalidates all sessions and outstanding Google/Apple browser-bound attempts for that account. Concurrent/replayed proofs cannot reset twice. A changed email or password invalidates an older reset proof.
 - An account originally created only through Google or Apple remains a provider account. Password recovery does not silently add a new password to it or merge accounts by email. Use its linked provider to sign in.
-- A verified Google profile or Apple identity can verify the exact email attached to that same AIDramio account. Linking a provider with a different email does not verify the application's existing email address. Previously stored matching Google identities retain their verified status.
+- A verified Google profile or Apple identity can verify the exact email attached to that same LingYing account. Linking a provider with a different email does not verify the application's existing email address. Previously stored matching Google identities retain their verified status.
 - Transactional email copy is currently in English; the application forms and statuses use the supported interface translations. Messages include both plain text and escaped HTML, the trusted configured application origin, and no wallet or episode-purchase details.
 
 ## Validation

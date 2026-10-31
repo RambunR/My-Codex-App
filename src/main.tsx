@@ -21,6 +21,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><
   <Route path="library" element={<Library/>}/><Route path="auth" element={<Auth/>}/><Route path="wallet" element={<WalletPage/>}/><Route path="account" element={<Account/>}/>
   <Route path="studio" element={<Suspense fallback={<Loading/>}><Studio/></Suspense>}/><Route path="studio/new" element={<Suspense fallback={<Loading/>}><SeriesEditor/></Suspense>}/><Route path="studio/series/:id" element={<Suspense fallback={<Loading/>}><SeriesEditor/></Suspense>}/><Route path="admin" element={<Suspense fallback={<Loading/>}><Admin/></Suspense>}/>
   <Route path="help" element={<InfoPage type="help"/>}/><Route path="terms" element={<InfoPage type="terms"/>}/><Route path="privacy" element={<InfoPage type="privacy"/>}/>
-  <Route path="*" element={<Empty title="404" action={<a href="/" className="button primary">AIDramio →</a>}/>}/>
+  <Route path="*" element={<Empty title="404" action={<a href="/" className="button primary">LingYing →</a>}/>}/>
 </Route></Routes></AppProvider></I18nProvider></BrowserRouter></React.StrictMode>);
 if('serviceWorker' in navigator&&import.meta.env.PROD)window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));

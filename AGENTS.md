@@ -1,4 +1,4 @@
-# AIDramio agent instructions
+# LingYing agent instructions
 
 Use this existing checkout. Do not create a Git worktree unless the user requests one. Read `README.md`, preserve user changes and runtime data, and keep secrets out of source control and output.
 

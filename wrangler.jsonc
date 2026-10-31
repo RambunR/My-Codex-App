@@ -50,7 +50,7 @@
     "SEED_CATALOG": "true",
     "EMAIL_PROVIDER": "cloudflare",
     "CF_EMAIL_ACCOUNT_ID": "95040c4f244233138195b80657887486",
-    "MAIL_FROM": "AIDramio <accounts@hknovaxrproduction.com>"
+    "MAIL_FROM": "LingYing <accounts@hknovaxrproduction.com>"
   },
   "observability": {
     "enabled": true

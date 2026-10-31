@@ -209,7 +209,7 @@ test('Cloudflare structured sending accepts queued or delivered recipients and p
       cloudflareOutcome=outcome;const token='b'.repeat(64);
       await sendAccountEmail('cloudflare-recipient@example.test','reset',token,randomUUID());
       const sent=cloudflareMessages.at(-1);assert.deepEqual(sent.from,{address:'accounts@verified.example',name:'AIDramio'});assert.equal(sent.to,'cloudflare-recipient@example.test');
-      assert.equal(sent.subject,'Reset your AIDramio password');assert.ok(sent.html.includes('<!doctype html>'));assert.ok(sent.text.includes('30 minutes'));
+      assert.equal(sent.subject,'Reset your LingYing password');assert.ok(sent.html.includes('<!doctype html>'));assert.ok(sent.text.includes('30 minutes'));
       const link=tokenFrom(sent);assert.equal(link.token,token);assert.equal(link.url.searchParams.get('mode'),'reset');
     }
   }finally{restore();}

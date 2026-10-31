@@ -1,6 +1,6 @@
-# AIDramio
+# LingYing · 靈映
 
-A working short-drama platform for live-action, animated, AI-assisted, and AI-generated stories. It has a responsive viewer app, a publisher studio, persistent accounts and media, episode purchases, and an administrator console.
+**LingYing** (靈映 / 灵映), formerly AIDramio, is a working short-drama platform for live-action, animated, AI-assisted, and AI-generated stories. It has a responsive viewer app, a publisher studio, persistent accounts and media, episode purchases, and an administrator console.
 
 Live application: **[aidramio.jimmy-tsoi2001.workers.dev](https://aidramio.jimmy-tsoi2001.workers.dev)**. See [deployment details](docs/DEPLOYMENT.md) for the Cloudflare application and update command. Stripe test Checkout is integrated into this existing website; real charges remain disabled while `STRIPE_TEST_MODE=true`.
 
@@ -12,9 +12,9 @@ Google registration/sign-in is enabled alongside email/password, with both OAuth
 
 Apple registration/sign-in and account linking are implemented; activation requires the operator's Apple Developer Services ID and signing key. See [Apple setup](docs/APPLE_SIGN_IN.md). Forgot password, reset, verification and resend controls are also implemented, with [Cloudflare Email Sending or Resend sender setup](docs/EMAIL_AUTH.md) required for actual delivery. Until credentials are configured, the interface clearly marks those services unavailable. The older `aidramio-sandbox` has its own separate credentials and does not inherit the main site's Google login; use the main website for current features.
 
-Brand PNG: [transparent AIDramio logo](public/aidramio-logo.png), also served at `/aidramio-logo.png`.
+Previous brand PNG (historical wordmark): [transparent AIDramio logo](public/aidramio-logo.png), also served at `/aidramio-logo.png`.
 
-The same logo's coral play symbol is used for the website header, browser favicon, Apple touch icon and installed-app icons.
+The coral play symbol is retained for LingYing and used for the website header, browser favicon, Apple touch icon and installed-app icons.
 
 Upload test files: [download 10 numbered test episodes](https://aidramio.jimmy-tsoi2001.workers.dev/downloads/dramio-test-episodes.zip). Unzip the archive and select its `Dramio_Test_Episodes` folder in the studio folder uploader. Each MP4 is 10 seconds, 720×1280, H.264 with silent AAC audio, and shows a white episode number on black. All ten were created with FFmpeg without an AI video model; each is approximately 21 KB.
 

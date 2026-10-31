@@ -38,12 +38,12 @@ export async function sendAccountEmail(email:string,kind:MailKind,token:string,r
   url.search=new URLSearchParams({mode:kind==='reset'?'reset':'verify'}).toString();
   // Fragments never reach Worker access logs or HTTP Referer headers.
   url.hash=new URLSearchParams({token}).toString();
-  const title=kind==='reset'?'Reset your AIDramio password':'Verify your AIDramio email';
-  const instruction=kind==='reset'?'Use this secure link to choose a new password for your AIDramio account.':'Confirm that this email address belongs to you to verify your AIDramio account.';
+  const title=kind==='reset'?'Reset your LingYing password':'Verify your LingYing email';
+  const instruction=kind==='reset'?'Use this secure link to choose a new password for your LingYing account.':'Confirm that this email address belongs to you to verify your LingYing account.';
   const expiry=kind==='reset'?'This link expires in 30 minutes and can be used once.':'This link expires in 24 hours and can be used once.';
   const ignore=kind==='reset'?'If you did not request a password reset, you can ignore this email. Your password has not changed.':'If you did not request this email, you can ignore it.';
-  const text=`${title}\n\n${instruction}\n\n${url.href}\n\n${expiry}\n\n${ignore}\n\nAIDramio`;
-  const html=`<!doctype html><html><body style="font-family:Arial,sans-serif;background:#f5f5f7;padding:24px;color:#202024"><main style="max-width:560px;margin:auto;background:#fff;padding:32px;border-radius:20px"><p style="font-weight:bold;color:#ff684d">AIDramio</p><h1 style="font-size:25px">${escapeHtml(title)}</h1><p>${escapeHtml(instruction)}</p><p style="margin:28px 0"><a href="${escapeHtml(url.href)}" style="display:inline-block;padding:14px 20px;background:#ff684d;color:#111;text-decoration:none;border-radius:10px;font-weight:bold">${escapeHtml(title)}</a></p><p>${escapeHtml(expiry)}</p><p style="color:#666">${escapeHtml(ignore)}</p><p style="font-size:12px;overflow-wrap:anywhere">If the button does not work, open this link:<br>${escapeHtml(url.href)}</p></main></body></html>`;
+  const text=`${title}\n\n${instruction}\n\n${url.href}\n\n${expiry}\n\n${ignore}\n\nLingYing`;
+  const html=`<!doctype html><html><body style="font-family:Arial,sans-serif;background:#f5f5f7;padding:24px;color:#202024"><main style="max-width:560px;margin:auto;background:#fff;padding:32px;border-radius:20px"><p style="font-weight:bold;color:#ff684d">LingYing</p><h1 style="font-size:25px">${escapeHtml(title)}</h1><p>${escapeHtml(instruction)}</p><p style="margin:28px 0"><a href="${escapeHtml(url.href)}" style="display:inline-block;padding:14px 20px;background:#ff684d;color:#111;text-decoration:none;border-radius:10px;font-weight:bold">${escapeHtml(title)}</a></p><p>${escapeHtml(expiry)}</p><p style="color:#666">${escapeHtml(ignore)}</p><p style="font-size:12px;overflow-wrap:anywhere">If the button does not work, open this link:<br>${escapeHtml(url.href)}</p></main></body></html>`;
   const selected=provider();
   const cloudflare=selected==='cloudflare';
   const endpoint=cloudflare?`https://api.cloudflare.com/client/v4/accounts/${config.cloudflareEmailAccountId}/email/sending/send`:'https://api.resend.com/emails';

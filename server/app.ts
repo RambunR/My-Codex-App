@@ -98,7 +98,7 @@ export function createApp() {
   registerAppleAuth(app);
   registerEmailAuth(app);
   app.get('/api/health', (_req,res) => res.json({ ok: true, database: !!one('SELECT 1 AS ready') }));
-  app.get('/api/config', (_req,res) => res.json({ brand: 'AIDramio', languages: LANGUAGES, genres: GENRES, paymentsMode: config.payments,paymentsReady:paymentsReady(),paymentsConfigured:stripeConfigured(),sandbox:config.sandbox,paymentsTestMode:stripeTestPayments()||config.payments==='demo',uploadsEnabled:!config.sandbox,usdToHkd: config.usdToHkd,
+  app.get('/api/config', (_req,res) => res.json({ brand: 'LingYing', languages: LANGUAGES, genres: GENRES, paymentsMode: config.payments,paymentsReady:paymentsReady(),paymentsConfigured:stripeConfigured(),sandbox:config.sandbox,paymentsTestMode:stripeTestPayments()||config.payments==='demo',uploadsEnabled:!config.sandbox,usdToHkd: config.usdToHkd,
     limits: { maxEpisodeSeconds: 180, maxEpisodeBytes: MAX_EPISODE_BYTES, quotaBytes: DEFAULT_QUOTA_BYTES, activationHkd: 88, minimumPriceUsd: 0.1, creatorShare: 0.7, minimumPayoutHkd: 20,minWalletFundingUsd:MIN_WALLET_FUNDING_CENTS/100,maxWalletFundingUsd:MAX_WALLET_FUNDING_CENTS/100 }, demo: config.seed, runtime: (config as any).runtime || 'node', videoFormats: (config as any).videoFormats || ['mp4','mov','webm','m4v'], auth:{google:googleEnabled(),apple:appleEnabled(),email:emailAuthEnabled()} }));
   app.get('/api/auth/me', (req,res) => res.json({ user: req.user || null }));
   app.post('/api/auth/register', rateLimit('register', 12, 15 * 60_000), async (req,res) => {
