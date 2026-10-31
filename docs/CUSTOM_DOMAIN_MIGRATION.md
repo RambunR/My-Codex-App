@@ -12,7 +12,7 @@ Both domain routes attach to the existing `lingying` Worker, preserving stable W
 
 `STRIPE_SITE_ORIGIN` stays pinned to `https://aidramio.jimmy-tsoi2001.workers.dev` as an **internal logical financial identity**. It is not a customer-facing API endpoint and does not need to remain a browsable website after retirement. Keeping that value preserves existing and pending Checkout metadata while success/cancellation links and customer API calls use the custom domain.
 
-Cloudflare assets use `run_worker_first: true` so canonical routing applies to homepages, SPA routes and existing files. Signed POST deliveries to `/api/payments/webhook` reach signature verification directly without an HTTP redirect. Stripe test mode, test catalogue IDs and encrypted credentials remain unchanged by this hostname move.
+Cloudflare assets use `run_worker_first: true` so canonical routing applies to homepages, SPA routes and existing files. Signed POST deliveries to `/api/payments/webhook` reach signature verification directly without an HTTP redirect. The hostname migration itself did not change payment mode. The owner subsequently requested live card Checkout, confirmed live Secrets saved, and authorized the separate live-mode release described below.
 
 ## Google and Apple verification
 
@@ -26,33 +26,19 @@ Keep the same OAuth client IDs, Apple Services ID and signing key to preserve ex
 
 Use only the domain in Apple's domain field and a full HTTPS URL in its return-URL field. Existing provider client IDs, signing key and Worker secrets do not need replacement for these registration updates.
 
-## Move the existing Stripe test webhook to this domain
+## Stripe on the custom domain
 
-The current integration remains **Stripe test mode**. This domain change does not enable live charges or creator payouts.
+The owner has requested **live card Checkout** after the earlier test-mode domain move and reports saving live API/webhook Secrets. The separate release target is `PAYMENTS_MODE=stripe`, `STRIPE_TEST_MODE=false`, `STRIPE_AUTO_CONFIGURE_WEBHOOK=true`, cleared optional test catalogue IDs, and **`PAYOUTS_ENABLED=false`**. Deployment and no-cost live configuration verification are pending. Follow [STRIPE_LIVE_SETUP.md](STRIPE_LIVE_SETUP.md) for secure configuration and the exact seven Snapshot event selections.
 
-The owner reports the existing Stripe destination updated to the custom domain. The public handler is reachable directly and rejects unsigned requests with HTTP 400 `INVALID_SIGNATURE`, as expected. There is no Stripe API read credential or connected Stripe tool available here, so the Dashboard endpoint URL, selected events, enabled status and signed delivery history have not been independently inspected. The catalogue's saved old URL is historical, not evidence that the owner's Dashboard change failed.
+Both testing and live destinations use the path **`https://lingyingdrama.com/api/payments/webhook`**, but each Stripe environment/destination has its own signing secret. A live destination must be configured in Stripe's **Live** environment; editing the previous test endpoint URL does not enable live events. Keep keys/signing secrets encrypted on the existing `lingying` Worker, never on the compatibility gateway.
 
-1. Open [Stripe Dashboard → Webhooks](https://dashboard.stripe.com/webhooks), using the **same test environment/Sandbox currently connected to LingYing**.
-2. In **Workbench → Webhooks / Event destinations**, open the existing active destination whose endpoint URL is `https://aidramio.jimmy-tsoi2001.workers.dev/api/payments/webhook`.
-3. Choose **Edit destination/endpoint** and change its endpoint URL to:
+The live event set includes four Checkout lifecycle events and `charge.refunded`, `charge.dispute.created` and `charge.dispute.closed`. Financial risk holds require administrator review and manual compensation; they do not claim full automatic clawback. Creator payouts stay paused independently of card Checkout. Test credit, passes and earnings remain test-only.
 
-   ```text
-   https://lingyingdrama.com/api/payments/webhook
-   ```
+The bounded readiness helper verifies the saved key's exact existing live Stripe account, merchant charge capability and one enabled matching Snapshot endpoint. It can append only missing required subscriptions while preserving the endpoint and signing secret; account/webhook read and, when changes are required, webhook write permissions are needed. `paymentSetup` exposes safe status/error codes and new Checkout remains gated until readiness succeeds. The helper does not create endpoints or make payments.
 
-4. Keep **Snapshot** payloads, events on the existing Stripe account, and the existing API version. Preserve these four event selections:
+No-cost verification opens an **unpaid** live Checkout and cancels it without card submission. Its return URL must remain on the custom domain. The owner-only payment-status endpoint records an actual signed expiration receipt, allowing webhook signing-secret pairing/direct domain delivery to be checked without a charge. An expired status alone does not prove delivery, and neither test establishes completed paid settlement. The earlier public handler check reached signature verification directly and rejected unsigned requests with HTTP 400; neither that response nor an owner-reported URL establishes successful Stripe delivery.
 
-   ```text
-   checkout.session.completed
-   checkout.session.async_payment_succeeded
-   checkout.session.async_payment_failed
-   checkout.session.expired
-   ```
-
-5. Save the same destination so its endpoint identity and signing secret remain unchanged. The existing `STRIPE_WEBHOOK_SECRET` on the **lingying** Worker continues to match it. Existing API keys, products/prices and client credentials do not need replacement for this URL edit.
-6. Inspect a test delivery in Stripe Workbench and confirm a direct HTTP 2xx response at the new URL. A website Checkout return may reconcile payment server-side, so that return alone does not independently prove webhook delivery. A synthetic or unrelated event must not create arbitrary wallet credit.
-
-Preserve `STRIPE_SITE_ORIGIN`, `STRIPE_TEST_MODE=true` and the current test keys/catalogue during this move. Keep signing secrets in Cloudflare Secrets. Live-mode setup is a separate release decision after the production-readiness blockers are addressed.
+The previous test-mode webhook migration instructions remain in [STRIPE_SETUP.md](STRIPE_SETUP.md) for audit. Do not rerun historical bootstrap helpers or restore test keys/catalogue settings on the live website. Preserve `STRIPE_SITE_ORIGIN` throughout the live switch and keep the raw webhook body unchanged for signature verification.
 
 ## Temporary compatibility and old-address cleanup
 

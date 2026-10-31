@@ -83,6 +83,49 @@ CREATE TABLE IF NOT EXISTS withdrawals (
  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','processing','paid','rejected')),
  transfer_id TEXT, note TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS payment_provider_links (
+ table_group TEXT NOT NULL CHECK(table_group IN ('default','test')), livemode INTEGER NOT NULL CHECK(livemode IN (0,1)),
+ payment_id TEXT NOT NULL, user_id TEXT NOT NULL REFERENCES users(id), provider_session TEXT NOT NULL,
+ payment_intent TEXT, charge_id TEXT, amount_cents INTEGER NOT NULL CHECK(amount_cents > 0), currency TEXT NOT NULL,
+ created_at TEXT NOT NULL DEFAULT (datetime('now')),
+ PRIMARY KEY(table_group,livemode,payment_id), UNIQUE(table_group,livemode,provider_session),
+ UNIQUE(table_group,livemode,payment_intent), UNIQUE(table_group,livemode,charge_id)
+);
+CREATE TABLE IF NOT EXISTS stripe_webhook_receipts (
+ event_id TEXT PRIMARY KEY, financial_mode TEXT NOT NULL CHECK(financial_mode IN ('test','live')),
+ event_type TEXT NOT NULL, object_id TEXT NOT NULL, payment_id TEXT NOT NULL, endpoint_host TEXT NOT NULL,
+ received_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS stripe_webhook_receipt_payment ON stripe_webhook_receipts(financial_mode,payment_id);
+CREATE TABLE IF NOT EXISTS payment_risk_cases (
+ id TEXT PRIMARY KEY, table_group TEXT NOT NULL CHECK(table_group IN ('default','test')),
+ livemode INTEGER NOT NULL CHECK(livemode IN (0,1)), kind TEXT NOT NULL CHECK(kind IN ('refund','dispute')),
+ provider_object_id TEXT NOT NULL, payment_intent TEXT, charge_id TEXT,
+ payment_id TEXT, user_id TEXT REFERENCES users(id), status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','resolved')),
+ amount_cents INTEGER NOT NULL DEFAULT 0 CHECK(amount_cents >= 0), currency TEXT NOT NULL DEFAULT '',
+ provider_status TEXT NOT NULL DEFAULT 'unknown', provider_updated_at INTEGER NOT NULL DEFAULT 0,
+ wallet_debit_cents INTEGER NOT NULL DEFAULT 0 CHECK(wallet_debit_cents >= 0),
+ platform_loss_cents INTEGER NOT NULL DEFAULT 0 CHECK(platform_loss_cents >= 0),
+ pass_revoked INTEGER NOT NULL DEFAULT 0 CHECK(pass_revoked IN (0,1)),
+ decision TEXT, note TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT (datetime('now')),
+ updated_at TEXT NOT NULL DEFAULT (datetime('now')), resolved_at TEXT,
+ UNIQUE(table_group,livemode,kind,provider_object_id)
+);
+CREATE TABLE IF NOT EXISTS payment_risk_events (
+ table_group TEXT NOT NULL CHECK(table_group IN ('default','test')), livemode INTEGER NOT NULL CHECK(livemode IN (0,1)),
+ event_id TEXT NOT NULL, event_type TEXT NOT NULL, case_id TEXT REFERENCES payment_risk_cases(id),
+ snapshot_json TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')),
+ PRIMARY KEY(table_group,livemode,event_id)
+);
+CREATE TABLE IF NOT EXISTS payment_review_resolutions (
+ id TEXT PRIMARY KEY, case_id TEXT NOT NULL REFERENCES payment_risk_cases(id), actor_id TEXT NOT NULL REFERENCES users(id),
+ decision TEXT NOT NULL CHECK(decision IN ('reconciled','platform_loss','provider_reversed')),
+ wallet_delta_micros INTEGER NOT NULL DEFAULT 0, platform_loss_delta_cents INTEGER NOT NULL DEFAULT 0,
+ pass_delta INTEGER NOT NULL DEFAULT 0, note TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS payment_risk_user ON payment_risk_cases(table_group,livemode,user_id,status);
+CREATE INDEX IF NOT EXISTS payment_risk_unmapped ON payment_risk_cases(table_group,livemode,status,payment_id);
+CREATE INDEX IF NOT EXISTS payment_risk_provider ON payment_risk_cases(table_group,livemode,payment_intent,charge_id);
 CREATE TABLE IF NOT EXISTS storage_requests (
  id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), requested_gb INTEGER NOT NULL, reason TEXT NOT NULL,
  status TEXT NOT NULL DEFAULT 'pending', created_at TEXT NOT NULL DEFAULT (datetime('now'))

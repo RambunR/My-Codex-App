@@ -13,7 +13,9 @@ import { one, all, run, transaction } from './db.js';
 import { AppError, assert } from './errors.js';
 import { readSession, requireAuth, requirePublisher, requireAdmin, hashPassword, verifyPassword, createSession, destroySession, getUser, rateLimit } from './auth.js';
 import { prepareVideo, prepareCover, putObject, deleteObject, serveObject, removeTempFile } from './storage.js';
-import { createCheckout, settlePayment, unlockEpisode, requestWithdrawal,returnWithdrawalFunds, addLedger, stripe,paymentsReady,stripeConfigured,stripeModeMatches,stripeTestPayments } from './finance.js';
+import { createCheckout, cancelCheckout, settlePayment, unlockEpisode, requestWithdrawal,returnWithdrawalFunds, addLedger, stripe,paymentsReady,stripeConfigured,stripeModeMatches,stripeTestPayments,assertPayoutsEnabled } from './finance.js';
+import {processRiskEvent,recordPaymentLink,adminPaymentReviews,resolvePaymentReview} from './payment-risk.js';
+import {ensureStripeWebhookReady,stripeWebhookReadiness} from './stripe-readiness.js';
 import { paymentTable,purchaseTable,ledgerTable,hasEpisodePurchase,usingTestPaymentState } from './payment-state.js';
 import { startPlayback,recordPlayback,readSeriesAnalytics } from './analytics.js';
 import { LANGUAGES, GENRES, MAX_EPISODE_BYTES, DEFAULT_QUOTA_BYTES,MIN_WALLET_FUNDING_CENTS,MAX_WALLET_FUNDING_CENTS } from '../shared/config.js';
@@ -63,23 +65,36 @@ export function createApp() {
   app.use((req, res, next) => { res.setHeader('X-Content-Type-Options','nosniff'); res.setHeader('Referrer-Policy',req.path==='/auth'||req.path.startsWith('/api/auth/')?'no-referrer':'strict-origin-when-cross-origin'); res.setHeader('X-Frame-Options','DENY'); if(req.path==='/auth')res.setHeader('Cache-Control','no-store'); next(); });
   app.use('/api',credentialedCors);
   app.post('/api/payments/webhook', express.raw({ type: 'application/json', limit: '1mb' }), async (req, res) => {
-    assert(config.payments === 'stripe' && stripe && paymentsReady(), 503, 'PAYMENTS_UNAVAILABLE', 'Webhook is not configured.');
+    // Pausing new Checkout must not drop signed refunds or existing payments.
+    assert(stripe && stripeConfigured(), 503, 'PAYMENTS_UNAVAILABLE', 'Webhook is not configured.');
     let event;
     try { event = await stripe.webhooks.constructEventAsync(req.body, req.headers['stripe-signature'] as string, config.stripeWebhook); }
     catch { throw new AppError(400, 'INVALID_SIGNATURE', 'Invalid webhook signature.'); }
     if(!stripeModeMatches(event.livemode)) {res.json({received:true,ignored:true});return;}
+    const risk=processRiskEvent(event);
+    if(risk.handled){res.json({received:true,...risk});return;}
+    const checkoutEvent=['checkout.session.completed','checkout.session.async_payment_succeeded','checkout.session.expired','checkout.session.async_payment_failed'].includes(event.type);
+    if(checkoutEvent){
+      const session=event.data.object as Stripe.Checkout.Session;
+      if(!stripeModeMatches(session.livemode)||session.metadata?.site&&session.metadata.site!==stripeSiteOrigin()){res.json({received:true,ignored:true});return;}
+    }
     if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
       const session = event.data.object;
       if(!stripeModeMatches(session.livemode)){res.json({received:true,ignored:true});return;}
       if(session.metadata?.site&&session.metadata.site!==stripeSiteOrigin()){res.json({received:true,ignored:true});return;}
       if (session.payment_status === 'paid' && session.metadata?.paymentId) {
         if(!one(`SELECT id FROM ${paymentTable()} WHERE id=?`,session.metadata.paymentId)){res.json({received:true,ignored:true});return;}
-        settlePayment(session.metadata.paymentId, { amount: session.amount_total!, currency: session.currency!, session: session.id,livemode:session.livemode });
+        settlePayment(session.metadata.paymentId, { amount: session.amount_total!, currency: session.currency!, session: session.id,livemode:session.livemode,sessionObject:session });
       }
     }
     if(event.type==='checkout.session.expired'||event.type==='checkout.session.async_payment_failed'){
       const session=event.data.object;
       if(stripeModeMatches(session.livemode)&&session.metadata?.paymentId)run(`UPDATE ${paymentTable()} SET status=? WHERE id=? AND provider_session=? AND provider='stripe' AND status='pending'`,event.type==='checkout.session.expired'?'expired':'failed',session.metadata.paymentId,session.id);
+    }
+    if(checkoutEvent&&typeof event.id==='string'){
+      const session=event.data.object as Stripe.Checkout.Session;
+      const payment=session.metadata?.paymentId?one(`SELECT id FROM ${paymentTable()} WHERE id=? AND provider_session=? AND provider='stripe'`,session.metadata.paymentId,session.id):undefined;
+      if(payment)run('INSERT OR IGNORE INTO stripe_webhook_receipts (event_id,financial_mode,event_type,object_id,payment_id,endpoint_host) VALUES (?,?,?,?,?,?)',event.id,event.livemode?'live':'test',event.type,session.id,payment.id,String(req.headers.host||'').slice(0,255));
     }
     res.json({ received: true });
   });
@@ -100,8 +115,8 @@ export function createApp() {
   registerAppleAuth(app);
   registerEmailAuth(app);
   app.get('/api/health', (_req,res) => res.json({ ok: true, database: !!one('SELECT 1 AS ready') }));
-  app.get('/api/config', (_req,res) => res.json({ brand: 'LingYing', languages: LANGUAGES, genres: GENRES, paymentsMode: config.payments,paymentsReady:paymentsReady(),paymentsConfigured:stripeConfigured(),sandbox:config.sandbox,paymentsTestMode:stripeTestPayments()||config.payments==='demo',uploadsEnabled:!config.sandbox,usdToHkd: config.usdToHkd,
-    limits: { maxEpisodeSeconds: 180, maxEpisodeBytes: MAX_EPISODE_BYTES, quotaBytes: DEFAULT_QUOTA_BYTES, activationHkd: 88, minimumPriceUsd: 0.1, creatorShare: 0.7, minimumPayoutHkd: 20,minWalletFundingUsd:MIN_WALLET_FUNDING_CENTS/100,maxWalletFundingUsd:MAX_WALLET_FUNDING_CENTS/100 }, demo: config.seed, runtime: (config as any).runtime || 'node', videoFormats: (config as any).videoFormats || ['mp4','mov','webm','m4v'], auth:{google:googleEnabled(),apple:appleEnabled(),email:emailAuthEnabled()} }));
+  app.get('/api/config', async (_req,res) => {if(config.payments==='stripe'&&stripeConfigured())await ensureStripeWebhookReady(stripe);return res.json({ brand: 'LingYing', languages: LANGUAGES, genres: GENRES, paymentsMode: config.payments,paymentsReady:paymentsReady(),paymentsConfigured:stripeConfigured(),paymentSetup:stripeWebhookReadiness(),sandbox:config.sandbox,paymentsTestMode:stripeTestPayments()||config.payments==='demo',payoutsEnabled:config.payoutsEnabled&&!stripeTestPayments(),uploadsEnabled:!config.sandbox,usdToHkd: config.usdToHkd,
+    limits: { maxEpisodeSeconds: 180, maxEpisodeBytes: MAX_EPISODE_BYTES, quotaBytes: DEFAULT_QUOTA_BYTES, activationHkd: 88, minimumPriceUsd: 0.1, creatorShare: 0.7, minimumPayoutHkd: 20,minWalletFundingUsd:MIN_WALLET_FUNDING_CENTS/100,maxWalletFundingUsd:MAX_WALLET_FUNDING_CENTS/100 }, demo: config.seed, runtime: (config as any).runtime || 'node', videoFormats: (config as any).videoFormats || ['mp4','mov','webm','m4v'], auth:{google:googleEnabled(),apple:appleEnabled(),email:emailAuthEnabled()} });});
   app.get('/api/auth/me', (req,res) => res.json({ user: req.user || null }));
   app.post('/api/auth/register', rateLimit('register', 12, 15 * 60_000), async (req,res) => {
     const body = registration.parse(req.body);
@@ -195,17 +210,28 @@ export function createApp() {
     const body=z.discriminatedUnion('kind',[z.object({kind:z.literal('activation')}),z.object({kind:z.literal('funding'),amount_cents:z.number().int().min(MIN_WALLET_FUNDING_CENTS).max(MAX_WALLET_FUNDING_CENTS)})]).parse(req.body);
     res.json(await createCheckout(req.user!.id,body.kind,body.kind==='funding'?body.amount_cents:8800));
   });
+  app.post('/api/payments/:id/cancel',requireAuth,rateLimit('checkout-cancel',30,60_000),async(req,res)=>{
+    res.json(await cancelCheckout(req.user!.id,id(req)));
+  });
+  app.get('/api/payments/:id/status',requireAuth,(req,res)=>{
+    const payment=one(`SELECT id,status,kind,amount_cents,currency FROM ${paymentTable()} WHERE id=? AND user_id=? AND provider='stripe'`,id(req),req.user!.id);
+    assert(payment,404,'NOT_FOUND','Payment not found.');
+    const financialMode=/^(sk|rk)_live_/.test(config.stripeKey)?'live':'test';
+    const webhooks=all('SELECT event_type AS type,received_at,endpoint_host FROM stripe_webhook_receipts WHERE payment_id=? AND financial_mode=? ORDER BY received_at DESC,event_id DESC LIMIT 20',payment.id,financialMode);
+    res.json({payment,webhooks});
+  });
   app.post('/api/payments/:id/demo-confirm', requireAuth, (req,res) => {
     assert(config.payments==='demo' && !config.production,404,'NOT_FOUND','Not found.');
     const payment=one('SELECT * FROM payments WHERE id=? AND user_id=?',id(req),req.user!.id); assert(payment?.provider==='demo',404,'NOT_FOUND','Payment not found.');
     settlePayment(payment.id); res.json({ user:getUser(req.user!.id) });
   });
   app.post('/api/payments/reconcile', requireAuth, async (req,res) => {
-    const { session_id }=z.object({session_id:z.string().max(300)}).parse(req.body); assert(stripe && config.payments==='stripe'&&paymentsReady(),503,'PAYMENTS_UNAVAILABLE','Payments unavailable.');
+    const { session_id }=z.object({session_id:z.string().max(300)}).parse(req.body); assert(stripe && stripeConfigured(),503,'PAYMENTS_UNAVAILABLE','Payments unavailable.');
     const payment=one(`SELECT * FROM ${paymentTable()} WHERE provider_session=? AND user_id=?`,session_id,req.user!.id);assert(payment,404,'NOT_FOUND','Payment not found.');
     const session=await stripe.checkout.sessions.retrieve(session_id);
     assert(stripeModeMatches(session.livemode),400,'PAYMENT_MODE_MISMATCH','Payment mode does not match this application.');
-    if(session.payment_status==='paid')settlePayment(payment.id,{amount:session.amount_total!,currency:session.currency!,session:session.id,livemode:session.livemode});
+    if(session.payment_status==='paid')settlePayment(payment.id,{amount:session.amount_total!,currency:session.currency!,session:session.id,livemode:session.livemode,sessionObject:session});
+    else recordPaymentLink(payment.id,session);
     res.json({ paid:session.payment_status==='paid',user:getUser(req.user!.id) });
   });
   app.get('/api/studio', requireAuth, (req,res) => {
@@ -275,14 +301,14 @@ export function createApp() {
     run('INSERT INTO storage_requests (id,user_id,requested_gb,reason) VALUES (?,?,?,?)',crypto.randomUUID(),req.user!.id,b.requested_gb,b.reason);res.status(201).json({ok:true});
   });
   app.post('/api/studio/connect', requirePublisher, async (req,res) => {
-    assert(!stripeTestPayments(),503,'TEST_PAYOUTS_DISABLED','Payouts are unavailable during Stripe test payments.');
+    assertPayoutsEnabled();
     assert(stripe && config.payments==='stripe'&&paymentsReady(),503,'PAYMENTS_UNAVAILABLE','Payout onboarding is not configured yet.');
     let account=req.user!.stripe_account_id;
     if(!account){const created=await stripe.accounts.create({type:'express',email:req.user!.email,capabilities:{transfers:{requested:true}},metadata:{userId:req.user!.id}});account=created.id;run('UPDATE users SET stripe_account_id=? WHERE id=?',account,req.user!.id);}
     const link=await stripe.accountLinks.create({account,refresh_url:`${publicAppUrl()}/studio?connect=retry`,return_url:`${publicAppUrl()}/studio?connect=done`,type:'account_onboarding'});res.json({url:link.url});
   });
   app.post('/api/studio/withdrawals', requirePublisher, async (req,res) => {
-    assert(!stripeTestPayments(),503,'TEST_PAYOUTS_DISABLED','Payouts are unavailable during Stripe test payments.');
+    assertPayoutsEnabled();
     const b=z.object({amount_cents:z.number().int().min(1).max(10000000),note:z.string().max(500).default('')}).parse(req.body);
     if(config.payments==='stripe') {assert(stripe&&paymentsReady(),503,'PAYMENTS_UNAVAILABLE','Payouts are not configured yet.');assert(req.user!.stripe_account_id,400,'CONNECT_REQUIRED','Connect your payout account first.');const account=await stripe.accounts.retrieve(req.user!.stripe_account_id);assert(account.payouts_enabled,400,'CONNECT_REQUIRED','Complete your payout account verification first.');}
     else assert(config.payments==='demo' && !config.production,503,'PAYMENTS_UNAVAILABLE','Payouts are not configured yet.');
@@ -300,7 +326,7 @@ export function createApp() {
     transaction(()=>{const r=one("SELECT * FROM storage_requests WHERE id=? AND status='pending'",id(req));assert(r,404,'NOT_FOUND','Pending request not found.');if(approve)run('UPDATE users SET quota_bytes=MAX(quota_bytes,?) WHERE id=?',r.requested_gb*1024**3,r.user_id);run('UPDATE storage_requests SET status=? WHERE id=?',approve?'approved':'rejected',r.id);});res.json({ok:true});
   });
   app.post('/api/admin/withdrawals/:id', requireAdmin, async (req,res) => {
-    assert(!stripeTestPayments(),503,'TEST_PAYOUTS_DISABLED','Payouts are unavailable during Stripe test payments.');
+    assertPayoutsEnabled();
     const {approve}=z.object({approve:z.boolean()}).parse(req.body);
     const w=one('SELECT w.*,u.stripe_account_id FROM withdrawals w JOIN users u ON u.id=w.user_id WHERE w.id=?',id(req));assert(w,404,'NOT_FOUND','Payout not found.');
     if(!approve){transaction(()=>{const current=one('SELECT * FROM withdrawals WHERE id=?',w.id)!;assert(current.status==='pending',409,'ALREADY_PROCESSED','This payout is already being processed.');run("UPDATE withdrawals SET status='rejected' WHERE id=?",w.id);returnWithdrawalFunds(w.user_id,w.amount_micros);addLedger(w.user_id,'withdrawal_refund',w.amount_micros,w.id,'Payout declined · funds returned');});res.json({ok:true});return;}
@@ -313,6 +339,11 @@ export function createApp() {
       run("UPDATE withdrawals SET status='paid',transfer_id=? WHERE id=?",transfer.id,w.id);
     }else{assert(config.payments==='demo'&&!config.production,503,'PAYMENTS_UNAVAILABLE','Payouts unavailable.');run("UPDATE withdrawals SET status='paid',transfer_id=? WHERE id=?",`demo_${w.id}`,w.id);}
     res.json({ok:true});
+  });
+  app.get('/api/admin/payment-reviews',requireAdmin,(_req,res)=>res.json({reviews:adminPaymentReviews()}));
+  app.post('/api/admin/payment-reviews/:id/resolve',requireAdmin,(req,res)=>{
+    const body=z.object({decision:z.enum(['reconciled','platform_loss','provider_reversed']),note:z.string().trim().min(10).max(2000),wallet_debit_cents:z.number().int().min(0).max(MAX_WALLET_FUNDING_CENTS).optional()}).parse(req.body);
+    res.json({review:resolvePaymentReview(id(req),req.user!.id,body)});
   });
   app.use('/api',(_req,res)=>res.status(404).json({error:{code:'NOT_FOUND',message:'This endpoint does not exist.'}}));
   return app;

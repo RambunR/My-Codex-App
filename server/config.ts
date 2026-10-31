@@ -7,6 +7,8 @@ export const config = {
   production: process.env.NODE_ENV === 'production',
   sandbox: false,
   stripeTestMode: process.env.STRIPE_TEST_MODE === 'true',
+  payoutsEnabled: process.env.PAYOUTS_ENABLED === 'true' || process.env.NODE_ENV !== 'production' && process.env.PAYOUTS_ENABLED !== 'false',
+  stripeAutoConfigureWebhook: process.env.STRIPE_AUTO_CONFIGURE_WEBHOOK === 'true',
   appUrl: process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`,
   publicUrl: process.env.PUBLIC_APP_URL || '',
   stripeSiteOrigin: process.env.STRIPE_SITE_ORIGIN || '',

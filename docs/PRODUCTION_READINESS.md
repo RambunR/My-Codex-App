@@ -1,10 +1,20 @@
 # LingYing production readiness — 31 October 2026
 
-31 October 2026 (Hong Kong time). Public site: https://lingying.jimmy-tsoi2001.workers.dev . Baseline source: `6a6bb43e9f7f51adfea41f0b34662f6fc3996247`.
+31 October 2026 (Hong Kong time). Current public site: https://lingyingdrama.com . Historical audit baseline source: `6a6bb43e9f7f51adfea41f0b34662f6fc3996247`.
 
-**Verdict: not ready to accept real customer money or release the complete paid creator service.** The test application has working core flows, but enabling live credentials alone would not resolve the financial and operational gaps below.
+**Status: owner-authorized live card Checkout activation is underway; deployment and live verification are pending. The complete paid creator service is not release-ready.** The requested live-card mode keeps creator payouts independently paused and adds refund/dispute risk holds. Credential presence and a successful unpaid Checkout do not prove live settlement, provider delivery or full operational readiness.
 
-## Verified baseline
+## Current live-card release scope
+
+The owner confirmed saving live API/webhook Secrets and requested actual activation on the same custom-domain website. The target is `PAYMENTS_MODE=stripe`, `STRIPE_TEST_MODE=false`, `STRIPE_AUTO_CONFIGURE_WEBHOOK=true`, optional test catalogue IDs cleared for inline HK$88 Dramio Pass / custom USD wallet pricing, and **`PAYOUTS_ENABLED=false`**. See [the live setup guide](STRIPE_LIVE_SETUP.md). The existing account database and private media remain in place. Test balances, pass ownership, purchases and earnings stay separate and are never converted to live money or entitlements.
+
+The release adds durable holds for `charge.refunded`, `charge.dispute.created` and `charge.dispute.closed`, with administrator review and manual financial compensation. These holds contain affected activity; they do not automatically claw back spent credit, creator earnings or previous transfers. A closed dispute must not silently release a hold. The deployed behavior and regression results remain pending verification in this section.
+
+The bounded server helper checks the existing live Stripe account, charge capability and exactly one matching enabled Snapshot endpoint. It appends only missing required subscriptions and preserves all other endpoint settings; live verification is pending. New Checkout stays gated until it reports ready. Restricted-key permission failures and account/endpoint mismatches are surfaced as safe `paymentSetup` codes. The helper neither creates endpoints nor submits charges or payouts.
+
+No-cost verification may open an unpaid live Checkout and cancel/expire that owned Session without submitting a card. It must leave real wallet funds and funding ledgers unchanged. An actual signed `checkout.session.expired` receipt recorded for that owner at `lingyingdrama.com` can prove signing-secret pairing/direct webhook delivery without a charge; expired status alone cannot. It does **not** establish a completed charge, paid settlement or live refund behavior. No live charge, wallet funding, creator transfer or bank payout is authorized by this configuration check.
+
+## Verified historical test-mode baseline
 
 - 113 backend checks passed after the media corrections (98 baseline checks plus 15 media regressions), covering authentication, authorization, exact monetary arithmetic, purchase races, signature/mode/amount validation, test/live separation, quotas, analytics, provider state/token fixtures, and origin compatibility.
 - 25 browser journeys passed against isolated local data. Registration, email/password login, demo wallet funding/unlock, Dramio Pass, real folder uploads, publishing, likes/statistics, recovery UI and mobile layouts were exercised. These payment confirmations are local demonstrations, not Stripe card transactions.
@@ -17,12 +27,12 @@
 
 ## Release blockers and unverified release dependencies
 
-1. **Refund/dispute reconciliation is absent.** An isolated signed-event reproduction credited US$5, then full refund and dispute events returned HTTP 200 while the wallet retained US$5. Creator earnings and later payout eligibility can become inconsistent with returned funds. Implement and test reconciliation or a concrete safe operational compensation process before live money. The isolated audit evidence is retained outside source control; relevant implementation is `server/app.ts:65–84` and the omission is recorded in `docs/STRIPE_SETUP.md`.
-2. **The deployed payment configuration is test-only.** Live merchant eligibility, live credentials/catalogue/webhook configuration, deliberate live payment verification and fees remain outside this audit. Switching mode is an operator action, not a test pass.
-3. **Recovery and verification email cannot currently be delivered.** Live `auth.email:false`; delivery credentials are absent. Configure the selected verified sender/provider and verify actual delivery plus password-reset/session revocation end to end.
-4. **Real creator payouts remain unverified and disabled in test mode.** Connect onboarding/country eligibility and bank settlement have not passed a live test. Admin approval currently records a transfer to a connected account as paid, not confirmed bank receipt. Automatic weekly payouts are not implemented.
+1. **Refund/dispute compensation remains an operator responsibility.** The new release adds durable risk holds and administrator review, with validation pending. Full automatic reversal of spent wallet credit, episode entitlements, creator earnings and prior transfers is not implemented. Operators must reconcile and compensate affected records before resolving a hold. Payouts stay paused to contain onward transfers; this does not erase existing platform/customer exposure.
+2. **Live configuration and completed settlement require independent verification.** The owner reports live Secrets saved and authorized activation. Deploying live mode, the bounded account/endpoint readiness check, signing-secret pairing, completed paid settlement and refund/dispute behavior are distinct checks. The no-cost unpaid Checkout/cancellation plus signed expiration receipt can establish account/Session compatibility and live webhook delivery, but not a completed payment or paid-wallet settlement.
+3. **Recovery and verification email cannot currently be delivered.** Last observed live `auth.email:false`; delivery credentials were absent. Configure the selected verified sender/provider and verify actual delivery plus password-reset/session revocation end to end.
+4. **Real creator payouts remain deliberately paused.** `PAYOUTS_ENABLED=false` blocks Connect onboarding, withdrawal requests and administrator transfer approval independently of card Checkout. Connect country eligibility, live transfers and bank settlement remain unverified. A transfer recorded as paid does not confirm receipt in a creator's bank. Automatic weekly payouts are not implemented.
 5. **A public uploader service lacks an administrative content-takedown/report workflow.** The implemented admin console handles users/storage/withdrawals. Published paid content cannot simply be unpublished by its creator. Establish a controlled operator removal path before an unrestricted uploader launch.
-6. **Successful real Google/Apple consent and returning-account sign-in remain unverified.** Local cryptographic/state tests and live authorization/cancellation/key-parsing probes pass their stated scope; they do not certify production provider publishing/approval or a complete real-account login.
+6. **Successful real Google/Apple consent and returning-account sign-in remain unverified.** Google accepts the custom-domain callback; Apple still rejected it as of the latest 10:00 UTC public check. Local cryptographic/state tests and authorization/cancellation/key-parsing probes establish only their stated scope. They do not certify a complete real-account login.
 
 ## Media defects found during the audit
 
@@ -36,10 +46,10 @@ The duration fix addresses the reproduced missing-audio check. Container-header 
 - The Arabic footer language control is about 42.47px wide versus the 44px touch-target recommendation.
 - Legal document bodies remain English; interface dictionaries cover 21 languages.
 - Physical-device Safari/Android behavior, sustained production load capacity and a complete backup/restore exercise were not established here. No load test was run against the production service.
-- The old `aidramio` gateway is an active API/session/OAuth/webhook dependency. Deleting it without migration breaks the current application.
-- Public Stripe test activation permits testing real uploads within the ordinary quota. Restrict the test audience while payments are fake; test funding does not cover real hosting/storage usage.
+- The main website and browser API now use the custom domain. The old `aidramio` gateway remains temporary compatibility for legacy links, raw webhook delivery and existing Checkout return URLs; it does not transfer old session/OAuth cookies. Retire it only after those dependencies are verified gone.
+- The previous public Stripe test activation permitted real uploads within the ordinary quota. Its test passes are not live entitlements and must not be converted during the payment switch. Preserve media/account records and communicate the live pass status clearly.
 
-No existing customer balances, payouts, credentials, media, account records or payment mode were modified by the checks. Hosted Stripe testing uses one clearly identified audit account and fake funds, retaining its test transactions for audit. No live card, charge, payout or billing change was performed.
+The historical audit checks did not modify existing customer balances, payouts, credentials, media, account records or payment mode. The separately authorized live-card release changes configuration and adds financial risk records, with verification pending. Hosted Stripe testing uses one clearly identified audit account and fake funds, retaining its test transactions for audit. No live card, charge, payout or billing change was performed.
 
 ## Actual Stripe test Checkout
 
@@ -55,4 +65,4 @@ The media corrections were committed as `e2323395f6456df875d1367b1bf5a1c50b84b62
 - Post-deployment database health passed. Worker variables, all eight encrypted secret names, the original SQLite namespace and media bucket were unchanged. Stripe remains in test mode, and recovery-email availability remains false.
 - The production-dependency npm audit reported **zero known advisories** at audit time. The scan covers npm advisories, rather than every infrastructure or application risk.
 
-The fixed playback and demonstrated audio-duration defects are no longer listed as unresolved release blockers. Financial reconciliation, email delivery, real creator disbursement, provider sign-in/webhook verification and operator content controls still require work before the real-money launch.
+The fixed playback and demonstrated audio-duration defects are no longer unresolved blockers. The later live-card release adds financial risk containment with payouts paused; it does not complete manual compensation procedures, email delivery, real creator disbursement, provider sign-in/live settlement verification or operator content controls. These limits must remain visible when describing commercial readiness.

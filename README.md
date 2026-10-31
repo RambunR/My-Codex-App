@@ -2,7 +2,7 @@
 
 **LingYing** (靈映 / 灵映), formerly AIDramio, is a working short-drama platform for live-action, animated, AI-assisted, and AI-generated stories. It has a responsive viewer app, a publisher studio, persistent accounts and media, episode purchases, and an administrator console.
 
-Primary application: **[lingyingdrama.com](https://lingyingdrama.com)**; `www.lingyingdrama.com` redirects to the canonical domain. See [deployment details](docs/DEPLOYMENT.md) for the Cloudflare application and update command. Stripe test Checkout is integrated into this existing website; real charges remain disabled while `STRIPE_TEST_MODE=true`.
+Primary application: **[lingyingdrama.com](https://lingyingdrama.com)**; `www.lingyingdrama.com` redirects to the canonical domain. See [deployment details](docs/DEPLOYMENT.md) for the Cloudflare application and update command. The owner has authorized live Stripe card Checkout on this existing website, with creator payouts independently paused. Deployment and live configuration verification are in progress; see [live Stripe setup](docs/STRIPE_LIVE_SETUP.md).
 
 The website and its browser API use the purchased domain directly on the existing **`lingying`** Worker, retaining the original database, media and provider secrets. `APP_URL` and `PUBLIC_APP_URL` are both `https://lingyingdrama.com`. The previous `workers.dev` addresses and **`aidramio`** gateway remain temporary compatibility routes during provider/webhook and return-link retirement. The separate `STRIPE_SITE_ORIGIN` retains the old internal financial identity; it does not send customers to the old API.
 
@@ -12,7 +12,7 @@ Source repository: **[RambunR/My-Codex-App](https://github.com/RambunR/My-Codex-
 
 Agent shortcut: send **`/push`** in chat, optionally followed by a commit message, to check the changes, commit and push them to GitHub `main`, update the existing Cloudflare website, and verify the live site. **“Push and deploy”** is an equivalent plain-language request. This project convention is defined in [AGENTS.md](AGENTS.md); it does not add a built-in Codex slash-menu entry or a terminal command. Future agents working in this repository should follow those instructions.
 
-Google registration/sign-in is implemented alongside email/password, with both OAuth credentials configured securely on the Worker. The new custom-domain callback registration is still pending external provider setup; credential presence alone does not establish that sign-in currently completes. Follow [the Google setup guide](docs/GOOGLE_SIGN_IN.md) for testing, credential rotation and release settings. Existing password accounts connect Google explicitly from Account settings, preserving their original wallet and purchases.
+Google registration/sign-in is implemented alongside email/password, with both OAuth credentials configured securely on the Worker. Google accepts the custom-domain callback URL; a completed real-account sign-in remains independently unverified. Credential presence alone does not establish that sign-in completes. Follow [the Google setup guide](docs/GOOGLE_SIGN_IN.md) for testing, credential rotation and release settings. Existing password accounts connect Google explicitly from Account settings, preserving their original wallet and purchases.
 
 Apple registration/sign-in and account linking are implemented; activation requires the operator's Apple Developer Services ID and signing key. See [Apple setup](docs/APPLE_SIGN_IN.md). Forgot password, reset, verification and resend controls are also implemented, with [Cloudflare Email Sending or Resend sender setup](docs/EMAIL_AUTH.md) required for actual delivery. Until credentials are configured, the interface clearly marks those services unavailable. The older `aidramio-sandbox` has its own separate credentials and does not inherit the main site's Google login; use the main website for current features.
 
@@ -28,9 +28,9 @@ To enable episode uploads, first save the series details: a 2–120-character ti
 
 After successful publication, the studio opens **Explore → Newest** with the series' spoken language, first selected genre and production method already selected. Newest uses the first publication date so older drafts appear when they go live; editing or pressing Publish again does not reset that date. Existing published series retain their original creation-date ordering when a publication date was not recorded.
 
-Stripe payment testing uses **the same [main website](https://lingyingdrama.com)**, Google/email accounts, studio and uploads. Wallet **Add funds** and publisher activation open Stripe-hosted **test** Checkout, with a visible test-payment notice. Test balances, activation, paid unlocks and earnings are stored separately from real financial records; no test earnings can be withdrawn. See [Stripe setup and test instructions](docs/STRIPE_SETUP.md). The earlier separate sandbox is no longer the user-facing test workflow.
+The owner requested **live Stripe card Checkout** on this same website after saving live API/webhook Secrets. The release target is `STRIPE_TEST_MODE=false` and `STRIPE_AUTO_CONFIGURE_WEBHOOK=true`, with inline **HK$88 Dramio Pass** and custom **USD wallet deposits from US$5**. Deployment/configuration verification is pending; the test notice must reflect the actual backend mode. The server verifies the existing live Stripe account and exactly one enabled custom-domain Snapshot endpoint, appends only missing required event subscriptions, and blocks new Checkout if readiness fails. It preserves the endpoint/signing secret and does not create destinations or move money. No-cost verification cancels an unpaid Checkout and checks the recorded signed expiration delivery, without submitting a card. See [live Stripe setup](docs/STRIPE_LIVE_SETUP.md).
 
-To prepare real payments on the purchased domain, follow [live Stripe setup](docs/STRIPE_LIVE_SETUP.md). Live API/webhook credentials must be stored securely on the existing Worker; the current test notice and payment mode remain unchanged until that switch is completed and the known refund/dispute accounting gap is addressed.
+Creator payouts are independently paused with **`PAYOUTS_ENABLED=false`**. Refund/dispute events create durable financial risk holds for administrator review; they do not automatically recover spent wallet credit or creator earnings. Existing test balances, passes, purchases and earnings stay in separate tables and never become real money or live entitlements. [Historical Stripe testing instructions](docs/STRIPE_SETUP.md) are retained for isolated testing and audit; do not switch the public website back to test mode to follow them.
 
 Phone viewing uses readable two-column story cards, touch-sized controls, header search, fixed bottom navigation, native sharing when available, and portrait/landscape episode controls. Phone form inputs use 16px text. Creator/admin code downloads when those routes are opened. See [phone usability checks](docs/MOBILE_UX.md), including the rapid-filter and long-title regressions. The public operator is **HK NovaXR Production**, with contact **contactus@hknovaxrproduction.com** in the footer and Help, Terms and Privacy pages.
 
@@ -38,7 +38,7 @@ Screenshots: [viewer on desktop](docs/screenshots/viewer.png) · [phone discover
 
 ## Deploy to Cloudflare
 
-The full application can run on Cloudflare Workers, with a SQLite-backed Durable Object for accounts and money transactions, and a private R2 bucket for publisher media. See [Cloudflare deployment instructions](docs/CLOUDFLARE.md). Run `npm run build:cloudflare`, validate locally with `npm run test:cloudflare`, and publish a new application using `npm run deploy:cloudflare` after adding the Cloudflare API token securely to environment settings. The tracked main configuration explicitly enables Stripe test mode; matching test credentials and webhook signing secret are required before Checkout is ready.
+The full application can run on Cloudflare Workers, with a SQLite-backed Durable Object for accounts and money transactions, and a private R2 bucket for publisher media. See [Cloudflare deployment instructions](docs/CLOUDFLARE.md). Run `npm run build:cloudflare`, validate locally with `npm run test:cloudflare`, and update the existing `lingying` Worker using [AGENTS.md](AGENTS.md) with the securely configured Cloudflare API token. Do not use the new-application deployment helper for this existing website. The live-card target requires matching live API/webhook Secrets, `STRIPE_TEST_MODE=false`, cleared optional test catalogue IDs and `PAYOUTS_ENABLED=false`; configuration verification remains pending.
 
 ## Start locally
 
@@ -79,7 +79,7 @@ You can also register a new account, activate publishing through the HK$88 test 
 - Upload one video, multiple videos, or a directory. The studio sorts filenames numerically, shows individual upload/processing results, and lets a publisher edit episode titles and numbers. Publishers can edit series title, synopsis, cover, up to three genres, spoken language, production method, price, and free-episode count.
 - Episode prices start at **US$0.10**. Publishers choose the first N free episodes. Paid unlocks split **70% to the publisher / 30% to the platform**.
 - Wallet funding starts at **US$5** per checkout, with a custom USD amount chosen by the viewer to two decimal places. The former US$200 cap is removed; this integration supports up to US$999,999.99 per deposit within its documented API amount range. Verified payment credits the full chosen amount once. The publisher activation checkout is charged separately as HK$88 once.
-- Payout requests start at **HK$20 equivalent** using the configured indicative exchange rate. Funds are reserved on request, refunded on rejection, and paid through Stripe Connect after administrator approval in live mode.
+- Creator payout functionality is implemented with an **HK$20 equivalent** request minimum, reserved funds and administrator-approved Stripe Connect transfers, but **`PAYOUTS_ENABLED=false`** deliberately pauses onboarding, new withdrawal requests and transfer approval in this live-card release. Automatic weekly payouts are not implemented.
 - Administrator console for account overview, storage approvals, payout approvals, platform revenue, and activation revenue.
 - Installable web-app manifest, local icons/fonts, mobile bottom navigation, safe-area support, and an offline information page. Paid media and private API data are not cached by the service worker.
 
@@ -105,15 +105,17 @@ APP_URL=https://your-domain.example
 DATA_DIR=/persistent/aidramio
 PAYMENTS_MODE=stripe
 STRIPE_TEST_MODE=false
+STRIPE_AUTO_CONFIGURE_WEBHOOK=true
+PAYOUTS_ENABLED=false
 SEED_DEMO=false
 USD_TO_HKD=7.8
 ```
 
 **Use a new production data directory.** Startup refuses databases containing the known demo accounts. Keep the production directory on a persistent volume; ephemeral hosting disks will lose accounts and media. Use `PAYMENTS_MODE=disabled` when deploying without real payment credentials; checkout stays unavailable in that mode.
 
-For real payments, set **`STRIPE_TEST_MODE=false`** and provide matching live **`STRIPE_SECRET_KEY`** and **`STRIPE_WEBHOOK_SECRET`**. The currently deployed main website intentionally uses `STRIPE_TEST_MODE=true` with test credentials. Configure a Stripe webhook at **`/api/payments/webhook`** for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed` and `checkout.session.expired`. Stripe Checkout receives the exact server-created amount/currency. Only a verified paid webhook or server-side Checkout reconciliation can settle a payment. The raw webhook body is preserved for signature verification.
+For real payments, use **`STRIPE_TEST_MODE=false`** and matching live **`STRIPE_SECRET_KEY`** and **`STRIPE_WEBHOOK_SECRET`** Secrets. Follow [the live configuration guide](docs/STRIPE_LIVE_SETUP.md); activation/deployment verification is pending. Use a live Snapshot webhook at **`https://lingyingdrama.com/api/payments/webhook`** subscribed to the four Checkout lifecycle events plus `charge.refunded`, `charge.dispute.created` and `charge.dispute.closed`. Stripe receives the server-created amount/currency. Only verified paid settlement can credit an application wallet; raw webhook bodies remain intact for signature verification. `paymentSetup` reports safe readiness status/codes. Existing signed webhook handling, Session reconciliation and unpaid cancellation continue when new Checkout is paused; the readiness helper never sends a charge or payout.
 
-Enable **Stripe Connect Express** and transfers for publisher payouts. Publishers onboard through the studio, complete Stripe verification, and request a payout. The administrator's approval creates an idempotent USD transfer to the connected account. Availability, cross-border transfer support, and payout schedules depend on the platform's Stripe account and publisher countries. These integrations are implemented but have not been exercised against a live merchant account in this workspace.
+Refunds/disputes create durable financial risk holds and require administrator review and manual compensation. The hold is not full automatic reversal of past wallet spending, episode unlocks or creator earnings. Keep **`PAYOUTS_ENABLED=false`** independently of card payment mode. Stripe Connect country/capability checks, creator onboarding, live transfer and bank-settlement verification remain prerequisites before separately enabling payouts; no automatic weekly transfer is configured.
 
 Provide `ADMIN_EMAIL`, `ADMIN_PASSWORD` (at least 16 characters), and optional `ADMIN_NAME` through secure environment injection, then run:
 
@@ -143,7 +145,7 @@ Back up both the SQLite database and media. Use SQLite's backup API while the se
 
 ## Production readiness
 
-The 31 October 2026 audit confirms hosted Stripe **test** wallet funding and Dramio Pass purchases, with isolated account/session/upload/browser coverage. The site is **not ready for real-money launch**: refund/dispute reconciliation, recovery-email delivery, live creator payout verification and final provider checks remain. See [the production-readiness report](docs/PRODUCTION_READINESS.md) for evidence, media corrections and validation limits.
+The 31 October 2026 audit demonstrated hosted Stripe **test** funding and Dramio Pass purchases. The owner has since authorized live card Checkout with payouts paused and refund/dispute risk holds; deployment and no-cost live Checkout verification are pending. This does **not** establish full commercial readiness: manual refund/dispute compensation, recovery-email delivery, real Google/Apple sign-in, live webhook settlement and operator content controls remain unverified or incomplete. See [the production-readiness report](docs/PRODUCTION_READINESS.md).
 
 ## Validation
 
@@ -167,7 +169,7 @@ server/storage.ts     Video validation, processing, local/S3 media delivery
 server/db.ts          SQLite schema and transactions
 server/seed.ts        Development-only sample catalogue
 cloudflare/           Workers entry point, durable SQLite and R2 adapters
-wrangler.jsonc        Existing main Cloudflare bindings, explicit Stripe test mode
+wrangler.jsonc        Existing main Cloudflare bindings and payment/payout modes
 shared/config.ts      Languages, limits, shared types
 tests/                API/integrity tests and Playwright journeys
 public/               Locally hosted artwork, fonts, icons, service worker

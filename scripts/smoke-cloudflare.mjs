@@ -4,7 +4,7 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {spawn,execFileSync} from 'node:child_process';
 import {once} from 'node:events';
-import {randomBytes} from 'node:crypto';
+import {randomBytes,createHmac} from 'node:crypto';
 
 // Entirely local: Miniflare emulates Durable Objects and R2. Never deploys or charges money.
 const dir=await mkdtemp(path.join(tmpdir(),'aidramio-cloudflare-test-'));
@@ -18,6 +18,8 @@ async function start(production=false,testStripe=false,publicOrigin=base){
     '--var',`ENVIRONMENT:${production?'production':'development'}`,'--var',`PAYMENTS_MODE:${testStripe?'stripe':production?'disabled':'demo'}`,'--var',`STRIPE_TEST_MODE:${testStripe}`,'--var',`APP_URL:${base}`,'--var',`PUBLIC_APP_URL:${publicOrigin}`,'--var',`STRIPE_SITE_ORIGIN:${base}`,'--var',`BOOTSTRAP_TOKEN:${bootstrap}`];
   if(!production||testStripe)args.push('--var','GOOGLE_CLIENT_ID:local-test.apps.googleusercontent.com','--var','GOOGLE_CLIENT_SECRET:local-test-only-google-secret');
   if(testStripe)args.push('--var','STRIPE_SECRET_KEY:rk_test_local_cloudflare_fixture_only','--var','STRIPE_WEBHOOK_SECRET:whsec_local_cloudflare_fixture_only');
+  args.push('--var',`PAYOUTS_ENABLED:${!production}`);
+  args.push('--var','STRIPE_AUTO_CONFIGURE_WEBHOOK:false');
   child=spawn(process.execPath,args,{env:{...process.env,XDG_CONFIG_HOME:path.join(dir,'config'),WRANGLER_SEND_METRICS:'false',WRANGLER_LOG_PATH:path.join(dir,'wrangler.log')},stdio:['ignore','pipe','pipe']});
   child.stdout.on('data',d=>{logs+=d;});child.stderr.on('data',d=>{logs+=d;});
   for(let n=0;n<120;n++){
@@ -171,6 +173,21 @@ try{
   await request('/api/studio/connect',{},publisher,503);
   await request('/api/studio/withdrawals',{amount_cents:300},publisher,503);
   console.log('PASS: same-site Stripe test mode retains Google, uploads and real entitlements, exposes separate zero test balances, and blocks payouts.');
+
+  const riskPayload=JSON.stringify({id:'evt_cloudflare_risk_fixture',type:'charge.refunded',livemode:false,created:Math.floor(Date.now()/1000),data:{object:{id:'ch_cloudflare_unknown_risk',payment_intent:'pi_cloudflare_unknown_risk',amount:500,amount_refunded:500,currency:'usd',livemode:false}}});
+  const signedAt=Math.floor(Date.now()/1000);
+  const riskSignature=`t=${signedAt},v1=${createHmac('sha256','whsec_local_cloudflare_fixture_only').update(`${signedAt}.${riskPayload}`).digest('hex')}`;
+  const sendRisk=async()=>{const response=await fetch(base+'/api/payments/webhook',{method:'POST',headers:{'Content-Type':'application/json','Stripe-Signature':riskSignature},body:riskPayload});assert.equal(response.status,200);return response.json();};
+  assert.equal((await sendRisk()).unmapped,true);assert.equal((await sendRisk()).duplicate,true);
+  const reviews=(await request('/api/admin/payment-reviews',undefined,admin)).data.reviews;
+  assert.equal(reviews.length,1);assert.equal(reviews[0].status,'open');assert.equal(reviews[0].mapped,false);
+  await request('/api/admin/payment-reviews',undefined,viewer,403);
+  await request(`/api/admin/payment-reviews/${reviews[0].id}/resolve`,{decision:'platform_loss',wallet_debit_cents:0,note:'Unmatched provider reference must remain held.'},admin,409);
+  await stop();await start(true,true);
+  const persistedReviews=(await request('/api/admin/payment-reviews',undefined,admin)).data.reviews;
+  assert.equal(persistedReviews.length,1);assert.equal(persistedReviews[0].id,reviews[0].id);assert.equal(persistedReviews[0].status,'open');
+  assert.equal((await request('/api/auth/me',undefined,viewer)).data.user.wallet_micros,0);
+  console.log('PASS: signed refund events persist once across Cloudflare SQL restart, unmatched cases stay held, and non-admin/unmapped resolutions are rejected.');
 
   await stop();await start(true);
   const production=(await request('/api/config')).data;assert.equal(production.paymentsMode,'disabled');assert.equal(production.runtime,'cloudflare');assert.equal(production.auth.google,false);

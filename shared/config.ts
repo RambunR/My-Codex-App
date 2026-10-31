@@ -37,6 +37,7 @@ export interface User {
   wallet_micros: number; earnings_micros: number; quota_bytes: number; used_bytes: number; language: string;
   stripe_account_id?: string; connected?: boolean;
   email_verified?: boolean;
+  payment_review?: boolean;
   dramio_pass?: {active:boolean;test:boolean;purchased_at:string|null};
 }
 export interface Series {

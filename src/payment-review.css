@@ -1,0 +1,12 @@
+.payment-review-notice,.payout-pause-notice{min-width:0;text-align:start}
+.payment-review-notice h2{display:flex;align-items:center;gap:.5rem}
+.payment-review-notice h2>svg{flex-shrink:0}
+.payment-review-notice p,.payout-pause-notice p{line-height:1.6}
+.activation-card .payment-review-notice,.activation-card .payout-pause-notice{padding:16px;margin-block:18px}
+.activation-card .payment-review-notice h2,.activation-card .payout-pause-notice h2{font-size:1rem;line-height:1.4;letter-spacing:normal;margin:0 0 .6rem;justify-content:flex-start}
+.activation-card .payment-review-notice p,.activation-card .payout-pause-notice p{font-size:.875rem}
+.payment-reviews-panel .request-list>.payment-review-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:1rem;align-items:start}
+.payment-review-row>div{min-width:0}
+.payment-review-row strong,.payment-review-row small,.payment-review-row p{overflow-wrap:anywhere}
+.payment-review-row small{display:block}
+@media(max-width:540px){.payment-reviews-panel .request-list>.payment-review-row{grid-template-columns:minmax(0,1fr)}.payment-review-row>div:last-child{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}}
