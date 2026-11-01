@@ -21,7 +21,8 @@ export const LANGUAGES = [
   { code: 'ms', name: 'Bahasa Melayu', region: 'Malaysia', flag: '🇲🇾' },
   { code: 'ta', name: 'தமிழ்', region: 'India · Sri Lanka', flag: '🇮🇳' },
 ] as const;
-export const GENRES = ['romance', 'fantasy', 'thriller', 'drama', 'comedy', 'action', 'sci-fi', 'historical', 'horror', 'animation'] as const;
+export {GENRES} from './taxonomy.js';
+import type {StoryTheme,SeriesFormat} from './taxonomy.js';
 export const MAX_EPISODE_SECONDS = 180;
 export const MAX_EPISODE_BYTES = 75 * 1024 * 1024;
 export const DEFAULT_QUOTA_BYTES = 5 * 1024 * 1024 * 1024;
@@ -47,6 +48,7 @@ export interface Series {
   episode_count: number; views: number; saves: number; status: string; featured: number; created_at: string; published_at?: string;
   likes: number; liked: boolean;
   saved?: boolean; demo?: number; subtitle_languages?: string[]; first_episode_id?: string;
+  themes?: StoryTheme[]; format?: SeriesFormat|null;
   taken_down?: boolean; moderation_reason?: string; moderated_at?: string;
 }
 export interface Episode { id: string; series_id: string; title: string; number: number; duration: number; bytes: number; free: boolean; unlocked: boolean; cover?: string; views?: number }

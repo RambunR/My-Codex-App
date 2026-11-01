@@ -61,6 +61,9 @@ try{
   await stop();
   await start();
   const cfg=(await request('/api/config')).data;assert.equal(cfg.runtime,'cloudflare');assert.equal(cfg.paymentsMode,'demo');assert.equal(cfg.auth.google,true);
+  assert.ok(cfg.standardGenres.includes('romantic-comedy'));assert.ok(cfg.standardGenres.includes('medical'));
+  assert.ok(cfg.storyThemes.includes('revenge'));assert.deepEqual(cfg.formats,['live-action','animation','anime-donghua','motion-comic']);
+  assert.deepEqual(cfg.creationTypes,['human','ai-assisted','ai-generated']);
   assert.equal(cfg.auth.apple,false);assert.equal(cfg.auth.email,false);
   const authPage=await fetch(base+'/auth?mode=forgot');assert.equal(authPage.status,200);assert.equal(authPage.headers.get('referrer-policy'),'no-referrer');assert.equal(authPage.headers.get('cache-control'),'no-store');
   await request('/api/auth/apple/start',undefined,'',503);
@@ -77,6 +80,12 @@ try{
   const replay=await fetch(callback,{redirect:'manual',headers:{Cookie:binding}});assert.equal(new URL(replay.headers.get('location'),base).searchParams.get('error'),'google_expired');
   console.log('PASS: Cloudflare Google authorization, private browser binding, durable OAuth state, cancellation and replay protection.');
   const series=(await request('/api/series')).data.series;assert.equal(series.length,20);
+  const legacyAnimated=(await request('/api/series/tokyo-tomorrow')).data.series;
+  assert.equal(legacyAnimated.format,'animation');assert.deepEqual(legacyAnimated.themes,[]);
+  assert.ok((await request('/api/series?format=animation')).data.series.some(s=>s.id==='tokyo-tomorrow'));
+  assert.equal((await request('/api/series/after-midnight')).data.series.format,null);
+  await request('/api/series?format=not-a-format',undefined,'',400);
+  await request('/api/series?theme=not-a-theme',undefined,'',400);
   const sample=(await request('/api/series/'+series[0].id)).data;assert.ok(sample.episodes.every(e=>e.unlocked),'Public samples must all be free.');
   const previewUrl=base+`/api/episodes/${sample.episodes[0].id}/stream`;
   const sampleVideo=await fetch(previewUrl,{headers:{Origin:base}});assert.equal(sampleVideo.status,200);assert.equal(sampleVideo.redirected,false);assert.equal(sampleVideo.headers.get('access-control-allow-origin'),base);assert.equal(sampleVideo.headers.get('access-control-allow-credentials'),'true');assert.equal(sampleVideo.headers.get('cache-control'),'private, no-store');assert.equal((await sampleVideo.arrayBuffer()).byteLength,1037034);
@@ -106,8 +115,13 @@ try{
   assert.equal((await request('/api/auth/me',undefined,viewer)).data.user.wallet_micros,10_000_000);
   console.log('PASS: scrypt authentication, first-admin bootstrap, authorization, activation, and replay-safe funding.');
 
-  const body={title:'Cloudflare Published Drama',description:'A real upload used to validate durable financial and media storage.',language:'zh-TW',genres:['romance'],creation_type:'human',price_cents:501,free_episodes:1};
+  const body={title:'Cloudflare Published Drama',description:'A real upload used to validate durable financial and media storage.',language:'zh-TW',genres:['romance'],themes:['revenge','hidden-identity'],format:'animation',creation_type:'human',price_cents:501,free_episodes:1};
   const sid=(await request('/api/studio/series',body,publisher,201)).data.id;
+  const privateClassification=(await request(`/api/studio/series/${sid}`,undefined,publisher)).data.series;
+  assert.deepEqual(privateClassification.themes,body.themes);assert.equal(privateClassification.format,body.format);
+  const {themes:omittedThemes,format:omittedFormat,...legacyBody}=body;
+  await request(`/api/studio/series/${sid}`,legacyBody,publisher,200,'PATCH');
+  assert.deepEqual((await request(`/api/studio/series/${sid}`,undefined,publisher)).data.series.themes,body.themes);
   const video=await readFile('public/demo-preview.mp4');
   const cover=await readFile('public/images/midnight.jpg');
   await upload(`/api/studio/series/${sid}/cover`,cover,'cover.jpg',publisher,{},'cover',200);
@@ -121,8 +135,11 @@ try{
   const large=await upload(`/api/studio/series/${sid}/episodes`,Buffer.alloc(75*1024**2+1),'oversized.mp4',publisher,{title:'Too large',number:3},'video',413);assert.equal(large.error.code,'FILE_TOO_LARGE');
   assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.used_bytes,used);
   await request(`/api/studio/series/${sid}/status`,{status:'published'},publisher);
-  const newestPath='/api/series?'+new URLSearchParams({sort:'new',language:body.language,genre:body.genres[0],creation:body.creation_type});
+  const newestPath='/api/series?'+new URLSearchParams({sort:'new',language:body.language,genre:body.genres[0],theme:body.themes[0],format:body.format,creation:body.creation_type});
   const newest=(await request(newestPath)).data.series;assert.equal(newest[0].id,sid);
+  assert.deepEqual(newest[0].themes,body.themes);assert.equal(newest[0].format,body.format);
+  assert.equal((await request('/api/series?theme=revenge&format=live-action')).data.series.some(s=>s.id===sid),false);
+  assert.ok((await request('/api/series?genre=animation')).data.series.some(s=>s.id===sid));
   const publishedAt=newest[0].published_at;assert.ok(Number.isFinite(Date.parse(publishedAt)));
   await request(`/api/studio/series/${sid}/status`,{status:'published'},publisher);
   assert.equal((await request(newestPath)).data.series[0].published_at,publishedAt);
@@ -250,6 +267,9 @@ try{
   const retainedModerationAudit=(await request(moderationPath,undefined,admin)).data.events;
   assert.deepEqual(retainedModerationAudit,moderationAudit);
   assert.equal((await request(`/api/studio/series/${sid}`,undefined,admin)).data.series.taken_down,false);
+  const retainedClassification=(await request(`/api/studio/series/${sid}`,undefined,publisher)).data.series;
+  assert.deepEqual(retainedClassification.themes,body.themes);assert.equal(retainedClassification.format,body.format);
+  assert.ok((await request(newestPath)).data.series.some(s=>s.id===sid));
   await request('/api/auth/google/start',undefined,'',503);
   assert.equal((await request('/api/auth/me',undefined,viewer)).data.user.wallet_micros,4_990_000);
   assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.earnings_micros,507_000);

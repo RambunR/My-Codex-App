@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { LANGUAGES, type Locale } from '../shared/config';
 import { additionalMessages,googleAuthEnglish,googleAuthMessages,walletFundingEnglish,walletFundingMessages,sandboxEnglish,sandboxMessages,stripeTestingEnglish,stripeTestingMessages,analyticsEnglish,analyticsMessages,dramioPassEnglish,dramioPassMessages,editorValidationEnglish,editorValidationMessages,accountAuthEnglish,accountAuthMessages,livePaymentEnglish,livePaymentMessages } from './localeExtras';
 import {contentAdminEnglish,contentAdminMessages} from './content-admin-locales';
+import {taxonomyEnglish,taxonomyMessages} from './taxonomy-locales';
 
 const en = {
   ...contentAdminEnglish,
@@ -23,7 +24,7 @@ const en = {
   heroEyebrow:'A WORLD OF STORIES. A FEW MINUTES AWAY.', heroTitle:'Little episodes.\nBig obsessions.', heroSubtitle:'Fall into a new world. Discover extraordinary short dramas from creators everywhere.',
   featured:'IN THE SPOTLIGHT', heroTagline:'Two strangers. One missed train. A night that changes everything.',
   aiWelcome:'Human stories. Limitless imagination.', aiWelcomeBody:'Live action, animation, or something only AI could dream up. Every storyteller belongs here.',
-  aiStories:'AI stories', human:'Live action / original', 'ai-assisted':'AI-assisted', 'ai-generated':'AI-generated', creationType:'How was it made?',
+  aiStories:'AI stories', 'ai-assisted':'AI-assisted', 'ai-generated':'AI-generated', creationType:'How was it made?',
   creatorTitle:'Your story.\nTheir next obsession.', creatorSubtitle:'Create in your language. Find your people.', startCreating:'Start creating',
   worldTitle:'Stories without borders', worldBody:'21 interface languages. A whole world of perspectives.',
   minutes:'min', by:'By', aboutSeries:'About this series', moreLikeThis:'More to fall for', firstFree:'Start watching for free',
@@ -72,6 +73,7 @@ const en = {
   showPassword:'Show password',hidePassword:'Hide password',fieldRequired:'Please complete all required fields.', termsRequired:'Please accept the terms to continue.', invalidVideo:'This video must be readable and no longer than 3 minutes.',
   fileTooLarge:'This episode exceeds the 75 MB limit.', uploadComplete:'Upload queue complete.', membersOnly:'Sign in to continue',
   ...dramioPassEnglish,
+  ...taxonomyEnglish,
 } as const;
 export type Key = keyof typeof en;
 type Dictionary = Partial<Record<Key,string>>;
@@ -143,6 +145,7 @@ for(const language of LANGUAGES){if(!editorValidationMessages[language.code])thr
 for(const language of LANGUAGES){if(!accountAuthMessages[language.code])throw new Error(`Account authentication translations missing: ${language.code}`);Object.assign(dictionaries[language.code],accountAuthMessages[language.code]);}
 for(const language of LANGUAGES){if(!livePaymentMessages[language.code])throw new Error(`Live payment translations missing: ${language.code}`);Object.assign(dictionaries[language.code],livePaymentMessages[language.code]);}
 for(const language of LANGUAGES){if(!contentAdminMessages[language.code])throw new Error(`Content admin translations missing: ${language.code}`);Object.assign(dictionaries[language.code],contentAdminMessages[language.code]);}
+for(const language of LANGUAGES){if(!taxonomyMessages[language.code])throw new Error(`Taxonomy translations missing: ${language.code}`);Object.assign(dictionaries[language.code],taxonomyMessages[language.code]);}
 // Shared scripts are deliberately kept in their chosen script; traditional and simplified Chinese are independent locales.
 const I18nContext=createContext<{locale:Locale;setLocale:(l:Locale)=>void;t:(key:Key)=>string}>({locale:'en',setLocale:()=>{},t:k=>en[k]});
 export const baseMessages=en;

@@ -43,6 +43,13 @@ CREATE TABLE IF NOT EXISTS episodes (
  bytes INTEGER NOT NULL CHECK(bytes > 0), storage_key TEXT NOT NULL, original_name TEXT NOT NULL DEFAULT '',
  created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(series_id, number)
 );
+CREATE TABLE IF NOT EXISTS series_classifications (
+ series_id TEXT PRIMARY KEY REFERENCES series(id) ON DELETE CASCADE,
+ themes TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(themes) AND json_type(themes)='array' AND json_array_length(themes)<=5),
+ format TEXT CHECK(format IS NULL OR format IN ('live-action','animation','anime-donghua','motion-comic')),
+ updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS series_classifications_format ON series_classifications(format,series_id);
 CREATE TABLE IF NOT EXISTS series_publications (
  series_id TEXT PRIMARY KEY REFERENCES series(id) ON DELETE CASCADE, published_at TEXT NOT NULL
 );
