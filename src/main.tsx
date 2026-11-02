@@ -11,6 +11,7 @@ import { Auth,WalletPage,Account,InfoPage } from './pages/Account';
 import { Empty,Loading } from './ui';
 import './styles.css';
 import './mobile.css';
+import './dropdowns.css';
 const Studio=lazy(()=>import('./pages/Studio').then(module=>({default:module.Studio})));
 const SeriesEditor=lazy(()=>import('./pages/Studio').then(module=>({default:module.SeriesEditor})));
 const Admin=lazy(()=>import('./pages/Studio').then(module=>({default:module.Admin})));

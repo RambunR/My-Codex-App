@@ -1,0 +1,21 @@
+/* A shared inset for native dropdowns on every route. Keep native selection,
+   keyboard access, colors and control heights; reserve room beside the text. */
+:root body select:not([multiple]):not([size]){
+  appearance:none;-webkit-appearance:none;
+  padding-inline-end:var(--dropdown-end-padding,44px);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4' fill='none' stroke='%23ded4e8' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-size:16px 16px;
+  background-position:right var(--dropdown-arrow-inset,16px) center;
+}
+html[dir="rtl"] body select:not([multiple]):not([size]){background-position:left var(--dropdown-arrow-inset,16px) center;}
+/* Browse supplies a 10px outer gutter, so the combined inset remains 16px. */
+:root body .filter-select select:not([multiple]):not([size]){--dropdown-arrow-inset:6px;--dropdown-end-padding:32px;}
+:root body .subtitle-language-toggle{padding-inline-end:16px;}
+:root body .subtitle-language-toggle>svg:last-child,.faq-item>summary>svg{flex-shrink:0;}
+@media(min-width:801px){
+  :root body .header-language{padding-inline-end:16px;}
+  :root body .sidebar-bottom{padding-inline-end:16px;}
+}
+@media(forced-colors:active){
+  :root body select:not([multiple]):not([size]){appearance:auto;-webkit-appearance:auto;background-image:none;}
+}
