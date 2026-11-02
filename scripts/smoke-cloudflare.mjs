@@ -84,11 +84,14 @@ try{
   await start();
   const cfg=(await request('/api/config')).data;assert.equal(cfg.runtime,'cloudflare');assert.equal(cfg.paymentsMode,'demo');assert.equal(cfg.auth.google,true);
   assert.equal(cfg.limits.maxEpisodeBytes,maxEpisodeBytes);assert.equal(cfg.limits.maxEpisodeSeconds,240);assert.deepEqual(cfg.episodeUpload,{mode:'chunked',chunkBytes});
+  assert.deepEqual(cfg.walletFunding.presetAmountsCents,[1000,2500,5000,10000]);assert.deepEqual(cfg.walletFunding.rewards,[{amountCents:5000,bonusCents:500},{amountCents:10000,bonusCents:1500}]);
   assert.ok(cfg.standardGenres.includes('romantic-comedy'));assert.ok(cfg.standardGenres.includes('medical'));
   assert.ok(cfg.storyThemes.includes('revenge'));assert.deepEqual(cfg.formats,['live-action','animation','anime-donghua','motion-comic']);
   assert.deepEqual(cfg.creationTypes,['human','ai-assisted','ai-generated']);
   assert.equal(cfg.auth.apple,false);assert.equal(cfg.auth.email,false);
   const authPage=await fetch(base+'/auth?mode=forgot');assert.equal(authPage.status,200);assert.equal(authPage.headers.get('referrer-policy'),'no-referrer');assert.equal(authPage.headers.get('cache-control'),'no-store');
+  assert.equal(authPage.headers.get('x-frame-options'),'DENY');assert.equal(authPage.headers.get('x-content-type-options'),'nosniff');assert.match(authPage.headers.get('content-security-policy'),/frame-ancestors 'none'/);
+  const protectedPage=await fetch(base+'/studio');assert.equal(protectedPage.status,200);assert.equal(protectedPage.headers.get('x-frame-options'),'DENY');assert.equal(protectedPage.headers.get('referrer-policy'),'strict-origin-when-cross-origin');await protectedPage.body.cancel();
   await request('/api/auth/apple/start',undefined,'',503);
   await request('/api/auth/forgot-password',{email:'viewer@example.test'},'',503);
   await request('/api/auth/resend-verification',{email:'viewer@example.test'},'',503);
@@ -317,6 +320,32 @@ try{
   assert.deepEqual(await moderationFinance(),beforeHideFinance);
   console.log('PASS: creator hide/show denies owner and purchaser public URLs, retains private R2 preview, publication date, purchases, analytics and money.');
 
+  // Exercise bulk editorial changes against actual local SQL/R2 without
+  // changing the main paid drama used by all the financial restart checks.
+  const bulkBody={...body,title:'Local Bulk Episode Drama',genres:['drama'],themes:[],format:'live-action',free_episodes:1};
+  const bulkId=(await request('/api/studio/series',bulkBody,publisher,201)).data.id,bulkPath=`/api/studio/series/${bulkId}`;
+  await upload(bulkPath+'/cover',cover,'bulk-cover.jpg',publisher,{},'cover',200);
+  const bulkOne=await upload(bulkPath+'/episodes',video,'Bulk 001.mp4',publisher,{title:'Original 001',number:1});
+  const bulkTwo=await upload(bulkPath+'/episodes',video,'Bulk 002.mp4',publisher,{title:'Original 002',number:2});
+  await request(bulkPath+'/status',{status:'published'},publisher);
+  let bulkEditor=(await request(bulkPath,undefined,publisher)).data;
+  await request(bulkPath+'/episodes/batch',{action:'rename',revision:bulkEditor.episodes_revision,episode_ids:[bulkOne.id,bulkTwo.id],base_name:'Runtime Name'},viewer,403);
+  let bulkState=(await request(bulkPath+'/episodes/batch',{action:'rename',revision:bulkEditor.episodes_revision,episode_ids:[bulkOne.id,bulkTwo.id],base_name:'Runtime Name'},publisher)).data;
+  assert.deepEqual(bulkState.episodes.map(e=>e.title),['Runtime Name 001','Runtime Name 002']);
+  await request(bulkPath+'/episodes/batch',{action:'reorder',revision:bulkState.episodes_revision,episode_ids:[bulkTwo.id,bulkOne.id]},publisher,409);
+  bulkState=(await request(bulkPath+'/episodes/batch',{action:'reorder',revision:bulkState.episodes_revision,episode_ids:[bulkTwo.id,bulkOne.id],acknowledge_access_change:true},publisher)).data;
+  assert.deepEqual(bulkState.episodes.map(e=>[e.id,e.number,e.title]),[[bulkTwo.id,1,'Runtime Name 002'],[bulkOne.id,2,'Runtime Name 001']]);
+  const bulkPreview=(await request(bulkPath+'/episodes/batch-delete-preview',{revision:bulkState.episodes_revision,episode_ids:[bulkOne.id,bulkTwo.id]},publisher)).data;
+  assert.equal(bulkPreview.summary.episode_count,2);assert.equal(bulkPreview.summary.paid_episode_count,0);assert.equal(bulkPreview.summary.media_bytes,video.length*2);
+  const bulkDeleted=(await request(bulkPath+'/episodes/batch',{action:'delete',revision:bulkState.episodes_revision,episode_ids:[bulkOne.id,bulkTwo.id],confirmation_token:bulkPreview.confirmation_token,confirm_title:bulkBody.title,acknowledge:true},publisher)).data;
+  assert.equal(bulkDeleted.deleted_count,2);assert.equal(bulkDeleted.cleanup_pending,false);assert.equal(bulkDeleted.owner_storage.used_bytes,used+cover.length);
+  bulkEditor=(await request(bulkPath,undefined,publisher)).data;assert.equal(bulkEditor.series.status,'archived');assert.equal(bulkEditor.episodes.length,0);
+  for(const episode of [bulkOne,bulkTwo])await request(`/api/studio/episodes/${episode.id}/stream`,undefined,publisher,404);
+  const bulkSeriesProof=(await request(bulkPath+'/lifecycle',undefined,publisher)).data;
+  await request(bulkPath,{confirmation_token:bulkSeriesProof.confirmation_token,confirm_title:bulkBody.title,acknowledge:true},publisher,200,'DELETE');
+  assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.used_bytes,used);
+  console.log('PASS: Cloudflare bulk rename keeps numeric suffixes, atomic reorder confirms free access, and batch deletion releases exact quota only after R2 removal.');
+
   // Keep the main drama intact for restart checks. This separate paid upload
   // exercises irreversible deletion only inside the local SQL/R2 emulator.
   const deletionBody={title:'Disposable Cloudflare Lifecycle Drama',description:'A private local upload removed permanently after an exact paid-access confirmation.',language:'en',genres:['drama'],themes:[],format:'live-action',creation_type:'human',price_cents:10,free_episodes:0};
@@ -407,6 +436,19 @@ try{
   console.log('PASS: exact 200 MiB / 240-second upload uses forty 5 MiB requests, survives restart, replays completion once, and preserves full-file SHA-256 and exact quota.');
   console.log('PASS: permanent paid-series deletion enforces private fresh confirmations, removes R2 media and quota exactly, denies restoration, and retains financial receipts and historical sales.');
 
+  const giftCookie=(await request('/api/auth/register',{name:'Local funding gift viewer',email:'funding-gift@example.test',password,language:'en'},'',201)).cookie;
+  let giftBalance=0;
+  for(const[amount,bonus,total]of[[5000,500,5500],[10000,1500,11500]]){
+    const quote=(await request('/api/payments/checkout',{kind:'funding',amount_cents:amount},giftCookie)).data;
+    assert.equal(quote.amount_cents,amount);assert.equal(quote.funding.bonusCents,bonus);assert.equal(quote.funding.totalCreditCents,total);
+    assert.equal((await request('/api/auth/me',undefined,giftCookie)).data.user.wallet_micros,giftBalance);
+    const confirmed=(await request(`/api/payments/${quote.paymentId}/demo-confirm`,{},giftCookie)).data;giftBalance+=total*10000;
+    assert.equal(confirmed.user.wallet_micros,giftBalance);assert.equal((await request(`/api/payments/${quote.paymentId}/demo-confirm`,{},giftCookie)).data.user.wallet_micros,giftBalance);
+  }
+  const giftLedger=(await request('/api/wallet',undefined,giftCookie)).data.ledger;
+  assert.equal(giftBalance,170_000_000);assert.equal(giftLedger.filter(row=>row.kind==='funding_bonus').length,2);assert.equal(giftLedger.filter(row=>row.kind==='funding_bonus').reduce((sum,row)=>sum+row.amount_micros,0),20_000_000);
+  console.log('PASS: Cloudflare funding quotes credit US$50+5 and US$100+15 exactly once, separately audit gifts, and never credit before confirmation.');
+
   await stop();await start(true,true,base,true);
   const missingTest=(await request('/api/config')).data;
   assert.equal(missingTest.paymentsTestMode,true);assert.equal(missingTest.paymentsReady,false);assert.equal(missingTest.paymentsConfigured,false);
@@ -458,6 +500,7 @@ try{
   assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.used_bytes,used);
   await assertDisposableDeleted();
   const retainedPass=(await request('/api/auth/me',undefined,publisher)).data.user.dramio_pass;assert.equal(retainedPass.active,true);assert.equal(retainedPass.purchased_at,activated.dramio_pass.purchased_at);
+  assert.equal((await request('/api/auth/me',undefined,giftCookie)).data.user.wallet_micros,giftBalance);assert.equal((await request('/api/wallet',undefined,giftCookie)).data.ledger.filter(row=>row.kind==='funding_bonus').length,2);
   const persisted=await fetch(base+`/api/episodes/${second.id}/stream`,{headers:{Cookie:viewer,Range:'bytes=0-31'}});assert.equal(persisted.status,206);assert.equal((await persisted.arrayBuffer()).byteLength,32);
   await request('/api/payments/checkout',{kind:'funding',amount_cents:500},viewer,503);
   await request(`/api/payments/${funding.paymentId}/demo-confirm`,{},viewer,404);

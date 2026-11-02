@@ -17,6 +17,7 @@ import {initializeDatabase,one,run,transaction} from './db';
 import {DEMO_CATALOG} from '../shared/catalog';
 import {DEMO_PREVIEW_BYTES} from './preview-meta';
 import {canonicalApiRedirect,canonicalPageRedirect} from './routing';
+import {responseSecurityHeaders} from '../shared/security-headers';
 
 let listening=false;
 export class AIDramioApp {
@@ -67,10 +68,8 @@ export default {
     const canonical=canonicalApiRedirect(request,env)||canonicalPageRedirect(request,env);if(canonical)return canonical;
     if(url.pathname.startsWith('/api/'))return env.APP.get(env.APP.idFromName('platform')).fetch(request as any) as unknown as Promise<Response>;
     const response=await env.ASSETS.fetch(request as any) as unknown as Response;
-    if(url.pathname==='/auth'){
-      const headers=new Headers(response.headers);headers.set('Referrer-Policy','no-referrer');headers.set('Cache-Control','no-store');
-      return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
-    }
-    return response;
+    const headers=new Headers(response.headers);for(const[name,value]of Object.entries(responseSecurityHeaders(url.pathname)))headers.set(name,value);
+    if(url.pathname==='/auth')headers.set('Cache-Control','no-store');
+    return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
   },
 };

@@ -5,6 +5,7 @@ import {assert} from './errors.js';
 import {stripeSiteOrigin} from './origins.js';
 import {usingTestPaymentState,paymentTable,accountTable,accountIdColumn,ledgerTable,financeAccount} from './payment-state.js';
 import {verifiedStripeEventContext} from './stripe-event-context.js';
+import {fundingCreditForPayment} from './funding-rewards.js';
 
 type Row=Record<string,any>;
 export interface PaymentSessionLink {id:string;livemode?:boolean;amount_total?:number|null;currency?:string|null;payment_intent?:unknown}
@@ -48,7 +49,7 @@ function ownerFor(snapshot:Row):Row|undefined{
   return undefined;
 }
 
-function remaining(c:Row){
+function cashRemaining(c:Row){
   if(c.kind==='dispute'&&c.provider_status==='won')return 0;
   if(!c.payment_id)return c.amount_cents;
   const p=payment(c.payment_id);if(!p)return c.amount_cents;
@@ -56,6 +57,18 @@ function remaining(c:Row){
   const others=one('SELECT COALESCE(SUM(wallet_debit_cents+platform_loss_cents),0) AS n FROM payment_risk_cases WHERE table_group=? AND livemode=? AND payment_id=? AND id<>?',c.table_group,c.livemode,c.payment_id,c.id)!.n;
   return Math.max(0,Math.min(c.amount_cents,Math.max(0,p.amount_cents-others))-c.wallet_debit_cents-c.platform_loss_cents);
 }
+function giftAllocation(c:Row){return one<{bonus_debit_cents:number;bonus_loss_cents:number}>('SELECT bonus_debit_cents,bonus_loss_cents FROM funding_bonus_review_allocations WHERE case_id=?',c.id)||{bonus_debit_cents:0,bonus_loss_cents:0};}
+function originalGift(c:Row){
+  const p=c.payment_id?payment(c.payment_id):undefined;
+  return p?.kind==='funding'&&p.currency==='usd'&&p.status==='paid'?fundingCreditForPayment(p,c.table_group).bonusCents:0;
+}
+function giftRemaining(c:Row){
+  if(c.amount_cents<=0||c.kind==='dispute'&&c.provider_status==='won')return 0;
+  const gift=originalGift(c);if(!gift)return 0;
+  const allocated=Number(one('SELECT COALESCE(SUM(a.bonus_debit_cents+a.bonus_loss_cents),0) AS n FROM funding_bonus_review_allocations a JOIN payment_risk_cases r ON r.id=a.case_id WHERE r.table_group=? AND r.livemode=? AND r.payment_id=?',c.table_group,c.livemode,c.payment_id)!.n);
+  return Math.max(0,gift-allocated);
+}
+function remaining(c:Row){return cashRemaining(c)+giftRemaining(c);}
 
 function reopenUncoveredSiblings(c:Row){
   // Reversing one allocation can expose a refund previously covered by that
@@ -85,7 +98,8 @@ export function processRiskEvent(event:PaymentRiskEvent):{handled:boolean;ignore
       const newer=snapshot.provider_updated_at>c.provider_updated_at||snapshot.provider_updated_at===c.provider_updated_at&&!terminalConflict&&(terminals.includes(snapshot.provider_status)||!terminals.includes(c.provider_status));
       const increased=snapshot.amount_cents>c.amount_cents;
       const state=terminalConflict?'conflicting':newer?snapshot.provider_status:c.provider_status;
-      const needsReturn=state==='won'&&c.provider_status!=='won'&&(c.wallet_debit_cents>0||c.platform_loss_cents>0||c.pass_revoked);
+      const gift=giftAllocation(c);
+      const needsReturn=state==='won'&&c.provider_status!=='won'&&(c.wallet_debit_cents>0||c.platform_loss_cents>0||c.pass_revoked||gift.bonus_debit_cents>0||gift.bonus_loss_cents>0);
       const reopen=c.status==='resolved'&&(increased||needsReturn||terminalConflict||newer&&state==='lost'&&c.decision==='provider_reversed');
       const canAttach=p&&matchesCase(p,{...c,amount_cents:Math.max(c.amount_cents,snapshot.amount_cents),currency:c.currency||snapshot.currency})&&referencesAgree(c,snapshot);
       run(`UPDATE payment_risk_cases SET payment_intent=COALESCE(payment_intent,?),charge_id=COALESCE(charge_id,?),payment_id=COALESCE(payment_id,?),user_id=COALESCE(user_id,?),amount_cents=MAX(amount_cents,?),currency=CASE WHEN currency='' THEN ? ELSE currency END,provider_status=?,provider_updated_at=MAX(provider_updated_at,?),status=?,updated_at=datetime('now'),resolved_at=CASE WHEN ? THEN NULL ELSE resolved_at END WHERE id=?`,snapshot.payment_intent,snapshot.charge_id,canAttach?p.id:null,canAttach?p.user_id:null,snapshot.amount_cents,snapshot.currency,state,snapshot.provider_updated_at,reopen?'open':c.status,reopen?1:0,c.id);
@@ -102,7 +116,7 @@ export function assertPaymentAccountClear(userId:string){assert(!paymentAccountR
 export function assertPaymentPayoutsClear(){const p=partition();assert(!one("SELECT 1 FROM payment_risk_cases WHERE table_group=? AND livemode=? AND status='open' LIMIT 1",p.group,p.live),423,'PAYMENT_REVIEW_REQUIRED','Creator payouts are paused while payment reviews remain unresolved.');}
 
 export interface PaymentReviewCase extends Row {id:string;status:'open'|'resolved';mode:'test'|'live';payment_id:string|null;user_id:string|null;payment_kind:'funding'|'activation'|null;remaining_cents:number;mapped:boolean;provider_reversed_available:boolean;alreadyResolved?:boolean}
-function view(c:Row):PaymentReviewCase{const p=c.payment_id?payment(c.payment_id):undefined;return{...c,id:c.id,status:c.status,payment_id:c.payment_id,user_id:c.user_id,mode:c.livemode?'live':'test',payment_kind:p?.kind||null,remaining_cents:remaining(c),mapped:!!(c.payment_id&&c.user_id),provider_reversed_available:c.kind==='dispute'&&c.provider_status==='won'};}
+function view(c:Row):PaymentReviewCase{const p=c.payment_id?payment(c.payment_id):undefined,a=giftAllocation(c);return{...c,id:c.id,status:c.status,payment_id:c.payment_id,user_id:c.user_id,mode:c.livemode?'live':'test',payment_kind:p?.kind||null,remaining_cents:remaining(c),funding_bonus_cents:originalGift(c),bonus_debit_cents:a.bonus_debit_cents,bonus_loss_cents:a.bonus_loss_cents,wallet_debit_cents:c.wallet_debit_cents+a.bonus_debit_cents,platform_loss_cents:c.platform_loss_cents+a.bonus_loss_cents,mapped:!!(c.payment_id&&c.user_id),provider_reversed_available:c.kind==='dispute'&&c.provider_status==='won'};}
 export function adminPaymentReviews(){const p=partition();return all("SELECT c.*,u.name AS user_name,u.email AS user_email FROM payment_risk_cases c LEFT JOIN users u ON u.id=c.user_id WHERE c.table_group=? AND c.livemode=? ORDER BY CASE c.status WHEN 'open' THEN 0 ELSE 1 END,c.updated_at DESC,c.id LIMIT 200",p.group,p.live).map(view);}
 
 export function resolvePaymentReview(id:string,actorId:string,input:PaymentReviewDecision){
@@ -121,25 +135,32 @@ export function resolvePaymentReview(id:string,actorId:string,input:PaymentRevie
     let walletDelta=0,lossDelta=0,passDelta=0;
     if(input.decision==='provider_reversed'){
       assert(c.kind==='dispute'&&c.provider_status==='won',409,'PROVIDER_REVERSAL_UNVERIFIED','A signed provider dispute-won outcome is required.');assert(debit===0,400,'INVALID_AMOUNT','A provider reversal does not debit the wallet.');
-      walletDelta=c.wallet_debit_cents*10000;assert(Number.isSafeInteger(account.wallet_micros)&&account.wallet_micros>=0&&account.wallet_micros<=Number.MAX_SAFE_INTEGER-walletDelta,409,'BALANCE_LIMIT','This reversal exceeds the wallet limit.');
-      lossDelta=-c.platform_loss_cents;
+      const gift=giftAllocation(c);
+      walletDelta=(c.wallet_debit_cents+gift.bonus_debit_cents)*10000;assert(Number.isSafeInteger(account.wallet_micros)&&account.wallet_micros>=0&&account.wallet_micros<=Number.MAX_SAFE_INTEGER-walletDelta,409,'BALANCE_LIMIT','This reversal exceeds the wallet limit.');
+      lossDelta=-(c.platform_loss_cents+gift.bonus_loss_cents);
       if(walletDelta)run(`UPDATE ${accountTable()} SET wallet_micros=wallet_micros+? WHERE ${accountIdColumn()}=?`,walletDelta,c.user_id);
       if(p.kind==='activation'&&c.pass_revoked&&!one("SELECT 1 FROM payment_risk_cases WHERE table_group=? AND livemode=? AND payment_id=? AND id<>? AND amount_cents>0 AND provider_status<>'won' LIMIT 1",part.group,part.live,p.id,c.id)){run(`UPDATE ${accountTable()} SET publisher_active=1 WHERE ${accountIdColumn()}=?`,c.user_id);if(!usingTestPaymentState())run("UPDATE users SET role=CASE WHEN role='admin' THEN 'admin' ELSE 'publisher' END WHERE id=?",c.user_id);passDelta=1;}
       run('UPDATE payment_risk_cases SET wallet_debit_cents=0,platform_loss_cents=0,pass_revoked=0 WHERE id=?',id);
+      run('UPDATE funding_bonus_review_allocations SET bonus_debit_cents=0,bonus_loss_cents=0 WHERE case_id=?',id);
       reopenUncoveredSiblings(c);
     }else{
-      const due=remaining(c);assert(debit<=due,400,'INVALID_AMOUNT','The debit exceeds the remaining review amount.');
+      const cashDue=cashRemaining(c),giftDue=giftRemaining(c),due=cashDue+giftDue;assert(debit<=due,400,'INVALID_AMOUNT','The debit exceeds the remaining review amount.');
+      let cashDebit=debit,cashLoss=0;
       if(p.kind==='funding'){
         assert(p.currency==='usd',409,'CURRENCY_REVIEW_REQUIRED','Only USD wallet funding can be adjusted from the wallet.');
         assert(input.decision==='platform_loss'||debit===due,400,'REVIEW_AMOUNT_REQUIRED','Reconcile the full remaining amount or explicitly record the unrecovered platform loss.');
         assert(account.wallet_micros>=debit*10000,409,'INSUFFICIENT_FUNDS','The wallet cannot cover this debit. Reduce it and explicitly accept the remaining platform loss.');
         walletDelta=-debit*10000;if(debit)run(`UPDATE ${accountTable()} SET wallet_micros=wallet_micros-? WHERE ${accountIdColumn()}=?`,debit*10000,c.user_id);
         lossDelta=input.decision==='platform_loss'?due-debit:0;
+        cashDebit=Math.min(debit,cashDue);const bonusDebit=debit-cashDebit;
+        cashLoss=input.decision==='platform_loss'?cashDue-cashDebit:0;
+        const bonusLoss=input.decision==='platform_loss'?giftDue-bonusDebit:0;
+        if(bonusDebit||bonusLoss)run('INSERT INTO funding_bonus_review_allocations (case_id,bonus_debit_cents,bonus_loss_cents) VALUES (?,?,?) ON CONFLICT(case_id) DO UPDATE SET bonus_debit_cents=bonus_debit_cents+excluded.bonus_debit_cents,bonus_loss_cents=bonus_loss_cents+excluded.bonus_loss_cents',id,bonusDebit,bonusLoss);
       }else{
         assert(p.kind==='activation'&&p.currency==='hkd'&&debit===0,400,'INVALID_AMOUNT','Dramio Pass reviews cannot debit the USD wallet.');
-        run(`UPDATE ${accountTable()} SET publisher_active=0 WHERE ${accountIdColumn()}=?`,c.user_id);if(!usingTestPaymentState())run("UPDATE users SET role=CASE WHEN role='admin' THEN 'admin' ELSE 'viewer' END WHERE id=?",c.user_id);passDelta=-1;lossDelta=input.decision==='platform_loss'?due:0;
+        run(`UPDATE ${accountTable()} SET publisher_active=0 WHERE ${accountIdColumn()}=?`,c.user_id);if(!usingTestPaymentState())run("UPDATE users SET role=CASE WHEN role='admin' THEN 'admin' ELSE 'viewer' END WHERE id=?",c.user_id);passDelta=-1;lossDelta=input.decision==='platform_loss'?due:0;cashLoss=lossDelta;
       }
-      run('UPDATE payment_risk_cases SET wallet_debit_cents=wallet_debit_cents+?,platform_loss_cents=platform_loss_cents+?,pass_revoked=MAX(pass_revoked,?) WHERE id=?',debit,lossDelta,passDelta===-1?1:0,id);
+      run('UPDATE payment_risk_cases SET wallet_debit_cents=wallet_debit_cents+?,platform_loss_cents=platform_loss_cents+?,pass_revoked=MAX(pass_revoked,?) WHERE id=?',cashDebit,cashLoss,passDelta===-1?1:0,id);
     }
     const resolutionId=randomUUID();
     if(walletDelta)run(`INSERT INTO ${ledgerTable()} (id,user_id,kind,amount_micros,reference_id,description) VALUES (?,?,?,?,?,?)`,randomUUID(),c.user_id,walletDelta<0?'payment_review_debit':'payment_review_reversal',walletDelta,resolutionId,walletDelta<0?'Verified payment review adjustment':'Verified dispute reversal');

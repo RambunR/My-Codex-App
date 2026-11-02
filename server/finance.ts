@@ -13,6 +13,8 @@ import {verifiedStripeEventContext} from './stripe-event-context.js';
 import {assertPaymentAccountClear,assertPaymentPayoutsClear,recordPaymentLink} from './payment-risk.js';
 import {ensureStripeWebhookReady,stripeWebhookReadiness,resetStripeReadiness} from './stripe-readiness.js';
 import {assertSeriesAvailable} from './moderation.js';
+import {fundingRewardQuote} from '../shared/funding-rewards.js';
+import {storeFundingQuote,fundingCreditForPayment} from './funding-rewards.js';
 
 export let stripe = config.stripeKey ? new Stripe(config.stripeKey, {httpClient:Stripe.createFetchHttpClient()}) : null;
 const stripeLocales:Record<string,Stripe.Checkout.SessionCreateParams.Locale>={en:'en','zh-TW':'zh-TW','zh-CN':'zh',ja:'ja',ko:'ko',id:'id','pt-BR':'pt-BR',es:'es-419',vi:'vi',th:'th',fil:'fil',tr:'tr',ru:'ru',fr:'fr',de:'de',ms:'ms'};
@@ -46,11 +48,13 @@ export function settlePayment(paymentId: string, expected?: { amount: number; cu
     assert(payment.status === 'pending', 409, 'PAYMENT_CLOSED', 'This payment is no longer pending.');
     if (payment.kind === 'funding') {
       assert(payment.currency==='usd'&&Number.isSafeInteger(payment.amount_cents)&&payment.amount_cents>=MIN_WALLET_FUNDING_CENTS&&payment.amount_cents<=MAX_WALLET_FUNDING_CENTS,400,'PAYMENT_MISMATCH','Wallet deposits must be valid USD amounts of at least $5.00.');
-      const micros = payment.amount_cents * 10000;
+      const funding=fundingCreditForPayment(payment);
+      const paidMicros=payment.amount_cents*10000,bonusMicros=funding.bonusCents*10000,micros=funding.totalCreditCents*10000;
       const user=financeAccount(payment.user_id);
       assert(user&&canAdd(user.wallet_micros,micros),409,'BALANCE_LIMIT','This credit would exceed the supported wallet balance. Contact support.');
       run(`UPDATE ${accountTable()} SET wallet_micros=wallet_micros+? WHERE ${accountIdColumn()}=?`, micros, payment.user_id);
-      addLedger(payment.user_id, 'funding', micros, payment.id, 'Wallet top-up');
+      addLedger(payment.user_id, 'funding', paidMicros, payment.id, 'Wallet top-up');
+      if(bonusMicros)addLedger(payment.user_id,'funding_bonus',bonusMicros,payment.id,'Wallet funding gift · paid episode credit');
     } else {
       // Persisted server quotes stay payable after an offer is disabled. Client
       // amounts and provider metadata alone never establish a valid discount.
@@ -118,7 +122,7 @@ export async function createCheckout(userId: string, kind: 'funding' | 'activati
   if(kind==='funding'){
     assert(Number.isSafeInteger(cents)&&cents>=MIN_WALLET_FUNDING_CENTS&&cents<=MAX_WALLET_FUNDING_CENTS,400,'INVALID_AMOUNT','Enter a USD amount of at least $5.00 within the supported payment range.');
     const user=financeAccount(userId);
-    assert(user&&canAdd(user.wallet_micros,cents*10000),400,'WALLET_LIMIT_REACHED','This deposit would exceed the supported wallet balance.');
+    assert(user&&canAdd(user.wallet_micros,fundingRewardQuote(cents).totalCreditCents*10000),400,'WALLET_LIMIT_REACHED','This deposit and its gift would exceed the supported wallet balance.');
   }
   if (kind === 'activation') {
     const user = financeAccount(userId);
@@ -135,7 +139,6 @@ export async function createCheckout(userId: string, kind: 'funding' | 'activati
   // Custom messages cover every app language. Stripe's own controls use its
   // supported locale, with English for languages its hosted UI does not offer.
   const locale=stripeLocales[checkoutLanguage]||'en';
-  const messages=checkoutCopy(checkoutLanguage,kind==='funding'?amount:0);
   for(let attempt=0;attempt<3;attempt++){
     const payment=transaction(()=>{
       if(kind==='activation'){
@@ -146,13 +149,16 @@ export async function createCheckout(userId: string, kind: 'funding' | 'activati
       if(promotion){const fresh=quotePromotion(userId,promotion.code);assert(fresh.revision===promotion.revision&&fresh.amountHkdCents===promotion.amountHkdCents,409,'PROMOTION_CHANGED','This promotion changed. Apply the code again to confirm the current price.');}
       const id=crypto.randomUUID();run(`INSERT INTO ${paymentTable()} (id,user_id,kind,amount_cents,currency,provider) VALUES (?,?,?,?,?,?)`,id,userId,kind,amount,currency,config.payments);
       if(promotion)storePromotionQuote(id,promotion);
+      if(kind==='funding')storeFundingQuote(id,userId,amount);
       return{id,provider_session:null,amount_cents:amount,currency};
     });
     if(!payment)return{alreadyPaid:true};
     const id=payment.id as string;
+    const funding=kind==='funding'?fundingCreditForPayment({...payment,id,user_id:userId,kind:'funding'}):undefined;
+    const messages=checkoutCopy(checkoutLanguage,kind==='funding'?amount:0,funding?.bonusCents||0);
     const sameQuote=kind!=='activation'||payment.amount_cents===amount&&payment.currency===currency&&(promotion?validPromotionPayment({...payment,id})&&promotionSnapshot(id)?.code===promotion.code:!promotionSnapshot(id));
     const assertSameQuote=()=>{if(!sameQuote)throw new AppError(409,'ACTIVATION_CHECKOUT_CONFLICT','Close your existing unpaid Dramio Pass checkout before changing its promotion.',{paymentId:id});};
-    if(config.payments==='demo'){assertSameQuote();return{demo:true,paymentId:id,amount_cents:amount,currency};}
+    if(config.payments==='demo'){assertSameQuote();return{demo:true,paymentId:id,amount_cents:amount,currency,...(funding?{funding}:{})};}
     if(payment.provider_session){
       const existing=await stripe!.checkout.sessions.retrieve(payment.provider_session);
       if(financeAccount(userId)?.publisher_active)return{alreadyPaid:true};
@@ -160,7 +166,7 @@ export async function createCheckout(userId: string, kind: 'funding' | 'activati
       if(existing.payment_status==='paid'){
         settlePayment(id,{amount:existing.amount_total!,currency:existing.currency!,session:existing.id,livemode:existing.livemode,sessionObject:existing});return{alreadyPaid:true};
       }
-      if(existing.status==='open'){assertSameQuote();return{url:existing.url,paymentId:id};}
+      if(existing.status==='open'){assertSameQuote();return{url:existing.url,paymentId:id,...(funding?{funding}:{})};}
       assert(existing.status!=='complete',409,'PAYMENT_PROCESSING','Your payment is still processing. Please wait before trying again.');
       run(`UPDATE ${paymentTable()} SET status='expired' WHERE id=? AND status='pending'`,id);continue;
     }
@@ -170,7 +176,7 @@ export async function createCheckout(userId: string, kind: 'funding' | 'activati
       const session=await stripe!.checkout.sessions.create({mode:'payment',payment_method_types:['card'],client_reference_id:id,metadata,payment_intent_data:{metadata},locale,customer_email:one('SELECT email FROM users WHERE id=?',userId)!.email,
         branding_settings:{display_name:'LingYing · HK NovaXR Production'},
         custom_text:{after_submit:{message:messages.afterSubmit},...(kind==='funding'?{submit:{message:messages.submit}}:{})},
-        line_items:kind==='activation'&&config.stripeActivationPriceId&&!promotion?[{price:config.stripeActivationPriceId,quantity:1}]:[{price_data:{currency,unit_amount:amount,...(kind==='funding'&&config.stripeWalletProductId?{product:config.stripeWalletProductId}:{product_data:{name:kind==='activation'?'Dramio Pass':'LingYing wallet credit',...(kind==='funding'?{description:messages.description}:promotion?{description:`Promotion ${promotion.code} · HK$${(amount/100).toFixed(2)} once (regular HK$88).`}:{})}})},quantity:1}],
+        line_items:kind==='activation'&&config.stripeActivationPriceId&&!promotion?[{price:config.stripeActivationPriceId,quantity:1}]:[{price_data:{currency,unit_amount:amount,...(kind==='funding'&&config.stripeWalletProductId&&!funding?.bonusCents?{product:config.stripeWalletProductId}:{product_data:{name:kind==='activation'?'Dramio Pass':'LingYing wallet credit',...(kind==='funding'?{description:messages.description}:promotion?{description:`Promotion ${promotion.code} · HK$${(amount/100).toFixed(2)} once (regular HK$88).`}:{})}})},quantity:1}],
         success_url:`${publicAppUrl()}/${kind==='activation'?'studio':'wallet'}?checkout=success&session_id={CHECKOUT_SESSION_ID}${promotion?`&promo=${encodeURIComponent(promotion.code)}`:''}`,
         cancel_url:`${publicAppUrl()}/${kind==='activation'?'studio':'wallet'}?checkout=cancelled${promotion?`&promo=${encodeURIComponent(promotion.code)}`:''}`,
       },{idempotencyKey:`checkout:${id}`});
@@ -178,7 +184,7 @@ export async function createCheckout(userId: string, kind: 'funding' | 'activati
       run(`UPDATE ${paymentTable()} SET provider_session=? WHERE id=? AND status='pending'`,session.id,id);
       recordPaymentLink(id,session);
       if(kind==='activation'&&financeAccount(userId)?.publisher_active)return{alreadyPaid:true};
-      return{url:session.url,paymentId:id};
+      return{url:session.url,paymentId:id,...(funding?{funding}:{})};
     }catch(error){
       // A timeout can occur after Stripe created Checkout. Retain this pending
       // payment and stable idempotency key so activation retries cannot charge twice.

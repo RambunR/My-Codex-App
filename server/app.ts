@@ -12,7 +12,7 @@ import {registerEmailAuth,emailAuthEnabled,sendRegistrationVerification} from '.
 import { one, all, run, transaction } from './db.js';
 import { AppError, assert } from './errors.js';
 import { readSession, requireAuth, requirePublisher, requireAdmin, hashPassword, verifyPassword, createSession, destroySession, getUser, rateLimit } from './auth.js';
-import { prepareVideo, prepareCover, putObject, deleteObject, serveObject, removeTempFile } from './storage.js';
+import { prepareVideo, prepareCover, putObject, serveObject, removeTempFile } from './storage.js';
 import { createCheckout, cancelCheckout, settlePayment, unlockEpisode, requestWithdrawal,returnWithdrawalFunds, addLedger, stripe,paymentsReady,stripeConfigured,stripeModeMatches,stripeTestPayments,assertPayoutsEnabled } from './finance.js';
 import {processRiskEvent,recordPaymentLink,adminPaymentReviews,resolvePaymentReview,assertPaymentAccountClear} from './payment-risk.js';
 import {ensurePlatformOwnerAccess,creatorDisplayName} from './owner.js';
@@ -30,6 +30,9 @@ import {initializePromotions,adminPromotions,createPromotion,updatePromotion,quo
 import {themesSchema,formatSchema,seriesClassification,writeSeriesClassification,SERIES_FORMAT_SQL} from './taxonomy.js';
 import {registerEpisodeUploadSessions,chunkedEpisodeUploadsEnabled,EPISODE_UPLOAD_CHUNK_BYTES,reservedEpisodeUploadBytes,cleanupExpiredEpisodeUploads} from './episode-upload-sessions.js';
 import {episodeDurationSql,legacyEpisodeDuration,writeEpisodeDuration} from './episode-duration.js';
+import {responseSecurityHeaders} from '../shared/security-headers.js';
+import {registerEpisodeBatch,episodeBatchRevision,assertEpisodeBatchWritable,deleteSingleEpisode} from './episode-batch.js';
+import {WALLET_FUNDING_OPTIONS} from '../shared/funding-rewards.js';
 
 const language = z.enum(LANGUAGES.map(x => x.code) as [string, ...string[]]);
 const id = (req: Request, field = 'id') => String(req.params[field] || '');
@@ -81,7 +84,7 @@ export function createApp() {
   const app = express();
   app.disable('x-powered-by');
   if (process.env.TRUST_PROXY === 'true') app.set('trust proxy', 1);
-  app.use((req, res, next) => { res.setHeader('X-Content-Type-Options','nosniff'); res.setHeader('Referrer-Policy',req.path==='/auth'||req.path.startsWith('/api/auth/')?'no-referrer':'strict-origin-when-cross-origin'); res.setHeader('X-Frame-Options','DENY'); if(req.path==='/auth')res.setHeader('Cache-Control','no-store'); next(); });
+  app.use((req, res, next) => { for(const[name,value]of Object.entries(responseSecurityHeaders(req.path)))res.setHeader(name,value); if(req.path==='/auth')res.setHeader('Cache-Control','no-store'); next(); });
   app.use('/api',credentialedCors);
   app.post('/api/payments/webhook', express.raw({ type: 'application/json', limit: '1mb' }), async (req, res) => {
     // Check both saved pairs. The UI switch selects new Checkout, not which
@@ -154,7 +157,7 @@ export function createApp() {
   registerEmailAuth(app);
   app.get('/api/health', (_req,res) => res.json({ ok: true, database: !!one('SELECT 1 AS ready') }));
   app.get('/api/config', async (_req,res) => {initializePromotions();if(config.payments==='stripe'&&stripeConfigured())await ensureStripeWebhookReady(stripe);return res.json({ brand: 'LingYing', languages: LANGUAGES, genres: GENRES,standardGenres:STANDARD_GENRES,storyThemes:STORY_THEMES,formats:SERIES_FORMATS,creationTypes:CREATION_TYPES, passPromotion:{enabled:true},paymentsMode: config.payments,paymentsReady:paymentsReady(),paymentsConfigured:stripeConfigured(),paymentSetup:stripeWebhookReadiness(),sandbox:config.sandbox,paymentsTestMode:stripeTestPayments()||config.payments==='demo',payoutsEnabled:config.payoutsEnabled&&!stripeTestPayments(),uploadsEnabled:!config.sandbox,usdToHkd: config.usdToHkd,
-    limits: { maxEpisodeSeconds: MAX_EPISODE_SECONDS, maxEpisodeBytes: MAX_EPISODE_BYTES, quotaBytes: DEFAULT_QUOTA_BYTES, activationHkd: 88, minimumPriceUsd: 0.1, creatorShare: 0.7, minimumPayoutHkd: 20,minWalletFundingUsd:MIN_WALLET_FUNDING_CENTS/100,maxWalletFundingUsd:MAX_WALLET_FUNDING_CENTS/100 }, demo: config.seed,episodeUpload:{mode:chunkedEpisodeUploadsEnabled()?'chunked':'multipart',chunkBytes:EPISODE_UPLOAD_CHUNK_BYTES}, runtime: (config as any).runtime || 'node', videoFormats: (config as any).videoFormats || ['mp4','mov','webm','m4v'], auth:{google:googleEnabled(),apple:appleEnabled(),email:emailAuthEnabled()} });});
+    limits: { maxEpisodeSeconds: MAX_EPISODE_SECONDS, maxEpisodeBytes: MAX_EPISODE_BYTES, quotaBytes: DEFAULT_QUOTA_BYTES, activationHkd: 88, minimumPriceUsd: 0.1, creatorShare: 0.7, minimumPayoutHkd: 20,minWalletFundingUsd:MIN_WALLET_FUNDING_CENTS/100,maxWalletFundingUsd:MAX_WALLET_FUNDING_CENTS/100 },walletFunding:WALLET_FUNDING_OPTIONS, demo: config.seed,episodeUpload:{mode:chunkedEpisodeUploadsEnabled()?'chunked':'multipart',chunkBytes:EPISODE_UPLOAD_CHUNK_BYTES}, runtime: (config as any).runtime || 'node', videoFormats: (config as any).videoFormats || ['mp4','mov','webm','m4v'], auth:{google:googleEnabled(),apple:appleEnabled(),email:emailAuthEnabled()} });});
   app.get('/api/auth/me', (req,res) => res.json({ user: req.user || null }));
   app.post('/api/auth/register', rateLimit('register', 12, 15 * 60_000), async (req,res) => {
     const body = registration.parse(req.body);
@@ -298,7 +301,7 @@ export function createApp() {
   app.get('/api/studio/series/:id',requireAuth,(req,res)=>{
     ownSeries(req);const s=one(`${catalogSelect} WHERE s.id=?`,id(req))!;
     const episodes=all(`SELECT e.id,e.series_id,e.title,e.number,${episodeDurationSql('e')} AS duration,e.bytes FROM episodes e WHERE e.series_id=? ORDER BY e.number`,s.id);
-    res.setHeader('Cache-Control','private, no-store');res.json({series:serializeSeries(s,req.user!.id,true),episodes,owner_storage:ownerStorage(s)});
+    res.setHeader('Cache-Control','private, no-store');res.json({series:serializeSeries(s,req.user!.id,true),episodes,episodes_revision:episodeBatchRevision(s.id),owner_storage:ownerStorage(s)});
   });
   app.get('/api/studio/series/:id/cover',requireAuth,async(req,res)=>{
     const s=ownSeries(req);assert(s.cover_key,404,'NOT_FOUND','Cover not found.');res.setHeader('Cache-Control','private, no-store');
@@ -358,13 +361,13 @@ export function createApp() {
     finally{await removeTempFile(req.file.path);if(processed)await removeTempFile(processed.path);}
   });
   app.patch('/api/studio/episodes/:id', requirePublisher, (req,res) => {
-    const e=episodeRow(id(req));assert(e,404,'NOT_FOUND','Episode not found.');writableSeries(req,e.series_id);
+    const e=episodeRow(id(req));assert(e,404,'NOT_FOUND','Episode not found.');assertEpisodeBatchWritable(req,e.series_id);
     const b=z.object({title:z.string().trim().min(1).max(120),number:z.number().int().min(1).max(1000)}).parse(req.body);
     assert(!one('SELECT id FROM episodes WHERE series_id=? AND number=? AND id<>?',e.series_id,b.number,e.id),409,'EPISODE_EXISTS','This episode number is already in use.');run('UPDATE episodes SET title=?,number=? WHERE id=?',b.title,b.number,e.id);res.json({ok:true});
   });
+  registerEpisodeBatch(app);
   app.delete('/api/studio/episodes/:id', requirePublisher, async (req,res) => {
-    const e=transaction(()=>{const ep=episodeRow(id(req));assert(ep,404,'NOT_FOUND','Episode not found.');writableSeries(req,ep.series_id);assert(!one('SELECT id FROM purchases WHERE episode_id=? UNION ALL SELECT id FROM test_purchases WHERE episode_id=? LIMIT 1',ep.id,ep.id),409,'EPISODE_PURCHASED','Purchased episodes must remain available. Archive the series to stop new sales.');run('DELETE FROM episodes WHERE id=?',ep.id);run('UPDATE users SET used_bytes=MAX(0,used_bytes-?) WHERE id=?',ep.bytes,ep.creator_id);return ep;});
-    await deleteObject(e.storage_key);res.json({ok:true,user:getUser(req.user!.id),owner_storage:ownerStorage(e)});
+    res.json(await deleteSingleEpisode(req,id(req)));
   });
   app.post('/api/studio/series/:id/status', requirePublisher, (req,res) => {
     const s=ownSeries(req);assertSeriesWritable(s.id);assertPaymentAccountClear(s.creator_id);const {status}=z.object({status:z.enum(['draft','published','archived'])}).parse(req.body);if(status!=='published')assertSeriesLifecycleFinancialClear(req.user!.id,s.creator_id);

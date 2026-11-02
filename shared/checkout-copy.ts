@@ -112,9 +112,38 @@ const messages:Record<Locale,CheckoutCopy>={
   },
 };
 
-export function checkoutCopy(locale:string,amountCents:number):CheckoutCopy{
+// Each gift line states the actual charge, gift and total credit separately.
+const rewardDescriptions:Record<Locale,string>={
+  "en": "Pay {amount}; receive {total} wallet credit including {bonus} gift credit.",
+  "zh-TW": "支付 {amount}；錢包共獲得 {total}，其中包含 {bonus} 贈送點數。",
+  "zh-CN": "支付 {amount}；钱包共获得 {total}，其中包含 {bonus} 赠送额度。",
+  "ja": "{amount} を支払い、特典クレジット {bonus} を含む合計 {total} をウォレットに受け取ります。",
+  "ko": "{amount}를 결제하고 보너스 크레딧 {bonus}를 포함한 총 {total}의 지갑 크레딧을 받습니다.",
+  "hi": "{amount} का भुगतान करें; {bonus} उपहार क्रेडिट सहित कुल {total} वॉलेट क्रेडिट पाएँ।",
+  "id": "Bayar {amount}; terima total saldo dompet {total}, termasuk bonus saldo {bonus}.",
+  "pt-BR": "Pague {amount}; receba {total} de crédito na carteira, incluindo {bonus} de presente.",
+  "es": "Paga {amount}; recibe {total} en el monedero, incluidos {bonus} de saldo de regalo.",
+  "ar": "ادفع {amount} واحصل على إجمالي {total} في المحفظة، بما يشمل رصيد هدية بقيمة {bonus}.",
+  "bn": "{amount} দিন; {bonus} উপহার ক্রেডিটসহ মোট {total} ওয়ালেট ক্রেডিট পান।",
+  "ur": "{amount} ادا کریں؛ {bonus} تحفہ کریڈٹ سمیت کل {total} والیٹ کریڈٹ حاصل کریں۔",
+  "vi": "Thanh toán {amount}; nhận tổng {total} tín dụng ví, bao gồm {bonus} tín dụng tặng.",
+  "th": "จ่าย {amount} รับเครดิตกระเป๋าเงินรวม {total} ซึ่งรวมเครดิตของขวัญ {bonus}",
+  "fil": "Magbayad ng {amount}; tumanggap ng {total} wallet credit, kasama ang {bonus} na regalong credit.",
+  "tr": "{amount} ödeyin; {bonus} hediye bakiye dahil toplam {total} cüzdan bakiyesi alın.",
+  "ru": "Заплатите {amount} и получите {total} в кошелёк, включая {bonus} подарочных средств.",
+  "fr": "Payez {amount} et recevez {total} dans le portefeuille, dont {bonus} de crédit offert.",
+  "de": "Zahle {amount} und erhalte insgesamt {total} Wallet-Guthaben einschließlich {bonus} Bonusguthaben.",
+  "ms": "Bayar {amount}; terima jumlah kredit dompet {total}, termasuk kredit hadiah {bonus}.",
+  "ta": "{amount} செலுத்தி, {bonus} பரிசுத் தொகை உட்பட மொத்தம் {total} பணப்பைத் தொகை பெறுங்கள்."
+};
+
+export function checkoutCopy(locale:string,amountCents:number,bonusCents=0):CheckoutCopy{
   if(!Number.isSafeInteger(amountCents)||amountCents<0)throw new RangeError('Wallet credit must be a nonnegative safe integer number of USD cents.');
-  const copy=Object.hasOwn(messages,locale)?messages[locale as Locale]:messages.en;
-  const amount=`US$${Math.floor(amountCents/100)}.${String(amountCents%100).padStart(2,'0')}`;
-  return{description:copy.description.replace('{amount}',amount),submit:copy.submit,afterSubmit:copy.afterSubmit};
+  if(!Number.isSafeInteger(bonusCents)||bonusCents<0||!Number.isSafeInteger(amountCents+bonusCents)||bonusCents>0&&amountCents===0)throw new RangeError('Gift credit must be a nonnegative safe integer number of USD cents.');
+  const language=Object.hasOwn(messages,locale)?locale as Locale:'en';
+  const copy=messages[language];
+  const dollars=(cents:number)=>`US$${Math.floor(cents/100)}.${String(cents%100).padStart(2,'0')}`;
+  if(!bonusCents)return{description:copy.description.replace('{amount}',dollars(amountCents)),submit:copy.submit,afterSubmit:copy.afterSubmit};
+  const description=rewardDescriptions[language].replace('{amount}',dollars(amountCents)).replace('{bonus}',dollars(bonusCents)).replace('{total}',dollars(amountCents+bonusCents));
+  return{description,submit:description+' '+copy.submit,afterSubmit:copy.afterSubmit};
 }

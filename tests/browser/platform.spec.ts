@@ -12,7 +12,7 @@ test('guest watches free previews, encounters the paywall, and is prompted to re
 });
 test('registration, test wallet funding and a paid unlock persist across reload',async({page})=>{
   await page.goto('/auth?mode=register&next=/wallet');await page.getByLabel('Name',{exact:true}).fill('Browser Viewer');await page.getByLabel('Email address',{exact:true}).fill(`viewer-${Date.now()}@browser.test`);await page.getByLabel('Password',{exact:true}).fill('BrowserPass123!');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Create account',exact:true}).last().click();await expect(page).toHaveURL('/wallet');
-  await page.getByRole('button',{name:'US$5',exact:true}).click();await page.getByRole('button',{name:/Add funds ·/}).click();await expect(page.getByRole('dialog')).toContainText('No real money');await page.getByRole('button',{name:'Confirm test payment'}).click();await expect(page.locator('.balance-card>strong')).toHaveText('$5.00');
+  await page.locator('.topup-panel input[inputmode="decimal"]').fill('5.00');await page.getByRole('button',{name:/Add funds ·/}).click();await expect(page.getByRole('dialog')).toContainText('No real money');await page.getByRole('button',{name:'Confirm test payment'}).click();await expect(page.locator('.balance-card>strong')).toHaveText('$5.00');
   await page.goto('/watch/after-midnight/after-midnight-3');await page.getByRole('button',{name:/Unlock episode/}).click();await page.getByRole('button',{name:/Confirm ·/}).click();await expect(page.locator('video')).toBeVisible();await page.reload();await expect(page.locator('video')).toBeVisible();
   await page.goto('/wallet');await expect(page.locator('.balance-card>strong')).toHaveText('$4.70');
 });

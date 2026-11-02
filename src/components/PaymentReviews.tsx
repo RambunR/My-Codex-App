@@ -11,6 +11,7 @@ interface PaymentReview {
   user_id:string|null;payment_id:string|null;user_name?:string;user_email?:string;email?:string;
   payment_kind:'funding'|'activation';kind:'refund'|'dispute';
   amount_cents:number;currency:string;remaining_cents:number;
+  funding_bonus_cents?:number;
   wallet_debit_cents:number;platform_loss_cents:number;
   provider_status:string;charge_id?:string;payment_intent?:string;
   created_at:string;updated_at:string;resolved_at?:string;note?:string;decision?:string;
@@ -48,6 +49,7 @@ export function PaymentReviews(){
     </div>)}</div>:<p className="muted">{t('noPaymentReviews')}</p>}
     <Modal open={!!selected} onClose={()=>!busy&&setSelected(null)} title={t('resolvePaymentReview')}>
       {selected&&<><p>{t('reviewResolutionBody')}</p><p><strong>{selected.user_name||selected.user_id||selected.id}</strong> · {selected.mode.toUpperCase()}</p><div className="balance-row"><span>{t('reviewRemaining')}</span><strong>{amount(selected.remaining_cents,selected.currency)}</strong></div>
+      {!!selected.funding_bonus_cents&&<p className="field-hint">{t('reviewFundingGift').replace('{bonus}',amount(selected.funding_bonus_cents,'usd'))}</p>}
       {!mapped?<p className="form-error" role="alert">{t('reviewUnmapped')}</p>:conflicting?<p className="form-error" role="alert">{t('reviewAwaitingProvider')}</p>:<form onSubmit={submit}>
         <label className="field" htmlFor="payment-review-decision">{t('reviewDecision')}<select id="payment-review-decision" aria-label={t('reviewDecision')} value={decision} onChange={event=>changeDecision(event.target.value as Decision)} disabled={busy}>{canReverse?<option value="provider_reversed">{t('reviewProviderReversed')}</option>:<><option value="reconciled">{t('reviewRecover')}</option><option value="platform_loss">{t('reviewPlatformLoss')}</option></>}</select></label>
         {funding&&decision!=='provider_reversed'&&<label className="field">{t('reviewDebit')}<div className="money-input"><span>US$</span><input type="text" inputMode="decimal" autoComplete="off" aria-label={t('reviewDebit')} value={decision==='reconciled'?(selected.remaining_cents/100).toFixed(2):debit} onChange={event=>{setDebit(event.target.value);setConfirmed(false);}} disabled={busy||decision==='reconciled'} required aria-invalid={!validDebit} maxLength={20}/></div></label>}

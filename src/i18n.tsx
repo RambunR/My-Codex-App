@@ -8,6 +8,7 @@ import {folderUploadEnglish,folderUploadMessages} from './folder-upload-locales'
 import {passPromotionEnglish,passPromotionMessages} from './pass-promotion-locales';
 import {promoAdminEnglish,promoAdminMessages} from './promo-admin-locales';
 import {seriesLifecycleEnglish,seriesLifecycleMessages} from './series-lifecycle-locales';
+import {bulkRewardsEnglish,bulkRewardsMessages} from './bulk-rewards-locales';
 
 const en = {
   ...contentAdminEnglish,
@@ -85,6 +86,7 @@ const en = {
   ...passPromotionEnglish,
   ...promoAdminEnglish,
   ...seriesLifecycleEnglish,
+  ...bulkRewardsEnglish,
 } as const;
 export type Key = keyof typeof en;
 type Dictionary = Partial<Record<Key,string>>;
@@ -162,6 +164,7 @@ for(const language of LANGUAGES){if(!folderUploadMessages[language.code])throw n
 for(const language of LANGUAGES){if(!passPromotionMessages[language.code])throw new Error(`Pass promotion translations missing: ${language.code}`);Object.assign(dictionaries[language.code],passPromotionMessages[language.code]);}
 for(const language of LANGUAGES){if(!promoAdminMessages[language.code])throw new Error(`Promo admin translations missing: ${language.code}`);Object.assign(dictionaries[language.code],promoAdminMessages[language.code]);}
 for(const language of LANGUAGES){if(!seriesLifecycleMessages[language.code])throw new Error(`Series lifecycle translations missing: ${language.code}`);Object.assign(dictionaries[language.code],seriesLifecycleMessages[language.code]);}
+for(const language of LANGUAGES){if(!bulkRewardsMessages[language.code])throw new Error(`Bulk and reward translations missing: ${language.code}`);Object.assign(dictionaries[language.code],bulkRewardsMessages[language.code]);}
 const uploadConfirmationMessages:Record<Locale,string>={
   en:'Upload confirmation was interrupted. Refresh this series before retrying the file.',
   'zh-TW':'上傳確認中斷。請重新整理此系列，再重試上傳檔案。',

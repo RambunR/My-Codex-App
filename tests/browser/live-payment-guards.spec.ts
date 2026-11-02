@@ -17,7 +17,7 @@ test('live financial review holds retain balances and block new funding and publ
   await page.goto('/wallet');
   await expect(page.getByRole('heading',{name:'Payment account under review',exact:true})).toBeVisible();
   await expect(page.locator('.balance-card')).toContainText('$5.00');
-  await expect(page.getByRole('button',{name:/Add funds.*5\.00/})).toBeDisabled();
+  await expect(page.getByRole('button',{name:/Add funds.*10\.00/})).toBeDisabled();
   await expect(page.locator('.sandbox-notice')).toHaveCount(0);
   await page.goto('/studio');
   await expect(page.getByRole('button',{name:'New series',exact:true})).toBeDisabled();
@@ -31,7 +31,7 @@ test('live financial review holds retain balances and block new funding and publ
 test('live Checkout can be available while creator payout controls remain paused without a test-money notice',async({page})=>{
   const writes=await configureLive(page);
   await page.goto('/wallet');
-  await expect(page.getByRole('button',{name:/Add funds.*5\.00/})).toBeEnabled();
+  await expect(page.getByRole('button',{name:/Add funds.*10\.00/})).toBeEnabled();
   await expect(page.locator('.sandbox-notice')).toHaveCount(0);
   await expect(page.getByText('Stripe test payments.',{exact:false})).toHaveCount(0);
   await page.goto('/studio');

@@ -1,5 +1,8 @@
 import {APPLE_AUTH_SCHEMA} from './apple-schema.js';
 import {ACCOUNT_EMAIL_SCHEMA} from './email-schema.js';
+import {FUNDING_REWARD_SCHEMA} from './funding-reward-schema.js';
+import {EPISODE_BATCH_SCHEMA} from './episode-batch-schema.js';
+import {FUNDING_RISK_SCHEMA} from './funding-risk-schema.js';
 
 export const DATABASE_SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -247,4 +250,7 @@ CREATE INDEX IF NOT EXISTS purchases_episode_created ON purchases(episode_id,cre
 CREATE INDEX IF NOT EXISTS test_purchases_episode_created ON test_purchases(episode_id,created_at,user_id);
 ${APPLE_AUTH_SCHEMA}
 ${ACCOUNT_EMAIL_SCHEMA}
+${FUNDING_REWARD_SCHEMA}
+${EPISODE_BATCH_SCHEMA}
+${FUNDING_RISK_SCHEMA}
 `;

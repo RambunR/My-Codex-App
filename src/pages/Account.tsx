@@ -1,6 +1,6 @@
 import { useEffect,useState,type FormEvent } from 'react';
 import { Link,useLocation,useNavigate,useSearchParams } from 'react-router-dom';
-import { ArrowUpRight,ArrowRight,Eye,EyeOff,Mail,LockKeyhole,Sparkles,Wallet,Plus,ArrowDownLeft,ArrowUpRight as ArrowOut,Check,ShieldCheck,Clapperboard,Globe2,LogOut,Download,UserRound,ChevronDown,Film } from 'lucide-react';
+import { ArrowUpRight,ArrowRight,Eye,EyeOff,Mail,LockKeyhole,Sparkles,Wallet,Plus,ArrowDownLeft,ArrowUpRight as ArrowOut,Check,ShieldCheck,Clapperboard,Globe2,LogOut,Download,UserRound,ChevronDown,Film,Gift } from 'lucide-react';
 import { api,apiUrl,post,useApi,ApiError } from '../api';
 import { useApp } from '../context';
 import { useI18n,type Key } from '../i18n';
@@ -8,6 +8,7 @@ import { AuthGate,Avatar,Brand,Button,Empty,ErrorState,Loading,PageTitle,Modal }
 import { LANGUAGES,usd,MIN_WALLET_FUNDING_CENTS,MAX_WALLET_FUNDING_CENTS } from '../../shared/config';
 import { parseUsdCents } from '../../shared/money';
 import {DramioPassCard} from '../components/DramioPass';
+import {FundingReward,type FundingCreditQuote} from '../components/FundingReward';
 import {PaymentReviewNotice} from '../components/PaymentReview';
 import { COMPANY_NAME,CONTACT_EMAIL,CONTACT_HREF } from '../company';
 import '../account-auth.css';
@@ -100,18 +101,48 @@ function SignInAuth(){
 }
 export function WalletPage(){return <AuthGate><WalletContent/></AuthGate>;}
 function WalletContent(){
-  const{t}=useI18n();const{user,refreshUser,checkout,toast,config}=useApp();const[amount,setAmount]=useState('5');const[busy,setBusy]=useState(false);const[params,setParams]=useSearchParams();const{data,loading,error,refresh}=useApi<any>('/api/wallet');const returnTo=params.get('return');
+  const{t}=useI18n();const{user,refreshUser,checkout,toast,config}=useApp();const[amount,setAmount]=useState('10');const[busy,setBusy]=useState(false);const[params,setParams]=useSearchParams();const{data,loading,error,refresh}=useApi<any>('/api/wallet');const returnTo=params.get('return');
   const minimum=Number.isFinite(config.limits.minWalletFundingUsd)?Math.round(config.limits.minWalletFundingUsd*100):MIN_WALLET_FUNDING_CENTS;
   const maximum=Number.isFinite(config.limits.maxWalletFundingUsd)?Math.min(Math.round(config.limits.maxWalletFundingUsd*100),MAX_WALLET_FUNDING_CENTS):MAX_WALLET_FUNDING_CENTS;
   const amountCents=parseUsdCents(amount);const validAmount=amountCents!==null&&amountCents>=minimum&&amountCents<=maximum;
   const paymentsAvailable=config.paymentsMode!=='disabled'&&config.paymentsReady!==false&&!user?.payment_review;
   const fundingMessage=(key:'walletFundingHint'|'walletFundingRange')=>t(key).replace('{minimum}',usd(minimum*10000)).replace('{maximum}',usd(maximum*10000));
   const amountError=!amount.trim()?'':amountCents===null?(Number(amount)>maximum/100?fundingMessage('walletFundingRange'):t('walletFundingInvalid')):!validAmount?fundingMessage('walletFundingRange'):'';
+  const presets=[...new Set(config.walletFunding?.presetAmountsCents||[1000,2500,5000,10000])].filter(value=>Number.isSafeInteger(value)&&value>=1000&&value>=minimum&&value<=maximum);
+  const bonusFor=(cents:number)=>{const bonus=config.walletFunding?.rewards?.find(reward=>reward.amountCents===cents)?.bonusCents;return typeof bonus==='number'&&Number.isSafeInteger(bonus)&&bonus>0&&Number.isSafeInteger(cents+bonus)?bonus:0;};
+  const selectedBonus=validAmount?bonusFor(amountCents!):0;
+  const selectedQuote:FundingCreditQuote|undefined=validAmount&&selectedBonus>0?{amountCents:amountCents!,bonusCents:selectedBonus,totalCreditCents:amountCents!+selectedBonus,currency:'usd'}:undefined;
+  const presetLabel=(cents:number,bonus:number)=>bonus?t('walletRewardPresetLabel').replace('{amount}',usd(cents*10000)).replace('{bonus}',usd(bonus*10000)).replace('{total}',usd((cents+bonus)*10000)):`US$${cents/100}`;
+  const amountDescription=['wallet-amount-hint',amountError?'wallet-amount-error':'',selectedQuote?'wallet-reward-note':''].filter(Boolean).join(' ');
   useEffect(()=>{const session=params.get('session_id');if(params.get('checkout')==='cancelled'){toast(t('paymentCancelled'));setParams({}, {replace:true});}if(params.get('checkout')==='success'&&session){setBusy(true);post('/api/payments/reconcile',{session_id:session}).then(async d=>{await refreshUser();refresh();toast(t(d.paid?'paymentSuccess':'paymentProcessing'));}).catch(e=>toast(e.message,true)).finally(()=>{setBusy(false);setParams({}, {replace:true});});}},[params.get('session_id')]);
   useEffect(()=>refresh(),[user?.wallet_micros,user?.publisher_active]);
   const topUp=async()=>{if(!validAmount||!paymentsAvailable||busy)return;setBusy(true);try{await checkout('funding',amountCents!);}catch(e){toast((e as Error).message,true);}finally{setBusy(false);}};
-  const kind=(s:string):Key=>({funding:'addFunds',unlock:'unlock',earning:'earnings',activation:'dramioPass',withdrawal:'requestPayout',withdrawal_refund:'requestPayout'}[s] as Key)||'transactionHistory';
-  return <div className="page wallet-page"><PageTitle eyebrow={t('account')} title={t('wallet')} description={t('walletBody')}/><PaymentReviewNotice/>{returnTo&&<Link to={safeNext(returnTo)} className="back-link"><ArrowRight size={16}/>{t('continueWatching')}</Link>}<div className="wallet-grid"><section className="balance-card"><div className="balance-card-header"><Wallet size={25}/><span>USD</span></div><span>{t('balance')}</span><strong>{usd(user?.wallet_micros||0)}</strong><p>{t('walletNote')}</p><div className="balance-card-bottom"><span><ShieldCheck size={14}/>{t('setYourPrice')}</span><span>LingYing</span></div><div className="balance-decoration"/></section><section className="panel topup-panel"><h2>{t('addFunds')}</h2><p id="wallet-amount-hint">{fundingMessage('walletFundingHint')}</p><div className="amount-options">{[5,10,25,50].map(n=><button className={amountCents===n*100?'active':''} aria-pressed={amountCents===n*100} key={n} onClick={()=>setAmount(n.toFixed(2))}>US${n}{amountCents===n*100&&<Check size={12}/>}</button>)}</div><label className="field">{t('amount')} (USD)<div className="money-input"><span>US$</span><input type="text" inputMode="decimal" autoComplete="off" value={amount} onChange={e=>setAmount(e.target.value)} aria-label={t('amount')} aria-describedby={amountError?'wallet-amount-hint wallet-amount-error':'wallet-amount-hint'} aria-invalid={!!amountError} placeholder="5.00" maxLength={20}/></div></label>{amountError&&<p id="wallet-amount-error" className="form-error" role="alert">{amountError}</p>}<Button className="button primary wide" busy={busy} disabled={!validAmount||!paymentsAvailable} onClick={topUp}><Plus size={17}/>{t('addFunds')}{amountCents!==null&&<> · {usd(amountCents*10000)}</>}</Button>{(config.paymentsMode==='demo'||config.paymentsTestMode)&&<p className="payment-disclosure"><ShieldCheck size={14}/>{t(config.paymentsTestMode?'stripeTestPaymentBody':'testPaymentBody')}</p>}{!paymentsAvailable&&!user?.payment_review&&<p className="form-error">{t('paymentUnavailable')}</p>}</section></div><section className="panel ledger-panel"><div className="panel-heading"><h2>{t('transactionHistory')}</h2><Wallet size={18}/></div>{loading?<Loading/>:error?<ErrorState error={error} retry={refresh}/>:data?.ledger.length?<div className="ledger-list">{data.ledger.map((item:any)=><div key={item.id} className="ledger-row"><span className={`ledger-icon ${item.amount_micros>0?'positive':''}`}>{item.amount_micros>0?<ArrowDownLeft size={19}/>:<ArrowOut size={19}/>}</span><div><strong>{t(kind(item.kind))}</strong><p>{item.kind==='activation'?t('passNoMonthly'):item.kind==='funding'?t('walletNote'):item.description}</p></div><time>{new Date(item.created_at.replace(' ','T')+'Z').toLocaleDateString()}</time><strong className={item.amount_micros>0?'green-text':''}>{item.kind==='activation'?(Number.isSafeInteger(item.payment_amount_cents)&&item.payment_currency==='hkd'?`HK$${(item.payment_amount_cents/100).toFixed(2)}`:t('dramioPass')):`${item.amount_micros>0?'+':''}${usd(item.amount_micros)}`}</strong></div>)}</div>:<Empty title={t('noTransactions')} icon="film"/>}</section></div>;
+  const kind=(s:string):Key=>({funding:'addFunds',funding_bonus:'walletRewardLedgerTitle',unlock:'unlock',earning:'earnings',activation:'dramioPass',withdrawal:'requestPayout',withdrawal_refund:'requestPayout'}[s] as Key)||'transactionHistory';
+  return <div className="page wallet-page">
+    <PageTitle eyebrow={t('account')} title={t('wallet')} description={t('walletBody')}/><PaymentReviewNotice/>
+    {returnTo&&<Link to={safeNext(returnTo)} className="back-link"><ArrowRight size={16}/>{t('continueWatching')}</Link>}
+    <div className="wallet-grid">
+      <section className="balance-card"><div className="balance-card-header"><Wallet size={25}/><span>USD</span></div><span>{t('balance')}</span><strong>{usd(user?.wallet_micros||0)}</strong><p>{t('walletNote')}</p><div className="balance-card-bottom"><span><ShieldCheck size={14}/>{t('setYourPrice')}</span><span>LingYing</span></div><div className="balance-decoration"/></section>
+      <section className="panel topup-panel">
+        <h2>{t('addFunds')}</h2><p id="wallet-amount-hint">{fundingMessage('walletFundingHint')}</p>
+        <div className="amount-options wallet-funding-options">{presets.map(cents=>{const bonus=bonusFor(cents);return <button type="button" className={amountCents===cents?'active':''} aria-pressed={amountCents===cents} aria-label={presetLabel(cents,bonus)} key={cents} onClick={()=>setAmount((cents/100).toFixed(2))}>
+          <span className="funding-option-amount">US${cents/100}{amountCents===cents&&<Check size={12} aria-hidden="true"/>}</span>
+          {bonus>0&&<small className="funding-option-gift"><Gift size={14} aria-hidden="true"/>{t('walletRewardGift').replace('{bonus}',usd(bonus*10000))}</small>}
+        </button>;})}</div>
+        <label className="field">{t('amount')} (USD)<div className="money-input"><span>US$</span><input type="text" inputMode="decimal" autoComplete="off" value={amount} onChange={e=>setAmount(e.target.value)} aria-label={t('amount')} aria-describedby={amountDescription} aria-invalid={!!amountError} placeholder="10.00" maxLength={20}/></div></label>
+        {amountError&&<p id="wallet-amount-error" className="form-error" role="alert">{amountError}</p>}
+        {selectedQuote&&<FundingReward quote={selectedQuote} noteId="wallet-reward-note"/>}
+        <Button className="button primary wide" busy={busy} disabled={!validAmount||!paymentsAvailable} onClick={topUp}><Plus size={17}/>{t('addFunds')}{amountCents!==null&&<> · {usd(amountCents*10000)}</>}</Button>
+        {(config.paymentsMode==='demo'||config.paymentsTestMode)&&<p className="payment-disclosure"><ShieldCheck size={14}/>{t(config.paymentsTestMode?'stripeTestPaymentBody':'testPaymentBody')}</p>}
+        {!paymentsAvailable&&!user?.payment_review&&<p className="form-error">{t('paymentUnavailable')}</p>}
+      </section>
+    </div>
+    <section className="panel ledger-panel"><div className="panel-heading"><h2>{t('transactionHistory')}</h2><Wallet size={18}/></div>{loading?<Loading/>:error?<ErrorState error={error} retry={refresh}/>:data?.ledger.length?<div className="ledger-list">{data.ledger.map((item:any)=><div key={item.id} className="ledger-row">
+      <span className={`ledger-icon ${item.kind==='funding_bonus'?'funding-bonus':item.amount_micros>0?'positive':''}`}>{item.kind==='funding_bonus'?<Gift size={19} aria-hidden="true"/>:item.amount_micros>0?<ArrowDownLeft size={19}/>:<ArrowOut size={19}/>}</span>
+      <div><strong>{t(kind(item.kind))}</strong><p>{item.kind==='activation'?t('passNoMonthly'):item.kind==='funding'?t('walletNote'):item.kind==='funding_bonus'?t('walletRewardLedgerBody'):item.description}</p></div>
+      <time>{new Date(item.created_at.replace(' ','T')+'Z').toLocaleDateString()}</time><strong className={item.amount_micros>0?'green-text':''}>{item.kind==='activation'?(Number.isSafeInteger(item.payment_amount_cents)&&item.payment_currency==='hkd'?`HK$${(item.payment_amount_cents/100).toFixed(2)}`:t('dramioPass')):`${item.amount_micros>0?'+':''}${usd(item.amount_micros)}`}</strong>
+    </div>)}</div>:<Empty title={t('noTransactions')} icon="film"/>}</section>
+  </div>;
 }
 export function Account(){return <AuthGate><AccountContent/></AuthGate>;}
 function EmailVerificationPanel(){
