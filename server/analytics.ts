@@ -3,13 +3,19 @@ import {one,all,run,transaction} from './db.js';
 import {assert} from './errors.js';
 import {config} from './config.js';
 import {purchaseTable,usingTestPaymentState} from './payment-state.js';
-import {seriesIsTakenDown} from './moderation.js';
+import {publicSeriesAllowedSql} from './moderation.js';
 import type {AnalyticsMetrics,AnalyticsRange,AnalyticsRangeInput,PlaybackReceipt,SeriesAnalytics} from '../shared/analytics.js';
 
 const DAY=86_400_000,SESSION_WINDOW=30*60_000,MAX_HEARTBEAT_MS=15_000;
 interface PlaybackSession {id:string;episode_id:string;viewer_key:string;started_at_ms:number;last_seen_ms:number;watched_ms:number;reported_ms:number;counted_view:number;qualified_at_ms:number|null}
 const receipt=(session:PlaybackSession):PlaybackReceipt=>({sessionId:session.id,watchedMs:session.watched_ms,reportedMs:session.reported_ms,viewCounted:session.counted_view===1});
 const validViewer=(viewerKey:string)=>assert(/^[a-f0-9]{64}$/.test(viewerKey),400,'INVALID_VIEWER','Playback requires a valid viewer identity.');
+// HTTP routes enforce publication and entitlement before recording. Retain
+// internal draft-fixture support while stopping hidden/deleted/moderated data.
+function assertSeriesRecordable(seriesId:string){
+  const series=one(`SELECT s.status FROM series s WHERE s.id=? AND ${publicSeriesAllowedSql('s')}`,seriesId);
+  assert(series&&(series.status==='published'||series.status==='draft'),404,'NOT_FOUND','Series not found.');
+}
 
 // A durable window makes browser reloads, byte-range fetches and runtime restarts
 // unable to count another view for the same viewer and episode within 30 minutes.
@@ -17,7 +23,7 @@ export function startPlayback(episodeId:string,viewerKey:string,now=Date.now()):
   validViewer(viewerKey);
   return transaction(()=>{
     const episode=one<{series_id:string}>('SELECT series_id FROM episodes WHERE id=?',episodeId);
-    assert(episode&&!seriesIsTakenDown(episode.series_id),404,'NOT_FOUND','Episode not found.');
+    assert(episode,404,'NOT_FOUND','Episode not found.');assertSeriesRecordable(episode.series_id);
     const existing=one<PlaybackSession>('SELECT * FROM playback_sessions WHERE episode_id=? AND viewer_key=? AND started_at_ms>? ORDER BY started_at_ms DESC LIMIT 1',episodeId,viewerKey,now-SESSION_WINDOW);
     if(existing){run('UPDATE playback_sessions SET last_seen_ms=? WHERE id=?',now,existing.id);return receipt(existing);}
     const id=crypto.randomUUID();
@@ -36,7 +42,7 @@ export function recordPlayback(sessionId:string,viewerKey:string,cumulativeWatch
   return transaction(()=>{
     const session=one<PlaybackSession&{duration:number;series_id:string}>('SELECT p.*,e.duration,e.series_id FROM playback_sessions p JOIN episodes e ON e.id=p.episode_id WHERE p.id=? AND p.viewer_key=?',sessionId,viewerKey);
     assert(session,404,'NOT_FOUND','Playback session not found.');
-    assert(!seriesIsTakenDown(session.series_id),404,'NOT_FOUND','Playback session not found.');
+    assertSeriesRecordable(session.series_id);
     assert(now-session.started_at_ms<=SESSION_WINDOW,409,'PLAYBACK_EXPIRED','Restart playback to continue recording viewing activity.');
     const requested=Math.max(0,cumulativeWatchedMs-Math.max(session.reported_ms,session.watched_ms));
     const increase=Math.min(requested,Math.max(0,now-session.last_seen_ms),MAX_HEARTBEAT_MS);
@@ -76,7 +82,7 @@ function viewMetrics(row:Record<string,any>|undefined):Pick<AnalyticsMetrics,'vi
 
 export function readSeriesAnalytics(creatorId:string,seriesId:string,input:AnalyticsRangeInput={},now=Date.now()):SeriesAnalytics {
   const series=one<{id:string;title:string;creator_id:string}>('SELECT id,title,creator_id FROM series WHERE id=?',seriesId);
-  assert(series,404,'NOT_FOUND','Series not found.');
+  assert(series&&!one('SELECT 1 FROM series_deletions WHERE series_id=?',seriesId),404,'NOT_FOUND','Series not found.');
   assert(series.creator_id===creatorId,403,'FORBIDDEN','These statistics belong to another publisher.');
   const table=purchaseTable();
   const first=one<{at_ms:number|null}>(`SELECT MIN(at_ms) AS at_ms FROM (

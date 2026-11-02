@@ -3,7 +3,7 @@ import {mkdir,readFile,writeFile} from 'node:fs/promises';
 const root=process.cwd();
 const destination=path.join(root,'dist/cloudflare/server');await mkdir(destination,{recursive:true});
 const adapters=['db','config','storage','uploads','background'];
-for(const name of ['app','auth','owner','moderation','taxonomy','origins','google','apple','email-auth','mail','finance','promotions','payment-state','payment-risk','stripe-event-context','stripe-readiness','analytics','errors']){
+for(const name of ['app','auth','owner','series-lifecycle','moderation','taxonomy','origins','google','apple','email-auth','mail','finance','promotions','payment-state','payment-risk','stripe-event-context','stripe-readiness','analytics','errors']){
   let code=await readFile(path.join(root,'server',`${name}.ts`),'utf8');
   for(const adapter of adapters)code=code.replaceAll(`'./${adapter}.js'`,`'../../../cloudflare/${adapter}'`);
   code=code.replaceAll("'../shared/","'../../../shared/");

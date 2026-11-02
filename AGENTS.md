@@ -69,6 +69,14 @@ Use the existing secure `CLOUDFLARE_API_TOKEN` binding against `api.cloudflare.c
 
 Account records and financial transactions live in the SQLite-backed Durable Object; publisher media lives in private R2. Those records are not Git source and must not be deleted, reseeded, or included in a commit. Keep the existing migration history and use additive schema changes unless the user explicitly authorizes a data migration.
 
+## Creator series visibility and permanent deletion
+
+Creators can archive a published series to hide it and republish it while retaining its first-publication date, analytics and paid entitlements. Hidden content must be unavailable through public routes even to its owner or paid viewers; owner-only Studio preview is separate and does not count views. Administrative takedowns continue to prevent creator bypasses.
+
+Permanent series deletion requires the server's actor-bound, expiring content confirmation, exact current title and explicit acknowledgement. Preserve the fresh impact summary, including distinct affected buyers across both financial partitions and separate live/test counts. Check financial holds across both partitions because media is shared; never mutate the selected payment mode to check a hold. Deleted content is excluded from all public, Studio, administrator preview and moderation-restore paths. Keep financial purchase/ledger and moderation audit history through inaccessible minimal tombstones; do not automatically refund, reverse earnings or erase accounting records.
+
+Persist private-media cleanup before committing deletion, retry with bounded Durable Object alarms, and release quota exactly once after object removal. Preserve late-upload compensation, temporary-file cleanup and shared sample assets. A cleanup failure after commit must report deletion success with cleanup pending. Tests and read-only release verification do not authorize deleting or hiding real production content. See [series lifecycle](docs/SERIES_LIFECYCLE.md).
+
 ## Administrator identity and upload display
 
 Preserve `PLATFORM_OWNER_USER_ID`, `OFFICIAL_CREATOR_NAME` and `PLATFORM_ADMIN_EMAIL_SHA256` on the existing main Worker. The immutable owner UUID receives audited admin access. The email hash is an additional trusted selector: it grants the matching authenticated account admin access only after a current server email-verification record or matching signed Google identity proves the current stored email. Do not grant roles from an unverified registration address, display name, request body or frontend email comparison. Keep personal administrator email addresses out of public source; use the configured normalized hash. Role changes are audited and never create a session, paid Pass, balance, quota or financial transaction.

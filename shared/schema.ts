@@ -66,6 +66,23 @@ CREATE TABLE IF NOT EXISTS series_moderation_events (
 );
 CREATE INDEX IF NOT EXISTS series_moderation_visibility ON series_moderation(taken_down,series_id);
 CREATE INDEX IF NOT EXISTS series_moderation_audit ON series_moderation_events(series_id,created_at);
+CREATE TABLE IF NOT EXISTS series_deletions (
+ series_id TEXT PRIMARY KEY REFERENCES series(id), creator_id TEXT NOT NULL REFERENCES users(id),
+ actor_id TEXT NOT NULL REFERENCES users(id), summary_json TEXT NOT NULL,
+ deleted_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS series_deletion_confirmations (
+ token_hash TEXT PRIMARY KEY, series_id TEXT NOT NULL REFERENCES series(id), actor_id TEXT NOT NULL REFERENCES users(id),
+ content_hash TEXT NOT NULL, expires_at_ms INTEGER NOT NULL, created_at_ms INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS series_deletion_confirmation_subject ON series_deletion_confirmations(series_id,actor_id);
+CREATE TABLE IF NOT EXISTS series_media_deletions (
+ series_id TEXT NOT NULL REFERENCES series(id), creator_id TEXT NOT NULL REFERENCES users(id), object_key TEXT NOT NULL,
+ bytes INTEGER NOT NULL CHECK(bytes>=0), status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','done')),
+ attempts INTEGER NOT NULL DEFAULT 0, attempted_at_ms INTEGER, completed_at TEXT,
+ PRIMARY KEY(series_id,object_key)
+);
+CREATE INDEX IF NOT EXISTS series_media_deletions_pending ON series_media_deletions(status,attempted_at_ms);
 CREATE TABLE IF NOT EXISTS purchases (
  id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), episode_id TEXT NOT NULL REFERENCES episodes(id),
  price_micros INTEGER NOT NULL, creator_micros INTEGER NOT NULL, platform_micros INTEGER NOT NULL,

@@ -21,6 +21,8 @@ import {ensureStripeWebhookReady,stripeWebhookReadiness} from './stripe-readines
 import {runWithVerifiedStripeEventContext,type VerifiedStripeEventContext} from './stripe-event-context.js';
 import { paymentTable,purchaseTable,ledgerTable,hasEpisodePurchase,usingTestPaymentState } from './payment-state.js';
 import { startPlayback,recordPlayback,readSeriesAnalytics } from './analytics.js';
+import {isSeriesDeleted,previewSeriesDeletion,deleteSeriesPermanently,cleanupSeriesMedia,queueUnreferencedSeriesMedia,assertSeriesLifecycleFinancialClear} from './series-lifecycle.js';
+import {finishInBackground,scheduleMediaCleanup} from './background.js';
 import { LANGUAGES, GENRES, MAX_EPISODE_BYTES, DEFAULT_QUOTA_BYTES,MIN_WALLET_FUNDING_CENTS,MAX_WALLET_FUNDING_CENTS } from '../shared/config.js';
 import {SERIES_LIMITS} from '../shared/series-validation.js';
 import {STANDARD_GENRES,STORY_THEMES,SERIES_FORMATS,CREATION_TYPES} from '../shared/taxonomy.js';
@@ -37,7 +39,7 @@ const seriesSchema = z.object({ title: z.string().trim().min(SERIES_LIMITS.title
 });
 function ownSeries(req: Request, seriesId = id(req)) {
   const s = one('SELECT * FROM series WHERE id=?', seriesId);
-  assert(s, 404, 'NOT_FOUND', 'Series not found.'); assert(s.creator_id === req.user!.id || req.user!.role==='admin', 403, 'FORBIDDEN', 'This series belongs to another publisher.'); return s;
+  assert(s&&!isSeriesDeleted(seriesId), 404, 'NOT_FOUND', 'Series not found.'); assert(s.creator_id === req.user!.id || req.user!.role==='admin', 403, 'FORBIDDEN', 'This series belongs to another publisher.'); return s;
 }
 function writableSeries(req:Request,seriesId=id(req)){
   const s=ownSeries(req,seriesId);if(req.user!.role!=='admin')assertSeriesWritable(seriesId);return s;
@@ -73,6 +75,7 @@ function playbackViewer(req:Request,res:Response,create=false):string|undefined 
 
 export function createApp() {
   ensurePlatformOwnerAccess();
+  if(one("SELECT 1 FROM series_media_deletions WHERE status='pending' LIMIT 1"))void finishInBackground(scheduleMediaCleanup()).catch(()=>{});
   const app = express();
   app.disable('x-powered-by');
   if (process.env.TRUST_PROXY === 'true') app.set('trust proxy', 1);
@@ -278,9 +281,17 @@ export function createApp() {
     res.json({ paid:session.payment_status==='paid',user:getUser(req.user!.id) });
   });
   app.get('/api/studio', requireAuth, (req,res) => {
-    const user=req.user!;res.json({ user:getUser(user.id),series:all(`${catalogSelect} WHERE s.creator_id=? ORDER BY s.created_at DESC`,user.id).map(s=>serializeSeries(s,user.id,true)),
+    const user=req.user!;void finishInBackground(cleanupSeriesMedia(undefined,20)).catch(()=>{});res.json({ user:getUser(user.id),series:all(`${catalogSelect} WHERE s.creator_id=? AND NOT EXISTS (SELECT 1 FROM series_deletions d WHERE d.series_id=s.id) ORDER BY s.created_at DESC`,user.id).map(s=>serializeSeries(s,user.id,true)),
       stats:one(`SELECT COUNT(*) AS sales,COALESCE(SUM(p.creator_micros),0) AS lifetime_micros FROM ${purchaseTable()} p JOIN episodes e ON e.id=p.episode_id JOIN series s ON s.id=e.series_id WHERE s.creator_id=?`,user.id),
       withdrawals:stripeTestPayments()?[]:all('SELECT * FROM withdrawals WHERE user_id=? ORDER BY created_at DESC',user.id), storageRequests:all('SELECT * FROM storage_requests WHERE user_id=? ORDER BY created_at DESC',user.id) });
+  });
+  app.get('/api/studio/series/:id/lifecycle',requireAuth,rateLimit('series-delete-preview',30,60_000),(req,res)=>{
+    ownSeries(req);res.setHeader('Cache-Control','private, no-store');res.json(previewSeriesDeletion(req.user!.id,id(req)));
+  });
+  app.delete('/api/studio/series/:id',requireAuth,rateLimit('series-delete',20,60_000),async(req,res)=>{
+    const target=ownSeries(req);const body=z.object({confirmation_token:z.string().max(200),confirm_title:z.string().max(120),acknowledge:z.boolean()}).strict().parse(req.body);
+    const result=await deleteSeriesPermanently(req.user!.id,id(req),body);
+    try{res.json({...result,user:getUser(req.user!.id),owner_storage:ownerStorage(target)});}catch{res.json({...result,cleanup_pending:true});}
   });
   app.get('/api/studio/series/:id',requireAuth,(req,res)=>{
     ownSeries(req);const s=one(`${catalogSelect} WHERE s.id=?`,id(req))!;
@@ -290,6 +301,10 @@ export function createApp() {
   app.get('/api/studio/series/:id/cover',requireAuth,async(req,res)=>{
     const s=ownSeries(req);assert(s.cover_key,404,'NOT_FOUND','Cover not found.');res.setHeader('Cache-Control','private, no-store');
     if(s.cover_key.startsWith('public:')){res.redirect(s.cover_key.slice(7));return;}await serveObject(s.cover_key,req,res,'image/webp');
+  });
+  app.get('/api/studio/episodes/:id/stream',requireAuth,async(req,res)=>{
+    const episode=episodeRow(id(req));assert(episode,404,'NOT_FOUND','Episode not found.');const series=ownSeries(req,episode.series_id);if(req.user!.role!=='admin')assertSeriesWritable(series.id);
+    res.setHeader('Cache-Control','private, no-store');await serveObject(episode.storage_key,req,res,'video/mp4');
   });
   app.get('/api/studio/series/:id/analytics',requirePublisher,(req,res)=>{
     const s=ownSeries(req);
@@ -314,27 +329,29 @@ export function createApp() {
     });res.json({ok:true});
   });
   app.post('/api/studio/series/:id/cover', requirePublisher, (req,_res,next)=>{assert(!config.sandbox,403,'SANDBOX_UPLOAD_DISABLED','Uploads are disabled on the payment-test site. Use its sample episodes to test wallet purchases.');const s=writableSeries(req);assertPaymentAccountClear(s.creator_id);next();}, coverUpload.single('cover'), async (req,res) => {
-    assert(req.file,400,'FILE_REQUIRED','Choose a cover image.'); let processed: {path:string;bytes:number}|undefined;const key=`covers/${crypto.randomUUID()}.webp`;let saved=false;
+    assert(req.file,400,'FILE_REQUIRED','Choose a cover image.');let coverOwnerId=req.user!.id;let processed: {path:string;bytes:number}|undefined;const key=`covers/${crypto.randomUUID()}.webp`;let saved=false;
     try {
-      processed=await prepareCover(req.file.path);await putObject(processed.path,key,'image/webp');saved=true;
+      coverOwnerId=ownSeries(req).creator_id;
+      processed=await prepareCover(req.file.path);saved=true;await putObject(processed.path,key,'image/webp');
       const old=transaction(()=>{const s=writableSeries(req);assertPaymentAccountClear(s.creator_id);const u=ownerStorage(s);assert(u.used_bytes-s.cover_bytes+processed!.bytes<=u.quota_bytes,413,'QUOTA_EXCEEDED','This cover exceeds your storage allowance.');run('UPDATE users SET used_bytes=used_bytes-?+? WHERE id=?',s.cover_bytes,processed!.bytes,s.creator_id);run('UPDATE series SET cover_key=?,cover_bytes=? WHERE id=?',key,processed!.bytes,s.id);return s.cover_key;});
       saved=false;
-      if(old)deleteObject(old).catch(error=>console.error('Old cover cleanup failed',error));res.json({cover:apiUrl(`/api/studio/series/${id(req)}/cover`),user:getUser(req.user!.id),owner_storage:ownerStorage(ownSeries(req))});
-    } catch(error) { if(saved)await deleteObject(key);throw error; }
+      if(old)void finishInBackground(queueUnreferencedSeriesMedia(id(req),coverOwnerId,old)).catch(()=>console.warn('Old cover cleanup remains pending.'));res.json({cover:apiUrl(`/api/studio/series/${id(req)}/cover`),user:getUser(req.user!.id),owner_storage:ownerStorage(ownSeries(req))});
+    } catch(error) { if(saved)try{await queueUnreferencedSeriesMedia(id(req),coverOwnerId,key);}catch{console.warn('Uncommitted cover cleanup could not be queued.');}throw error; }
     finally {await removeTempFile(req.file.path);if(processed)await removeTempFile(processed.path);}
   });
   app.post('/api/studio/series/:id/episodes', requirePublisher, rateLimit('upload',60,60_000), (req,_res,next)=>{assert(!config.sandbox,403,'SANDBOX_UPLOAD_DISABLED','Uploads are disabled on the payment-test site. Use its sample episodes to test wallet purchases.');const s=writableSeries(req);assertPaymentAccountClear(s.creator_id);next();}, upload.single('video'), async (req,res) => {
-    assert(req.file,400,'FILE_REQUIRED','Choose an episode video.');const target=writableSeries(req);let processed:{path:string;bytes:number;duration:number}|undefined;const key=`videos/${target.creator_id}/${crypto.randomUUID()}.mp4`;let saved=false;
+    assert(req.file,400,'FILE_REQUIRED','Choose an episode video.');let target:ReturnType<typeof writableSeries>|undefined;let processed:{path:string;bytes:number;duration:number}|undefined;let key='';let saved=false;
     try {
+      target=writableSeries(req);key=`videos/${target.creator_id}/${crypto.randomUUID()}.mp4`;
       const body=z.object({title:z.string().trim().min(1).max(120),number:z.coerce.number().int().min(1).max(1000)}).parse(req.body);
       assert(!one('SELECT id FROM episodes WHERE series_id=? AND number=?',id(req),body.number),409,'EPISODE_EXISTS','An episode with this number already exists.');
       const u=ownerStorage(target);assert(u.used_bytes+req.file.size<=u.quota_bytes,413,'QUOTA_EXCEEDED','Not enough storage. Request an increase from your studio.');
-      processed=await prepareVideo(req.file.path);await putObject(processed.path,key,'video/mp4');saved=true;
+      processed=await prepareVideo(req.file.path);saved=true;await putObject(processed.path,key,'video/mp4');
       const episodeId=transaction(()=>{const s=writableSeries(req);assertPaymentAccountClear(s.creator_id);const user=ownerStorage(s);assert(user.used_bytes+processed!.bytes<=user.quota_bytes,413,'QUOTA_EXCEEDED','Not enough storage. Request an increase.');
         assert(!one('SELECT id FROM episodes WHERE series_id=? AND number=?',id(req),body.number),409,'EPISODE_EXISTS','An episode with this number already exists.');
         const eid=crypto.randomUUID();run('INSERT INTO episodes (id,series_id,title,number,duration,bytes,storage_key,original_name) VALUES (?,?,?,?,?,?,?,?)',eid,id(req),body.title,body.number,processed!.duration,processed!.bytes,key,req.file!.originalname.slice(0,255));run('UPDATE users SET used_bytes=used_bytes+? WHERE id=?',processed!.bytes,s.creator_id);return eid;});
-      res.status(201).json({id:episodeId,user:getUser(req.user!.id),owner_storage:ownerStorage(target),duration:processed.duration,bytes:processed.bytes});
-    }catch(error){if(saved)await deleteObject(key);throw error;}
+      saved=false;res.status(201).json({id:episodeId,user:getUser(req.user!.id),owner_storage:ownerStorage(target),duration:processed.duration,bytes:processed.bytes});
+    }catch(error){if(saved&&target)try{await queueUnreferencedSeriesMedia(id(req),target.creator_id,key);}catch{console.warn('Uncommitted episode cleanup could not be queued.');}throw error;}
     finally{await removeTempFile(req.file.path);if(processed)await removeTempFile(processed.path);}
   });
   app.patch('/api/studio/episodes/:id', requirePublisher, (req,res) => {
@@ -347,10 +364,13 @@ export function createApp() {
     await deleteObject(e.storage_key);res.json({ok:true,user:getUser(req.user!.id),owner_storage:ownerStorage(e)});
   });
   app.post('/api/studio/series/:id/status', requirePublisher, (req,res) => {
-    const s=ownSeries(req);assertSeriesWritable(s.id);assertPaymentAccountClear(s.creator_id);const {status}=z.object({status:z.enum(['draft','published','archived'])}).parse(req.body);
+    const s=ownSeries(req);assertSeriesWritable(s.id);assertPaymentAccountClear(s.creator_id);const {status}=z.object({status:z.enum(['draft','published','archived'])}).parse(req.body);if(status!=='published')assertSeriesLifecycleFinancialClear(req.user!.id,s.creator_id);
     if(status==='published'){assert(s.cover_key,400,'COVER_REQUIRED','Add a cover before publishing.');assert(one('SELECT id FROM episodes WHERE series_id=?',s.id),400,'EPISODES_REQUIRED','Upload at least one episode before publishing.');}
-    if(status!=='published')assert(!one('SELECT p.id FROM purchases p JOIN episodes e ON e.id=p.episode_id WHERE e.series_id=? UNION ALL SELECT p.id FROM test_purchases p JOIN episodes e ON e.id=p.episode_id WHERE e.series_id=? LIMIT 1',s.id,s.id),409,'HAS_PURCHASES','This series has paid viewers. Contact support before removing access.');
+    if(status==='draft')assert(!one('SELECT p.id FROM purchases p JOIN episodes e ON e.id=p.episode_id WHERE e.series_id=? UNION ALL SELECT p.id FROM test_purchases p JOIN episodes e ON e.id=p.episode_id WHERE e.series_id=? LIMIT 1',s.id,s.id),409,'HAS_PURCHASES','This series has paid viewers. Contact support before removing access.');
     transaction(()=>{
+      // Older published rows predate the publication ledger. Preserve their
+      // original listing date before a reversible hide changes their status.
+      if(s.status==='published')run('INSERT OR IGNORE INTO series_publications (series_id,published_at) VALUES (?,?)',s.id,s.created_at);
       if(status==='published')run('INSERT OR IGNORE INTO series_publications (series_id,published_at) VALUES (?,?)',s.id,s.status==='published'?s.created_at:new Date().toISOString());
       run('UPDATE series SET status=? WHERE id=?',status,s.id);
     });res.json({ok:true});
@@ -387,7 +407,7 @@ export function createApp() {
     res.json(setSeriesModeration(req.user!.id,id(req),body.action,body.reason));
   });
   app.get('/api/admin/episodes/:id/stream',requireAdmin,async(req,res)=>{
-    const episode=episodeRow(id(req));assert(episode,404,'NOT_FOUND','Episode not found.');
+    const episode=episodeRow(id(req));assert(episode&&!isSeriesDeleted(episode.series_id),404,'NOT_FOUND','Episode not found.');
     // Reviewing private media creates no purchase, playback session or counted view.
     await serveObject(episode.storage_key,req,res,'video/mp4');
   });

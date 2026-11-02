@@ -8,6 +8,7 @@ import {z} from 'zod';
 import {createApp,errorHandler} from '../dist/cloudflare/server/app';
 import {hashPassword,rateLimit} from '../dist/cloudflare/server/auth';
 import {configureStripe} from '../dist/cloudflare/server/finance';
+import {cleanupSeriesMedia} from '../dist/cloudflare/server/series-lifecycle';
 import {AppError,assert} from '../server/errors';
 import {bindRuntime,type Env} from './runtime';
 import {configure,config} from './config';
@@ -37,6 +38,12 @@ export class AIDramioApp {
       app.use((req,_res,next)=>{const address=req.headers['cf-connecting-ip'];if(typeof address==='string')Object.defineProperty(req,'ip',{value:address,configurable:true});next();});
       app.use(createApp());app.use(errorHandler);createServer(app).listen(8080);listening=true;
     }
+  }
+  async alarm(){
+    bindRuntime(this.ctx.storage,this.env,p=>this.ctx.waitUntil(p));
+    // A failed private-object deletion remains durable and continues retrying
+    // even when the creator closes the browser or this object is evicted.
+    await cleanupSeriesMedia(undefined,40);
   }
   private seedCatalogue(){transaction(()=>{
     const creator='catalog-publisher';run("INSERT INTO users (id,email,name,password_hash,role) VALUES (?,?,?,?, 'publisher')",creator,'catalog@aidramio.invalid','Studio Afterglow',randomBytes(64).toString('hex'));

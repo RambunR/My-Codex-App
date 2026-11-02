@@ -273,6 +273,105 @@ try{
   assert.deepEqual(await moderationFinance(),beforeModerationFinance);
   console.log('PASS: Cloudflare SQL moderation hides purchased content, preserves private admin review and audit history, blocks publisher republication, and restores access without changing money.');
 
+  const beforeHideFinance=await moderationFinance();
+  const beforeHideAnalytics=(await request(`/api/studio/series/${sid}/analytics?period=7d`,undefined,publisher)).data;
+  await request(`/api/studio/series/${sid}/status`,{status:'archived'},publisher);
+  assert.equal((await request(newestPath)).data.series.some(series=>series.id===sid),false);
+  for(const identity of ['',viewer,publisher,admin]){
+    await request(`/api/series/${sid}`,undefined,identity,404);
+    await request(`/api/series/${sid}/cover`,undefined,identity,404);
+    await request(`/api/episodes/${first.id}/stream`,undefined,identity,404);
+    await request(`/api/episodes/${second.id}/stream`,undefined,identity,404);
+  }
+  await request(`/api/episodes/${second.id}/unlock`,{},viewer,404);
+  await request(`/api/episodes/${first.id}/playback`,{},guestPlayback.cookie,404);
+  await request(`/api/playback/${guestPlayback.data.sessionId}`,{watchedMs:3300},guestPlayback.cookie,404,'PUT');
+  await request(`/api/series/${sid}/like`,{liked:true},viewer,404,'PUT');
+  const hiddenEditor=(await request(`/api/studio/series/${sid}`,undefined,publisher)).data;
+  assert.equal(hiddenEditor.series.status,'archived');assert.equal(hiddenEditor.episodes.length,2);
+  const hiddenOwnerPreview=await fetch(base+`/api/studio/episodes/${second.id}/stream`,{headers:{Cookie:publisher,Range:'bytes=0-15'}});
+  assert.equal(hiddenOwnerPreview.status,206);assert.equal(hiddenOwnerPreview.headers.get('cache-control'),'private, no-store');assert.equal((await hiddenOwnerPreview.arrayBuffer()).byteLength,16);
+  assert.deepEqual((await request(`/api/studio/series/${sid}/analytics?period=7d`,undefined,publisher)).data,beforeHideAnalytics);
+  assert.deepEqual(await moderationFinance(),beforeHideFinance);
+  await request(`/api/studio/series/${sid}/status`,{status:'published'},publisher);
+  assert.equal((await request(newestPath)).data.series[0].published_at,publishedAt);
+  assert.equal((await request(`/api/series/${sid}`,undefined,viewer)).data.episodes.find(episode=>episode.id===second.id).unlocked,true);
+  assert.deepEqual((await request(`/api/studio/series/${sid}/analytics?period=7d`,undefined,publisher)).data,beforeHideAnalytics);
+  assert.deepEqual(await moderationFinance(),beforeHideFinance);
+  console.log('PASS: creator hide/show denies owner and purchaser public URLs, retains private R2 preview, publication date, purchases, analytics and money.');
+
+  // Keep the main drama intact for restart checks. This separate paid upload
+  // exercises irreversible deletion only inside the local SQL/R2 emulator.
+  const deletionBody={title:'Disposable Cloudflare Lifecycle Drama',description:'A private local upload removed permanently after an exact paid-access confirmation.',language:'en',genres:['drama'],themes:[],format:'live-action',creation_type:'human',price_cents:10,free_episodes:0};
+  const disposableId=(await request('/api/studio/series',deletionBody,publisher,201)).data.id;
+  const disposablePath=`/api/studio/series/${disposableId}`;
+  await upload(disposablePath+'/cover',cover,'disposable-cover.jpg',publisher,{},'cover',200);
+  const disposableEpisode=await upload(disposablePath+'/episodes',video,'Disposable 01.mp4',publisher,{title:'Disposable paid episode',number:1});
+  await request(disposablePath+'/status',{status:'published'},publisher);
+  const disposableBytes=cover.length+video.length;
+  assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.used_bytes,used+disposableBytes);
+  await request(`/api/series/${disposableId}/like`,{liked:true},viewer,200,'PUT');
+  await request(`/api/series/${disposableId}/save`,{},viewer);
+  await request(`/api/episodes/${disposableEpisode.id}/unlock`,{},viewer);
+  await request(`/api/episodes/${disposableEpisode.id}/progress`,{seconds:1},viewer);
+  assert.equal((await request('/api/auth/me',undefined,viewer)).data.user.wallet_micros,4_890_000);
+  assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.earnings_micros,577_000);
+  const beforeDeletionFinance=await moderationFinance();
+  await request(disposablePath+'/lifecycle',undefined,'',401);
+  await request(disposablePath+'/lifecycle',undefined,viewer,403);
+  let deletionPreview=(await request(disposablePath+'/lifecycle',undefined,publisher)).data;
+  assert.equal(deletionPreview.series.id,disposableId);assert.equal(deletionPreview.series.title,deletionBody.title);
+  assert.equal(deletionPreview.summary.episode_count,1);assert.equal(deletionPreview.summary.views,0);assert.equal(deletionPreview.summary.likes,1);
+  assert.equal(deletionPreview.summary.real_paid_unlocks,1);assert.equal(deletionPreview.summary.real_paid_viewers,1);
+  assert.equal(deletionPreview.summary.test_paid_unlocks,0);assert.equal(deletionPreview.summary.test_paid_viewers,0);
+  assert.equal(deletionPreview.summary.affected_paid_viewers,1);assert.equal(deletionPreview.summary.media_bytes,disposableBytes);
+  assert.ok(Date.parse(deletionPreview.expires_at)>Date.now());
+  assert.deepEqual(await moderationFinance(),beforeDeletionFinance,'Deletion preview must not remove content, change balances or consume quota.');
+  const deletionConfirmation=()=>({confirmation_token:deletionPreview.confirmation_token,confirm_title:deletionBody.title,acknowledge:true});
+  await request(disposablePath,deletionConfirmation(),viewer,403,'DELETE');
+  const actorMismatch=await request(disposablePath,deletionConfirmation(),admin,400,'DELETE');assert.equal(actorMismatch.data.error.code,'DELETION_CONFIRMATION_INVALID');
+  const titleMismatch=await request(disposablePath,{...deletionConfirmation(),confirm_title:'Incorrect title'},publisher,400,'DELETE');assert.equal(titleMismatch.data.error.code,'DELETION_TITLE_MISMATCH');
+  const missingAcknowledgement=await request(disposablePath,{...deletionConfirmation(),acknowledge:false},publisher,400,'DELETE');assert.equal(missingAcknowledgement.data.error.code,'DELETION_ACK_REQUIRED');
+  await request(disposablePath,{...deletionBody,description:deletionBody.description+' Updated before confirmation.'},publisher,200,'PATCH');
+  const staleConfirmation=await request(disposablePath,deletionConfirmation(),publisher,409,'DELETE');assert.equal(staleConfirmation.data.error.code,'DELETION_CONFIRMATION_STALE');
+  deletionPreview=(await request(disposablePath+'/lifecycle',undefined,publisher)).data;
+  const deletionResult=(await request(disposablePath,deletionConfirmation(),publisher,200,'DELETE')).data;
+  assert.equal(deletionResult.deleted,true);assert.equal(deletionResult.cleanup_pending,false);assert.equal(deletionResult.released_bytes,disposableBytes);
+  assert.equal(deletionResult.owner_storage.used_bytes,used);
+  const afterDeletionFinance=await moderationFinance();
+  assert.equal(afterDeletionFinance.publisher.balances.used,used);
+  // Storage is released after R2 acknowledges removal; receipts and every
+  // financial value must stay exactly as they were immediately before delete.
+  afterDeletionFinance.publisher.balances.used=beforeDeletionFinance.publisher.balances.used;
+  assert.deepEqual(afterDeletionFinance,beforeDeletionFinance);
+  const assertDisposableDeleted=async()=>{
+    for(const identity of ['',viewer,publisher,admin]){
+      await request(`/api/series/${disposableId}`,undefined,identity,404);
+      await request(`/api/series/${disposableId}/cover`,undefined,identity,404);
+      await request(`/api/episodes/${disposableEpisode.id}/stream`,undefined,identity,404);
+    }
+    for(const identity of [publisher,admin]){
+      await request(disposablePath,undefined,identity,404);
+      await request(disposablePath+'/cover',undefined,identity,404);
+      await request(disposablePath+'/lifecycle',undefined,identity,404);
+      await request(disposablePath+'/analytics?period=all',undefined,identity,404);
+      await request(`/api/studio/episodes/${disposableEpisode.id}/stream`,undefined,identity,404);
+    }
+    await request(`/api/admin/episodes/${disposableEpisode.id}/stream`,undefined,admin,404);
+    await request(`/api/admin/series/${disposableId}/moderation`,{action:'restore',reason:'A permanently deleted local drama cannot be restored.'},admin,404);
+    assert.equal((await request('/api/studio',undefined,publisher)).data.series.some(series=>series.id===disposableId),false);
+    assert.equal((await request('/api/series')).data.series.some(series=>series.id===disposableId),false);
+    assert.equal((await request('/api/series?saved=true',undefined,viewer)).data.series.some(series=>series.id===disposableId),false);
+    assert.equal((await request('/api/history',undefined,viewer)).data.history.some(series=>series.id===disposableId),false);
+    const deletedAdmin=(await request('/api/admin/series?'+new URLSearchParams({q:deletionBody.title,status:'all'}),undefined,admin)).data;
+    assert.equal(deletedAdmin.total,0);
+  };
+  await assertDisposableDeleted();
+  await request(`/api/episodes/${disposableEpisode.id}/unlock`,{},viewer,404);
+  await request(disposablePath,deletionConfirmation(),publisher,404,'DELETE');
+  assert.equal((await request('/api/studio',undefined,publisher)).data.stats.sales,2,'Deletion must retain historical creator sales.');
+  console.log('PASS: permanent paid-series deletion enforces private fresh confirmations, removes R2 media and quota exactly, denies restoration, and retains financial receipts and historical sales.');
+
   await stop();await start(true,true,base,true);
   const missingTest=(await request('/api/config')).data;
   assert.equal(missingTest.paymentsTestMode,true);assert.equal(missingTest.paymentsReady,false);assert.equal(missingTest.paymentsConfigured,false);
@@ -319,8 +418,10 @@ try{
   assert.deepEqual(retainedClassification.themes,body.themes);assert.equal(retainedClassification.format,body.format);
   assert.ok((await request(newestPath)).data.series.some(s=>s.id===sid));
   await request('/api/auth/google/start',undefined,'',503);
-  assert.equal((await request('/api/auth/me',undefined,viewer)).data.user.wallet_micros,4_990_000);
-  assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.earnings_micros,507_000);
+  assert.equal((await request('/api/auth/me',undefined,viewer)).data.user.wallet_micros,4_890_000);
+  assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.earnings_micros,577_000);
+  assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.used_bytes,used);
+  await assertDisposableDeleted();
   const retainedPass=(await request('/api/auth/me',undefined,publisher)).data.user.dramio_pass;assert.equal(retainedPass.active,true);assert.equal(retainedPass.purchased_at,activated.dramio_pass.purchased_at);
   const persisted=await fetch(base+`/api/episodes/${second.id}/stream`,{headers:{Cookie:viewer,Range:'bytes=0-31'}});assert.equal(persisted.status,206);assert.equal((await persisted.arrayBuffer()).byteLength,32);
   await request('/api/payments/checkout',{kind:'funding',amount_cents:500},viewer,503);
