@@ -5,6 +5,6 @@ let cleanupTimer:ReturnType<typeof setTimeout>|undefined;
 /** Restart-safe work is in SQLite; this unref timer only wakes the worker. */
 export async function scheduleMediaCleanup(delayMs=60_000){
   if(cleanupTimer)return;
-  cleanupTimer=setTimeout(async()=>{cleanupTimer=undefined;try{const{cleanupSeriesMedia}=await import('./series-lifecycle.js');await cleanupSeriesMedia(undefined,40);}catch{void scheduleMediaCleanup();}},Math.max(0,delayMs));
+  cleanupTimer=setTimeout(async()=>{cleanupTimer=undefined;try{const{cleanupSeriesMedia}=await import('./series-lifecycle.js');await cleanupSeriesMedia(undefined,20);const{cleanupExpiredEpisodeUploads}=await import('./episode-upload-sessions.js');await cleanupExpiredEpisodeUploads(8);}catch{void scheduleMediaCleanup();}},Math.max(0,delayMs));
   cleanupTimer.unref?.();
 }

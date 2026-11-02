@@ -6,7 +6,7 @@ The owner signs in to the existing account used for the uploaded `test` series. 
 
 Choose **Upload own drama** in Content, or open [New series](https://lingyingdrama.com/studio/new). Save the title, synopsis, spoken language, genres, production method, episode price and free-episode count. Add a cover and choose the episode folder; filename order determines the episode order. Review and publish. The existing post-publication flow opens Explore → Newest with matching filters.
 
-Owner uploads display **LingYingDrama Offical**, exactly as requested. The display alias applies only to the configured owner UUID, including previous and future uploads. It does not replace original author/licence credits, alter the personal profile, transfer series ownership, or rename other publishers. Admins can publish without buying a Pass; this grants no paid Pass, credit or earnings. All episode duration, file size, storage quota and financial review rules remain in force: at most 180 seconds and 75 MiB per episode, with the existing account storage allowance.
+Owner uploads display **LingYingDrama Offical**, exactly as requested. The display alias applies only to the configured owner UUID, including previous and future uploads. It does not replace original author/licence credits, alter the personal profile, transfer series ownership, or rename other publishers. Admins can publish without buying a Pass; this grants no paid Pass, credit or earnings. All episode duration, file size, storage quota and financial review rules remain in force: at most 240 seconds and 200 MiB per episode, with the existing account storage allowance.
 
 ## Review or remove a violation
 

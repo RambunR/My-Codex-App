@@ -5,7 +5,7 @@ import { useApi,apiUrl,apiCrossOrigin,post } from '../api';
 import { useApp } from '../context';
 import { useI18n,languageName,type Key } from '../i18n';
 import { BackLink,Modal,Loading,ErrorState,Button,Avatar } from '../ui';
-import { type Series,type Episode,usd } from '../../shared/config';
+import { type Series,type Episode,usd,MAX_EPISODE_SECONDS } from '../../shared/config';
 import {usePlaybackAnalytics} from '../usePlaybackAnalytics';
 import '../watch-mobile.css';
 
@@ -15,7 +15,7 @@ export function Watch(){
   const ep=data?.episodes.find(e=>e.id===episodeId);const current=data?.episodes.findIndex(e=>e.id===episodeId)??-1;const locked=ep?!ep.free&&!ep.unlocked:true;const next=data?.episodes[current+1];const previous=data?.episodes[current-1];
   usePlaybackAnalytics(videoRef,ep?.id,!!ep&&!locked,user?.id,playRevision);
   useEffect(()=>{setConfirm(false);setVideoError(false);lastSaved.current=0;},[episodeId]);
-  const saveProgress=()=>{const seconds=videoRef.current?.currentTime||0;if(!user||!ep||seconds-lastSaved.current<5)return;lastSaved.current=seconds;post(`/api/episodes/${ep.id}/progress`,{seconds:Math.min(180,seconds)}).catch(()=>{});};
+  const saveProgress=()=>{const seconds=videoRef.current?.currentTime||0;if(!user||!ep||seconds-lastSaved.current<5)return;lastSaved.current=seconds;post(`/api/episodes/${ep.id}/progress`,{seconds:Math.min(MAX_EPISODE_SECONDS,seconds)}).catch(()=>{});};
   const unlock=async()=>{if(!ep)return;setBusy(true);try{const result=await post(`/api/episodes/${ep.id}/unlock`);setUser(result.user);setConfirm(false);toast(t('purchaseSuccess'));refresh();}catch(e){toast((e as Error).message,true);}finally{setBusy(false);}};
   if(loading&&!data)return <Loading/>;if(error)return <ErrorState error={error} retry={refresh}/>;if(!data||!ep)return <ErrorState error={new Error(t('noEpisodes'))}/>;
   const series=data.series;const price=series.price_cents*10000;const insufficient=(user?.wallet_micros||0)<price;

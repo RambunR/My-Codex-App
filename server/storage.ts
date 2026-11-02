@@ -28,7 +28,7 @@ export async function probeVideo(file: string) {
   const metadata = JSON.parse(stdout); const video = metadata.streams?.find((s: any) => s.codec_type === 'video');
   const duration = Number(metadata.format?.duration || video?.duration);
   assert(video && Number.isFinite(duration) && duration > 0, 422, 'INVALID_VIDEO', 'This file does not contain a readable video.');
-  assert(duration <= MAX_EPISODE_SECONDS, 422, 'VIDEO_TOO_LONG', 'Episodes must be 3 minutes or less.');
+  assert(duration <= MAX_EPISODE_SECONDS, 422, 'VIDEO_TOO_LONG', `Episodes must be ${MAX_EPISODE_SECONDS/60} minutes or less.`);
   assert(video.width <= 7680 && video.height <= 7680, 422, 'INVALID_VIDEO', 'Video dimensions are too large.');
   return { duration, width: video.width, height: video.height };
 }

@@ -23,11 +23,13 @@ import { paymentTable,purchaseTable,ledgerTable,hasEpisodePurchase,usingTestPaym
 import { startPlayback,recordPlayback,readSeriesAnalytics } from './analytics.js';
 import {isSeriesDeleted,previewSeriesDeletion,deleteSeriesPermanently,cleanupSeriesMedia,queueUnreferencedSeriesMedia,assertSeriesLifecycleFinancialClear} from './series-lifecycle.js';
 import {finishInBackground,scheduleMediaCleanup} from './background.js';
-import { LANGUAGES, GENRES, MAX_EPISODE_BYTES, DEFAULT_QUOTA_BYTES,MIN_WALLET_FUNDING_CENTS,MAX_WALLET_FUNDING_CENTS } from '../shared/config.js';
+import { LANGUAGES, GENRES, MAX_EPISODE_BYTES, MAX_EPISODE_SECONDS, DEFAULT_QUOTA_BYTES,MIN_WALLET_FUNDING_CENTS,MAX_WALLET_FUNDING_CENTS } from '../shared/config.js';
 import {SERIES_LIMITS} from '../shared/series-validation.js';
 import {STANDARD_GENRES,STORY_THEMES,SERIES_FORMATS,CREATION_TYPES} from '../shared/taxonomy.js';
 import {initializePromotions,adminPromotions,createPromotion,updatePromotion,quotePromotion} from './promotions.js';
 import {themesSchema,formatSchema,seriesClassification,writeSeriesClassification,SERIES_FORMAT_SQL} from './taxonomy.js';
+import {registerEpisodeUploadSessions,chunkedEpisodeUploadsEnabled,EPISODE_UPLOAD_CHUNK_BYTES,reservedEpisodeUploadBytes,cleanupExpiredEpisodeUploads} from './episode-upload-sessions.js';
+import {episodeDurationSql,legacyEpisodeDuration,writeEpisodeDuration} from './episode-duration.js';
 
 const language = z.enum(LANGUAGES.map(x => x.code) as [string, ...string[]]);
 const id = (req: Request, field = 'id') => String(req.params[field] || '');
@@ -61,7 +63,7 @@ function serializeSeries(s: Record<string, any>, userId?: string, privateView=fa
     saved: !!(userId && one('SELECT 1 FROM saves WHERE user_id=? AND series_id=?', userId, s.id)) };
 }
 function canWatch(userId: string | undefined, e: any) { return e.number <= e.free_episodes || e.creator_id === userId || !!(userId && hasEpisodePurchase(userId,e.id)); }
-function episodeRow(episodeId: string) { return one(`SELECT e.*,s.free_episodes,s.creator_id,s.status FROM episodes e JOIN series s ON s.id=e.series_id WHERE e.id=?`, episodeId); }
+function episodeRow(episodeId: string) { return one(`SELECT e.*,${episodeDurationSql('e')} AS duration,s.free_episodes,s.creator_id,s.status FROM episodes e JOIN series s ON s.id=e.series_id WHERE e.id=?`, episodeId); }
 function playbackViewer(req:Request,res:Response,create=false):string|undefined {
   if(req.user)return crypto.createHash('sha256').update('user:'+req.user.id).digest('hex');
   let token=(req.headers.cookie||'').split(';').map(value=>value.trim()).find(value=>value.startsWith('drama_viewer='))?.slice('drama_viewer='.length);
@@ -75,7 +77,7 @@ function playbackViewer(req:Request,res:Response,create=false):string|undefined 
 
 export function createApp() {
   ensurePlatformOwnerAccess();
-  if(one("SELECT 1 FROM series_media_deletions WHERE status='pending' LIMIT 1"))void finishInBackground(scheduleMediaCleanup()).catch(()=>{});
+  if(one("SELECT 1 FROM series_media_deletions WHERE status='pending' LIMIT 1")||one("SELECT 1 FROM episode_upload_sessions WHERE status<>'complete' AND (status<>'cancelled' OR cleanup_pending=1) LIMIT 1"))void finishInBackground(scheduleMediaCleanup()).catch(()=>{});
   const app = express();
   app.disable('x-powered-by');
   if (process.env.TRUST_PROXY === 'true') app.set('trust proxy', 1);
@@ -152,7 +154,7 @@ export function createApp() {
   registerEmailAuth(app);
   app.get('/api/health', (_req,res) => res.json({ ok: true, database: !!one('SELECT 1 AS ready') }));
   app.get('/api/config', async (_req,res) => {initializePromotions();if(config.payments==='stripe'&&stripeConfigured())await ensureStripeWebhookReady(stripe);return res.json({ brand: 'LingYing', languages: LANGUAGES, genres: GENRES,standardGenres:STANDARD_GENRES,storyThemes:STORY_THEMES,formats:SERIES_FORMATS,creationTypes:CREATION_TYPES, passPromotion:{enabled:true},paymentsMode: config.payments,paymentsReady:paymentsReady(),paymentsConfigured:stripeConfigured(),paymentSetup:stripeWebhookReadiness(),sandbox:config.sandbox,paymentsTestMode:stripeTestPayments()||config.payments==='demo',payoutsEnabled:config.payoutsEnabled&&!stripeTestPayments(),uploadsEnabled:!config.sandbox,usdToHkd: config.usdToHkd,
-    limits: { maxEpisodeSeconds: 180, maxEpisodeBytes: MAX_EPISODE_BYTES, quotaBytes: DEFAULT_QUOTA_BYTES, activationHkd: 88, minimumPriceUsd: 0.1, creatorShare: 0.7, minimumPayoutHkd: 20,minWalletFundingUsd:MIN_WALLET_FUNDING_CENTS/100,maxWalletFundingUsd:MAX_WALLET_FUNDING_CENTS/100 }, demo: config.seed, runtime: (config as any).runtime || 'node', videoFormats: (config as any).videoFormats || ['mp4','mov','webm','m4v'], auth:{google:googleEnabled(),apple:appleEnabled(),email:emailAuthEnabled()} });});
+    limits: { maxEpisodeSeconds: MAX_EPISODE_SECONDS, maxEpisodeBytes: MAX_EPISODE_BYTES, quotaBytes: DEFAULT_QUOTA_BYTES, activationHkd: 88, minimumPriceUsd: 0.1, creatorShare: 0.7, minimumPayoutHkd: 20,minWalletFundingUsd:MIN_WALLET_FUNDING_CENTS/100,maxWalletFundingUsd:MAX_WALLET_FUNDING_CENTS/100 }, demo: config.seed,episodeUpload:{mode:chunkedEpisodeUploadsEnabled()?'chunked':'multipart',chunkBytes:EPISODE_UPLOAD_CHUNK_BYTES}, runtime: (config as any).runtime || 'node', videoFormats: (config as any).videoFormats || ['mp4','mov','webm','m4v'], auth:{google:googleEnabled(),apple:appleEnabled(),email:emailAuthEnabled()} });});
   app.get('/api/auth/me', (req,res) => res.json({ user: req.user || null }));
   app.post('/api/auth/register', rateLimit('register', 12, 15 * 60_000), async (req,res) => {
     const body = registration.parse(req.body);
@@ -192,7 +194,7 @@ export function createApp() {
   app.get('/api/series/:id', (req,res) => {
     assertSeriesAvailable(id(req),{viewerId:req.user?.id,allowOwnerPreview:true});
     const s = one(`${catalogSelect} WHERE s.id=?`,id(req))!;
-    const episodes = all('SELECT e.id,e.series_id,e.title,e.number,e.duration,e.bytes,(SELECT COUNT(*) FROM playback_sessions p WHERE p.episode_id=e.id AND p.counted_view=1) AS views FROM episodes e WHERE e.series_id=? ORDER BY e.number',id(req)).map(e => ({...e,free:e.number <= s.free_episodes,unlocked:canWatch(req.user?.id,{...e,...{free_episodes:s.free_episodes,creator_id:s.creator_id}})}));
+    const episodes = all(`SELECT e.id,e.series_id,e.title,e.number,${episodeDurationSql('e')} AS duration,e.bytes,(SELECT COUNT(*) FROM playback_sessions p WHERE p.episode_id=e.id AND p.counted_view=1) AS views FROM episodes e WHERE e.series_id=? ORDER BY e.number`,id(req)).map(e => ({...e,free:e.number <= s.free_episodes,unlocked:canWatch(req.user?.id,{...e,...{free_episodes:s.free_episodes,creator_id:s.creator_id}})}));
     res.json({ series: serializeSeries(s,req.user?.id), episodes });
   });
   app.get('/api/series/:id/cover', async (req,res) => {
@@ -227,7 +229,7 @@ export function createApp() {
     res.json(startPlayback(e.id,playbackViewer(req,res,true)!));
   });
   app.put('/api/playback/:id', rateLimit('playback-heartbeat',180,60_000), (req,res)=>{
-    const {watchedMs}=z.object({watchedMs:z.number().int().min(0).max(180_000)}).parse(req.body);
+    const {watchedMs}=z.object({watchedMs:z.number().int().min(0).max(MAX_EPISODE_SECONDS*1000)}).parse(req.body);
     const viewer=playbackViewer(req,res);assert(viewer,404,'NOT_FOUND','Playback session not found.');
     const session=one('SELECT episode_id FROM playback_sessions WHERE id=? AND viewer_key=?',id(req),viewer);assert(session,404,'NOT_FOUND','Playback session not found.');
     const e=episodeRow(session.episode_id);assert(e,404,'NOT_FOUND','Episode not found.');assertSeriesAvailable(e.series_id);assert(canWatch(req.user?.id,e),403,'EPISODE_LOCKED','This episode is unavailable.');
@@ -236,11 +238,11 @@ export function createApp() {
   app.post('/api/episodes/:id/unlock', requireAuth, (req,res) => res.json({ ...unlockEpisode(req.user!.id,id(req)), user: getUser(req.user!.id) }));
   app.post('/api/episodes/:id/progress', requireAuth, (req,res) => {
     const e = episodeRow(id(req));assert(e,404,'NOT_FOUND','Episode not found.');assertSeriesAvailable(e.series_id,{viewerId:req.user?.id,allowOwnerPreview:true});assert(canWatch(req.user!.id,e),403,'EPISODE_LOCKED','Unlock this episode to watch.');
-    const { seconds } = z.object({ seconds: z.number().min(0).max(180) }).parse(req.body);
+    const { seconds } = z.object({ seconds: z.number().min(0).max(MAX_EPISODE_SECONDS) }).parse(req.body);
     run("INSERT INTO progress (user_id,episode_id,seconds) VALUES (?,?,?) ON CONFLICT(user_id,episode_id) DO UPDATE SET seconds=excluded.seconds,updated_at=datetime('now')",req.user!.id,id(req),Math.min(seconds,e.duration)); res.json({ ok:true });
   });
   app.get('/api/history', requireAuth, (req,res) => {
-    const rows=all(`SELECT s.*,u.name AS creator_name,e.id AS episode_id,e.number AS episode_number,e.duration,p.seconds,p.updated_at AS watched_at,
+    const rows=all(`SELECT s.*,u.name AS creator_name,e.id AS episode_id,e.number AS episode_number,${episodeDurationSql('e')} AS duration,p.seconds,p.updated_at AS watched_at,
       (SELECT COUNT(*) FROM episodes ep WHERE ep.series_id=s.id) AS episode_count,(SELECT COUNT(*) FROM saves sv WHERE sv.series_id=s.id) AS saves
       FROM progress p JOIN episodes e ON e.id=p.episode_id JOIN series s ON s.id=e.series_id JOIN users u ON u.id=s.creator_id WHERE p.user_id=? AND s.status='published' AND ${publicSeriesAllowedSql('s')} ORDER BY p.updated_at DESC LIMIT 50`,req.user!.id);
     const seen=new Set(); res.json({ history: rows.filter(s=>{if(seen.has(s.id))return false;seen.add(s.id);return true;}).map(s=>serializeSeries(s,req.user!.id)) });
@@ -281,7 +283,7 @@ export function createApp() {
     res.json({ paid:session.payment_status==='paid',user:getUser(req.user!.id) });
   });
   app.get('/api/studio', requireAuth, (req,res) => {
-    const user=req.user!;void finishInBackground(cleanupSeriesMedia(undefined,20)).catch(()=>{});res.json({ user:getUser(user.id),series:all(`${catalogSelect} WHERE s.creator_id=? AND NOT EXISTS (SELECT 1 FROM series_deletions d WHERE d.series_id=s.id) ORDER BY s.created_at DESC`,user.id).map(s=>serializeSeries(s,user.id,true)),
+    const user=req.user!;void finishInBackground(cleanupSeriesMedia(undefined,20)).catch(()=>{});void finishInBackground(cleanupExpiredEpisodeUploads(5)).catch(()=>{});res.json({ user:getUser(user.id),series:all(`${catalogSelect} WHERE s.creator_id=? AND NOT EXISTS (SELECT 1 FROM series_deletions d WHERE d.series_id=s.id) ORDER BY s.created_at DESC`,user.id).map(s=>serializeSeries(s,user.id,true)),
       stats:one(`SELECT COUNT(*) AS sales,COALESCE(SUM(p.creator_micros),0) AS lifetime_micros FROM ${purchaseTable()} p JOIN episodes e ON e.id=p.episode_id JOIN series s ON s.id=e.series_id WHERE s.creator_id=?`,user.id),
       withdrawals:stripeTestPayments()?[]:all('SELECT * FROM withdrawals WHERE user_id=? ORDER BY created_at DESC',user.id), storageRequests:all('SELECT * FROM storage_requests WHERE user_id=? ORDER BY created_at DESC',user.id) });
   });
@@ -295,7 +297,7 @@ export function createApp() {
   });
   app.get('/api/studio/series/:id',requireAuth,(req,res)=>{
     ownSeries(req);const s=one(`${catalogSelect} WHERE s.id=?`,id(req))!;
-    const episodes=all('SELECT id,series_id,title,number,duration,bytes FROM episodes WHERE series_id=? ORDER BY number',s.id);
+    const episodes=all(`SELECT e.id,e.series_id,e.title,e.number,${episodeDurationSql('e')} AS duration,e.bytes FROM episodes e WHERE e.series_id=? ORDER BY e.number`,s.id);
     res.setHeader('Cache-Control','private, no-store');res.json({series:serializeSeries(s,req.user!.id,true),episodes,owner_storage:ownerStorage(s)});
   });
   app.get('/api/studio/series/:id/cover',requireAuth,async(req,res)=>{
@@ -333,23 +335,24 @@ export function createApp() {
     try {
       coverOwnerId=ownSeries(req).creator_id;
       processed=await prepareCover(req.file.path);saved=true;await putObject(processed.path,key,'image/webp');
-      const old=transaction(()=>{const s=writableSeries(req);assertPaymentAccountClear(s.creator_id);const u=ownerStorage(s);assert(u.used_bytes-s.cover_bytes+processed!.bytes<=u.quota_bytes,413,'QUOTA_EXCEEDED','This cover exceeds your storage allowance.');run('UPDATE users SET used_bytes=used_bytes-?+? WHERE id=?',s.cover_bytes,processed!.bytes,s.creator_id);run('UPDATE series SET cover_key=?,cover_bytes=? WHERE id=?',key,processed!.bytes,s.id);return s.cover_key;});
+      const old=transaction(()=>{const s=writableSeries(req);assertPaymentAccountClear(s.creator_id);const u=ownerStorage(s);assert(u.used_bytes-s.cover_bytes+reservedEpisodeUploadBytes(s.creator_id)+processed!.bytes<=u.quota_bytes,413,'QUOTA_EXCEEDED','This cover exceeds your storage allowance.');run('UPDATE users SET used_bytes=used_bytes-?+? WHERE id=?',s.cover_bytes,processed!.bytes,s.creator_id);run('UPDATE series SET cover_key=?,cover_bytes=? WHERE id=?',key,processed!.bytes,s.id);return s.cover_key;});
       saved=false;
       if(old)void finishInBackground(queueUnreferencedSeriesMedia(id(req),coverOwnerId,old)).catch(()=>console.warn('Old cover cleanup remains pending.'));res.json({cover:apiUrl(`/api/studio/series/${id(req)}/cover`),user:getUser(req.user!.id),owner_storage:ownerStorage(ownSeries(req))});
     } catch(error) { if(saved)try{await queueUnreferencedSeriesMedia(id(req),coverOwnerId,key);}catch{console.warn('Uncommitted cover cleanup could not be queued.');}throw error; }
     finally {await removeTempFile(req.file.path);if(processed)await removeTempFile(processed.path);}
   });
+  registerEpisodeUploadSessions(app,{writableSeries,ownerStorage});
   app.post('/api/studio/series/:id/episodes', requirePublisher, rateLimit('upload',60,60_000), (req,_res,next)=>{assert(!config.sandbox,403,'SANDBOX_UPLOAD_DISABLED','Uploads are disabled on the payment-test site. Use its sample episodes to test wallet purchases.');const s=writableSeries(req);assertPaymentAccountClear(s.creator_id);next();}, upload.single('video'), async (req,res) => {
     assert(req.file,400,'FILE_REQUIRED','Choose an episode video.');let target:ReturnType<typeof writableSeries>|undefined;let processed:{path:string;bytes:number;duration:number}|undefined;let key='';let saved=false;
     try {
-      target=writableSeries(req);key=`videos/${target.creator_id}/${crypto.randomUUID()}.mp4`;
+      assert(req.file.size<=MAX_EPISODE_BYTES,413,'FILE_TOO_LARGE',`Episodes must be ${MAX_EPISODE_BYTES/1024**2} MiB or less.`);target=writableSeries(req);key=`videos/${target.creator_id}/${crypto.randomUUID()}.mp4`;
       const body=z.object({title:z.string().trim().min(1).max(120),number:z.coerce.number().int().min(1).max(1000)}).parse(req.body);
       assert(!one('SELECT id FROM episodes WHERE series_id=? AND number=?',id(req),body.number),409,'EPISODE_EXISTS','An episode with this number already exists.');
-      const u=ownerStorage(target);assert(u.used_bytes+req.file.size<=u.quota_bytes,413,'QUOTA_EXCEEDED','Not enough storage. Request an increase from your studio.');
+      const u=ownerStorage(target);assert(u.used_bytes+reservedEpisodeUploadBytes(target.creator_id)+req.file.size<=u.quota_bytes,413,'QUOTA_EXCEEDED','Not enough storage. Request an increase from your studio.');
       processed=await prepareVideo(req.file.path);saved=true;await putObject(processed.path,key,'video/mp4');
-      const episodeId=transaction(()=>{const s=writableSeries(req);assertPaymentAccountClear(s.creator_id);const user=ownerStorage(s);assert(user.used_bytes+processed!.bytes<=user.quota_bytes,413,'QUOTA_EXCEEDED','Not enough storage. Request an increase.');
+      const episodeId=transaction(()=>{const s=writableSeries(req);assertPaymentAccountClear(s.creator_id);const user=ownerStorage(s);assert(user.used_bytes+reservedEpisodeUploadBytes(s.creator_id)+processed!.bytes<=user.quota_bytes,413,'QUOTA_EXCEEDED','Not enough storage. Request an increase.');
         assert(!one('SELECT id FROM episodes WHERE series_id=? AND number=?',id(req),body.number),409,'EPISODE_EXISTS','An episode with this number already exists.');
-        const eid=crypto.randomUUID();run('INSERT INTO episodes (id,series_id,title,number,duration,bytes,storage_key,original_name) VALUES (?,?,?,?,?,?,?,?)',eid,id(req),body.title,body.number,processed!.duration,processed!.bytes,key,req.file!.originalname.slice(0,255));run('UPDATE users SET used_bytes=used_bytes+? WHERE id=?',processed!.bytes,s.creator_id);return eid;});
+        const eid=crypto.randomUUID();run('INSERT INTO episodes (id,series_id,title,number,duration,bytes,storage_key,original_name) VALUES (?,?,?,?,?,?,?,?)',eid,id(req),body.title,body.number,legacyEpisodeDuration(processed!.duration),processed!.bytes,key,req.file!.originalname.slice(0,255));writeEpisodeDuration(eid,processed!.duration);run('UPDATE users SET used_bytes=used_bytes+? WHERE id=?',processed!.bytes,s.creator_id);return eid;});
       saved=false;res.status(201).json({id:episodeId,user:getUser(req.user!.id),owner_storage:ownerStorage(target),duration:processed.duration,bytes:processed.bytes});
     }catch(error){if(saved&&target)try{await queueUnreferencedSeriesMedia(id(req),target.creator_id,key);}catch{console.warn('Uncommitted episode cleanup could not be queued.');}throw error;}
     finally{await removeTempFile(req.file.path);if(processed)await removeTempFile(processed.path);}
@@ -458,7 +461,8 @@ export function createApp() {
 export function errorHandler(error: any, _req: Request, res: Response, _next: NextFunction) {
   if(res.headersSent)return;
   if(error instanceof ZodError){res.status(400).json({error:{code:'VALIDATION',message:error.issues[0]?.message || 'Check the information you entered.',fields:error.issues.map(x=>({path:x.path.join('.'),message:x.message}))}});return;}
-  if(error instanceof multer.MulterError){res.status(413).json({error:{code:'FILE_TOO_LARGE',message:error.code==='LIMIT_FILE_SIZE'?'This file is too large. Episodes: 75 MB maximum. Covers: 5 MB maximum.':'Upload one file at a time.'}});return;}
+  if(error?.type==='entity.too.large'){res.status(413).json({error:{code:'FILE_TOO_LARGE',message:'This upload part exceeds the 5 MiB limit.'}});return;}
+  if(error instanceof multer.MulterError){res.status(413).json({error:{code:'FILE_TOO_LARGE',message:error.code==='LIMIT_FILE_SIZE'?`This file is too large. Episodes: ${MAX_EPISODE_BYTES/1024**2} MiB maximum. Covers: 5 MiB maximum.`:'Upload one file at a time.'}});return;}
   if(error instanceof AppError){res.status(error.status).json({error:{code:error.code,message:error.message,...(error.details?{details:error.details}:{})}});return;}
   if(error instanceof Stripe.errors.StripeError){res.status(502).json({error:{code:'PAYMENT_PROVIDER_ERROR',message:'The payment provider could not complete this request. Please try again shortly.'}});return;}
   console.error(error);res.status(500).json({error:{code:'INTERNAL',message:'Something went wrong. Please try again.'}});

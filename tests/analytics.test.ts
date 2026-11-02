@@ -138,6 +138,57 @@ test('replaying a clipped cumulative heartbeat cannot reclaim discarded watch ti
   const analytics=(await request('/api/studio/series/'+seriesId+'/analytics?period=7d',undefined,owner.cookie)).data;assert.equal(analytics.totals.views,1);assert.equal(analytics.totals.watchSeconds,5);assert.equal(analytics.totals.avgWatchSeconds,5);
 });
 
+test('four-minute playback preserves actual totals and summaries beyond the legacy three-minute database cap',async()=>{
+  const {seriesId,episodeIds}=fixture({duration:180});
+  // Simulate an existing database whose episodes/session CHECK constraints
+  // retain the old cap. The additive duration is the authoritative value.
+  const {writeEpisodeDuration}=await import('../server/episode-duration');
+  writeEpisodeDuration(episodeIds[0],240);
+  let now=Date.parse('2026-11-01T12:00:00.000Z');mock.method(Date,'now',()=>now);
+  const started=(await request('/api/episodes/'+episodeIds[0]+'/playback',{},viewerA.cookie)).data;
+  const route='/api/playback/'+started.sessionId;
+  for(let watchedMs=15_000;watchedMs<=240_000;watchedMs+=15_000){
+    now+=15_000;const heartbeat=(await request(route,{watchedMs},viewerA.cookie,200,'PUT')).data;
+    assert.equal(heartbeat.watchedMs,watchedMs);assert.equal(heartbeat.reportedMs,watchedMs);assert.equal(heartbeat.viewCounted,true);
+  }
+  assert.equal(one('SELECT watched_ms FROM playback_sessions WHERE id=?',started.sessionId)!.watched_ms,180_000);
+  assert.equal(one('SELECT reported_ms FROM playback_sessions WHERE id=?',started.sessionId)!.reported_ms,180_000);
+  const stored=one('SELECT * FROM playback_session_times WHERE session_id=?',started.sessionId)!;
+  assert.equal(stored.watched_ms,240_000);assert.equal(stored.reported_ms,240_000);
+  now+=5000;
+  const replay=(await request(route,{watchedMs:240_000},viewerA.cookie,200,'PUT')).data;
+  assert.equal(replay.watchedMs,240_000);assert.equal(one('SELECT views FROM series WHERE id=?',seriesId)!.views,1);
+  await request(route,{watchedMs:240_001},viewerA.cookie,400,'PUT');
+  const resumed=(await request('/api/episodes/'+episodeIds[0]+'/playback',{},viewerA.cookie)).data;
+  assert.equal(resumed.sessionId,started.sessionId);assert.equal(resumed.watchedMs,240_000);assert.equal(resumed.reportedMs,240_000);
+  const analytics=(await request('/api/studio/series/'+seriesId+'/analytics?period=7d',undefined,owner.cookie)).data;
+  assert.equal(analytics.totals.views,1);assert.equal(analytics.totals.watchSeconds,240);assert.equal(analytics.totals.avgWatchSeconds,240);
+  assert.equal(analytics.episodes[0].duration,240);assert.equal(analytics.episodes[0].watchSeconds,240);
+  assert.equal(analytics.daily.reduce((sum:number,day:any)=>sum+day.watchSeconds,0),240);
+  const deletion=(await request('/api/studio/series/'+seriesId+'/lifecycle',undefined,owner.cookie)).data;
+  assert.equal(deletion.summary.total_watch_seconds,240);assert.equal(deletion.summary.avg_watch_seconds,240);
+  await request('/api/episodes/'+episodeIds[0]+'/progress',{seconds:239},viewerA.cookie);
+  assert.equal(one('SELECT seconds FROM progress WHERE user_id=? AND episode_id=?',viewerA.id,episodeIds[0])!.seconds,239);
+  assert.equal((await request('/api/series/'+seriesId)).data.episodes[0].duration,240);
+  run('DELETE FROM playback_sessions WHERE id=?',started.sessionId);
+  assert.equal(one('SELECT * FROM playback_session_times WHERE session_id=?',started.sessionId),undefined);
+});
+
+test('a clipped four-minute report cannot be replayed to inflate credited time after the legacy cap',async()=>{
+  const {seriesId,episodeIds}=fixture({duration:180});
+  const {writeEpisodeDuration}=await import('../server/episode-duration');writeEpisodeDuration(episodeIds[0],240);
+  let now=Date.now();mock.method(Date,'now',()=>now);
+  const started=(await request('/api/episodes/'+episodeIds[0]+'/playback',{},viewerA.cookie)).data,route='/api/playback/'+started.sessionId;
+  now+=5000;const clipped=(await request(route,{watchedMs:240_000},viewerA.cookie,200,'PUT')).data;
+  assert.equal(clipped.watchedMs,5000);assert.equal(clipped.reportedMs,240_000);
+  now+=15_000;const replay=(await request(route,{watchedMs:240_000},viewerA.cookie,200,'PUT')).data;
+  assert.equal(replay.watchedMs,5000);assert.equal(replay.reportedMs,240_000);
+  const resumed=(await request('/api/episodes/'+episodeIds[0]+'/playback',{},viewerA.cookie)).data;
+  assert.equal(resumed.watchedMs,5000);assert.equal(resumed.reportedMs,240_000);
+  const summary=(await request('/api/studio/series/'+seriesId+'/analytics?period=7d',undefined,owner.cookie)).data;
+  assert.equal(summary.totals.views,1);assert.equal(summary.totals.watchSeconds,5);assert.equal(summary.totals.avgWatchSeconds,5);
+});
+
 test('UTC date ranges aggregate real viewing time, zero-fill days and count distinct paid viewers per episode and series',async()=>{
   const {seriesId,episodeIds}=fixture({free:0});
   function session(episodeId:string,viewer:string,qualifiedAt:string,watchedMs:number,counted=true){

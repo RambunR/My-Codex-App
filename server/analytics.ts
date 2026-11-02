@@ -4,6 +4,9 @@ import {assert} from './errors.js';
 import {config} from './config.js';
 import {purchaseTable,usingTestPaymentState} from './payment-state.js';
 import {publicSeriesAllowedSql} from './moderation.js';
+import {MAX_EPISODE_SECONDS} from '../shared/config.js';
+import {episodeDurationSql} from './episode-duration.js';
+import {playbackTimeSql,playbackSessionFieldsSql,LEGACY_PLAYBACK_MAX_MS} from './playback-times.js';
 import type {AnalyticsMetrics,AnalyticsRange,AnalyticsRangeInput,PlaybackReceipt,SeriesAnalytics} from '../shared/analytics.js';
 
 const DAY=86_400_000,SESSION_WINDOW=30*60_000,MAX_HEARTBEAT_MS=15_000;
@@ -24,7 +27,7 @@ export function startPlayback(episodeId:string,viewerKey:string,now=Date.now()):
   return transaction(()=>{
     const episode=one<{series_id:string}>('SELECT series_id FROM episodes WHERE id=?',episodeId);
     assert(episode,404,'NOT_FOUND','Episode not found.');assertSeriesRecordable(episode.series_id);
-    const existing=one<PlaybackSession>('SELECT * FROM playback_sessions WHERE episode_id=? AND viewer_key=? AND started_at_ms>? ORDER BY started_at_ms DESC LIMIT 1',episodeId,viewerKey,now-SESSION_WINDOW);
+    const existing=one<PlaybackSession>(`SELECT ${playbackSessionFieldsSql()} FROM playback_sessions p WHERE p.episode_id=? AND p.viewer_key=? AND p.started_at_ms>? ORDER BY p.started_at_ms DESC LIMIT 1`,episodeId,viewerKey,now-SESSION_WINDOW);
     if(existing){run('UPDATE playback_sessions SET last_seen_ms=? WHERE id=?',now,existing.id);return receipt(existing);}
     const id=crypto.randomUUID();
     run('INSERT INTO playback_sessions (id,episode_id,viewer_key,started_at_ms,last_seen_ms) VALUES (?,?,?,?,?)',id,episodeId,viewerKey,now,now);
@@ -38,9 +41,9 @@ export function startPlayback(episodeId:string,viewerKey:string,now=Date.now()):
 // previously clipped report must never credit the discarded time on a retry.
 export function recordPlayback(sessionId:string,viewerKey:string,cumulativeWatchedMs:number,now=Date.now()):PlaybackReceipt {
   validViewer(viewerKey);
-  assert(Number.isSafeInteger(cumulativeWatchedMs)&&cumulativeWatchedMs>=0&&cumulativeWatchedMs<=180_000,400,'INVALID_WATCH_TIME','Enter valid cumulative playback time.');
+  assert(Number.isSafeInteger(cumulativeWatchedMs)&&cumulativeWatchedMs>=0&&cumulativeWatchedMs<=MAX_EPISODE_SECONDS*1000,400,'INVALID_WATCH_TIME','Enter valid cumulative playback time.');
   return transaction(()=>{
-    const session=one<PlaybackSession&{duration:number;series_id:string}>('SELECT p.*,e.duration,e.series_id FROM playback_sessions p JOIN episodes e ON e.id=p.episode_id WHERE p.id=? AND p.viewer_key=?',sessionId,viewerKey);
+    const session=one<PlaybackSession&{duration:number;series_id:string}>(`SELECT ${playbackSessionFieldsSql()},${episodeDurationSql()} AS duration,e.series_id FROM playback_sessions p JOIN episodes e ON e.id=p.episode_id WHERE p.id=? AND p.viewer_key=?`,sessionId,viewerKey);
     assert(session,404,'NOT_FOUND','Playback session not found.');
     assertSeriesRecordable(session.series_id);
     assert(now-session.started_at_ms<=SESSION_WINDOW,409,'PLAYBACK_EXPIRED','Restart playback to continue recording viewing activity.');
@@ -49,8 +52,10 @@ export function recordPlayback(sessionId:string,viewerKey:string,cumulativeWatch
     const watchedMs=Math.min(Math.floor(session.duration*1000),session.watched_ms+increase);
     const qualifies=watchedMs>=Math.min(3000,Math.floor(session.duration*1000));
     if(qualifies&&!session.counted_view)run('UPDATE series SET views=views+1 WHERE id=?',session.series_id);
-    run('UPDATE playback_sessions SET watched_ms=?,reported_ms=?,last_seen_ms=?,counted_view=?,qualified_at_ms=? WHERE id=?',watchedMs,Math.max(session.reported_ms,cumulativeWatchedMs),now,qualifies?1:0,session.qualified_at_ms??(qualifies?now:null),session.id);
-    return{sessionId:session.id,watchedMs,reportedMs:Math.max(session.reported_ms,cumulativeWatchedMs),viewCounted:qualifies};
+    const reportedMs=Math.max(session.reported_ms,cumulativeWatchedMs);
+    run('UPDATE playback_sessions SET watched_ms=?,reported_ms=?,last_seen_ms=?,counted_view=?,qualified_at_ms=? WHERE id=?',Math.min(LEGACY_PLAYBACK_MAX_MS,watchedMs),Math.min(LEGACY_PLAYBACK_MAX_MS,reportedMs),now,qualifies?1:0,session.qualified_at_ms??(qualifies?now:null),session.id);
+    if(watchedMs>LEGACY_PLAYBACK_MAX_MS||reportedMs>LEGACY_PLAYBACK_MAX_MS)run('INSERT INTO playback_session_times (session_id,watched_ms,reported_ms) VALUES (?,?,?) ON CONFLICT(session_id) DO UPDATE SET watched_ms=excluded.watched_ms,reported_ms=excluded.reported_ms',session.id,watchedMs,reportedMs);
+    return{sessionId:session.id,watchedMs,reportedMs,viewCounted:qualifies};
   });
 }
 
@@ -90,16 +95,16 @@ export function readSeriesAnalytics(creatorId:string,seriesId:string,input:Analy
     UNION ALL SELECT CAST(strftime('%s',p.created_at)*1000 AS INTEGER) AS at_ms FROM ${table} p JOIN episodes e ON e.id=p.episode_id WHERE e.series_id=? AND p.price_micros>0
   )`,seriesId,seriesId);
   const range=resolveAnalyticsRange(input,now,first?.at_ms??now),params=[seriesId,range.startMs,range.endMs];
-  const views=one(`SELECT COUNT(*) AS views,COALESCE(SUM(p.watched_ms),0) AS watched_ms FROM playback_sessions p JOIN episodes e ON e.id=p.episode_id WHERE e.series_id=? AND p.counted_view=1 AND p.qualified_at_ms>=? AND p.qualified_at_ms<?`,...params);
+  const views=one(`SELECT COUNT(*) AS views,COALESCE(SUM(${playbackTimeSql()}),0) AS watched_ms FROM playback_sessions p JOIN episodes e ON e.id=p.episode_id WHERE e.series_id=? AND p.counted_view=1 AND p.qualified_at_ms>=? AND p.qualified_at_ms<?`,...params);
   const paid=one(`SELECT COUNT(*) AS paidUnlocks,COUNT(DISTINCT p.user_id) AS paidViewers FROM ${table} p JOIN episodes e ON e.id=p.episode_id WHERE e.series_id=? AND p.price_micros>0 AND CAST(strftime('%s',p.created_at)*1000 AS INTEGER)>=? AND CAST(strftime('%s',p.created_at)*1000 AS INTEGER)<?`,...params);
   const likes=one<{n:number}>('SELECT COUNT(*) AS n FROM series_likes WHERE series_id=?',seriesId)!.n;
-  const episodeViews=all(`SELECT p.episode_id,COUNT(*) AS views,SUM(p.watched_ms) AS watched_ms FROM playback_sessions p JOIN episodes e ON e.id=p.episode_id WHERE e.series_id=? AND p.counted_view=1 AND p.qualified_at_ms>=? AND p.qualified_at_ms<? GROUP BY p.episode_id`,...params);
+  const episodeViews=all(`SELECT p.episode_id,COUNT(*) AS views,SUM(${playbackTimeSql()}) AS watched_ms FROM playback_sessions p JOIN episodes e ON e.id=p.episode_id WHERE e.series_id=? AND p.counted_view=1 AND p.qualified_at_ms>=? AND p.qualified_at_ms<? GROUP BY p.episode_id`,...params);
   const episodePaid=all(`SELECT p.episode_id,COUNT(*) AS paidUnlocks,COUNT(DISTINCT p.user_id) AS paidViewers FROM ${table} p JOIN episodes e ON e.id=p.episode_id WHERE e.series_id=? AND p.price_micros>0 AND CAST(strftime('%s',p.created_at)*1000 AS INTEGER)>=? AND CAST(strftime('%s',p.created_at)*1000 AS INTEGER)<? GROUP BY p.episode_id`,...params);
   const byEpisodeViews=new Map(episodeViews.map(row=>[row.episode_id,row])),byEpisodePaid=new Map(episodePaid.map(row=>[row.episode_id,row]));
-  const episodes=all<{id:string;title:string;number:number;duration:number}>('SELECT id,title,number,duration FROM episodes WHERE series_id=? ORDER BY number',seriesId).map(episode=>({
+  const episodes=all<{id:string;title:string;number:number;duration:number}>(`SELECT e.id,e.title,e.number,${episodeDurationSql()} AS duration FROM episodes e WHERE e.series_id=? ORDER BY e.number`,seriesId).map(episode=>({
     ...episode,...emptyMetrics(),...viewMetrics(byEpisodeViews.get(episode.id)),paidViewers:Number(byEpisodePaid.get(episode.id)?.paidViewers||0),paidUnlocks:Number(byEpisodePaid.get(episode.id)?.paidUnlocks||0),
   }));
-  const dailyViews=all(`SELECT date(p.qualified_at_ms/1000,'unixepoch') AS date,COUNT(*) AS views,SUM(p.watched_ms) AS watched_ms FROM playback_sessions p JOIN episodes e ON e.id=p.episode_id WHERE e.series_id=? AND p.counted_view=1 AND p.qualified_at_ms>=? AND p.qualified_at_ms<? GROUP BY date`,...params);
+  const dailyViews=all(`SELECT date(p.qualified_at_ms/1000,'unixepoch') AS date,COUNT(*) AS views,SUM(${playbackTimeSql()}) AS watched_ms FROM playback_sessions p JOIN episodes e ON e.id=p.episode_id WHERE e.series_id=? AND p.counted_view=1 AND p.qualified_at_ms>=? AND p.qualified_at_ms<? GROUP BY date`,...params);
   const dailyPaid=all(`SELECT date(p.created_at) AS date,COUNT(*) AS paidUnlocks,COUNT(DISTINCT p.user_id) AS paidViewers FROM ${table} p JOIN episodes e ON e.id=p.episode_id WHERE e.series_id=? AND p.price_micros>0 AND CAST(strftime('%s',p.created_at)*1000 AS INTEGER)>=? AND CAST(strftime('%s',p.created_at)*1000 AS INTEGER)<? GROUP BY date`,...params);
   const byDayViews=new Map(dailyViews.map(row=>[row.date,row])),byDayPaid=new Map(dailyPaid.map(row=>[row.date,row]));
   const daily:SeriesAnalytics['daily']=[];

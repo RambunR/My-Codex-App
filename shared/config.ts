@@ -23,8 +23,8 @@ export const LANGUAGES = [
 ] as const;
 export {GENRES} from './taxonomy.js';
 import type {StoryTheme,SeriesFormat} from './taxonomy.js';
-export const MAX_EPISODE_SECONDS = 180;
-export const MAX_EPISODE_BYTES = 75 * 1024 * 1024;
+export const MAX_EPISODE_SECONDS = 240;
+export const MAX_EPISODE_BYTES = 200 * 1024 * 1024;
 export const DEFAULT_QUOTA_BYTES = 5 * 1024 * 1024 * 1024;
 export const USD_MICROS = 1_000_000;
 export const ACTIVATION_HKD_CENTS = 8800;

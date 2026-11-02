@@ -66,7 +66,9 @@ The initial database is one SQLite-backed Durable Object, which serializes finan
 
 ## Publisher videos on Cloudflare
 
-The same **180-second, 75 MiB input, and 5 GiB publisher quota** limits apply. The Cloudflare adapter accepts browser-ready **H.264 MP4/MOV with AAC audio**, validates movie and video-track duration on the server using bounded R2 range reads, and stores the original accepted file. It does **not** run FFmpeg or native Sharp in Workers. HEVC/AV1/WebM videos must be exported as compatible MP4 before upload. Covers may be JPEG, PNG, or WebP up to 5 MiB and are retained without server-side conversion. UI upload hints and file selection adapt to the deployed runtime.
+The same **240-second, 200 MiB input, and 5 GiB publisher quota** limits apply. The Cloudflare adapter accepts browser-ready **H.264 MP4/MOV with AAC audio**, validates movie and video-track duration on the server using bounded R2 range reads, and stores the original accepted file. It does **not** run FFmpeg or native Sharp in Workers. HEVC/AV1/WebM videos must be exported as compatible MP4 before upload. Covers may be JPEG, PNG, or WebP up to 5 MiB and are retained without server-side conversion. UI upload hints and file selection adapt to the deployed runtime.
+
+Large episode files are transferred using authenticated, bounded HTTP chunks and assembled in private R2 before final validation. This keeps individual requests below Cloudflare's request-body cap; increasing the application limit does not increase that platform cap. The chunked path supports the 200 MiB episode limit without buying a higher Cloudflare plan. Final size, duration, ownership, moderation, payment-review and quota checks remain authoritative on the server.
 
 This avoids adding a paid video-transcoding service. The standalone Node target remains available and still converts its broader input formats automatically. Multipart uploads stream to R2 in bounded parts; active uploads are limited. Temporary objects are removed when processing completes. Configure an R2 lifecycle policy to delete leftover `tmp/` objects and incomplete multipart uploads after one day if desired for crash cleanup.
 

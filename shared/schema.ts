@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS series (
 );
 CREATE TABLE IF NOT EXISTS episodes (
  id TEXT PRIMARY KEY, series_id TEXT NOT NULL REFERENCES series(id) ON DELETE CASCADE, title TEXT NOT NULL,
- number INTEGER NOT NULL CHECK(number > 0), duration REAL NOT NULL CHECK(duration > 0 AND duration <= 180),
+ number INTEGER NOT NULL CHECK(number > 0), duration REAL NOT NULL CHECK(duration > 0 AND duration <= 240),
  bytes INTEGER NOT NULL CHECK(bytes > 0), storage_key TEXT NOT NULL, original_name TEXT NOT NULL DEFAULT '',
  created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(series_id, number)
 );
@@ -83,6 +83,31 @@ CREATE TABLE IF NOT EXISTS series_media_deletions (
  PRIMARY KEY(series_id,object_key)
 );
 CREATE INDEX IF NOT EXISTS series_media_deletions_pending ON series_media_deletions(status,attempted_at_ms);
+CREATE TABLE IF NOT EXISTS episode_upload_sessions (
+ id TEXT PRIMARY KEY, series_id TEXT NOT NULL REFERENCES series(id), actor_id TEXT NOT NULL REFERENCES users(id),
+ creator_id TEXT NOT NULL REFERENCES users(id), object_key TEXT NOT NULL UNIQUE, upload_id TEXT,
+ episode_id TEXT NOT NULL UNIQUE, title TEXT NOT NULL, number INTEGER NOT NULL,
+ filename TEXT NOT NULL, total_bytes INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'creating'
+ CHECK(status IN ('creating','uploading','completing','complete','cancelled')),
+ cleanup_pending INTEGER NOT NULL DEFAULT 0, created_at_ms INTEGER NOT NULL, expires_at_ms INTEGER NOT NULL,
+ completed_at_ms INTEGER
+);
+CREATE TABLE IF NOT EXISTS episode_durations (
+ episode_id TEXT PRIMARY KEY REFERENCES episodes(id) ON DELETE CASCADE,
+ seconds REAL NOT NULL CHECK(seconds>0 AND seconds<=240)
+);
+CREATE TABLE IF NOT EXISTS playback_session_times (
+ session_id TEXT PRIMARY KEY REFERENCES playback_sessions(id) ON DELETE CASCADE,
+ watched_ms INTEGER NOT NULL CHECK(watched_ms>=0 AND watched_ms<=240000),
+ reported_ms INTEGER NOT NULL CHECK(reported_ms>=0 AND reported_ms<=240000)
+);
+CREATE INDEX IF NOT EXISTS episode_upload_owner_active ON episode_upload_sessions(creator_id,status,expires_at_ms);
+CREATE INDEX IF NOT EXISTS episode_upload_cleanup ON episode_upload_sessions(cleanup_pending,expires_at_ms);
+CREATE TABLE IF NOT EXISTS episode_upload_parts (
+ session_id TEXT NOT NULL REFERENCES episode_upload_sessions(id), part_number INTEGER NOT NULL,
+ bytes INTEGER NOT NULL, sha256 TEXT NOT NULL, etag TEXT NOT NULL,
+ PRIMARY KEY(session_id,part_number)
+);
 CREATE TABLE IF NOT EXISTS purchases (
  id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), episode_id TEXT NOT NULL REFERENCES episodes(id),
  price_micros INTEGER NOT NULL, creator_micros INTEGER NOT NULL, platform_micros INTEGER NOT NULL,

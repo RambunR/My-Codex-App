@@ -17,6 +17,7 @@ import { LANGUAGES,MAX_EPISODE_BYTES,type Series,type Episode,usd,bytes } from '
 import {parseUsdCents} from '../../shared/money';
 import {SERIES_LIMITS,seriesDetailsErrors,type SeriesField} from '../../shared/series-validation';
 import {selectVideoFiles,collectDroppedVideos,FolderReadError,type VideoSelection} from '../folder-upload';
+import {uploadEpisodeFile,UploadConfirmationUnknownError} from '../episode-upload';
 import '../editor-validation.css';
 import '../pass-promotion.css';
 
@@ -139,10 +140,7 @@ function SeriesEditorContent(){
   const save=async(e?:FormEvent)=>{e?.preventDefault();if(editorLocked||saving||publishing||uploading||collecting||lifecycleOpen||selectionBusy.current||!validate())return;setSaving(true);try{const sid=await saveDetails();setAttempted(false);toast(t('savedSuccess'));if(!id)navigate(`/studio/series/${sid}${adminReturn?'?from=admin':''}`,{replace:true});else refresh();}catch(error){reportSaveError(error);}finally{setSaving(false);}};
   const publish=async()=>{if(takenDown||saving||publishing||uploading||collecting||lifecycleOpen||selectionBusy.current||!validate())return;setPublishing(true);try{const sid=await saveDetails();await post(`/api/studio/series/${sid}/status`,{status:'published'});setAttempted(false);toast(t('publishedSuccess'));const filters=new URLSearchParams({sort:'new',language:form.language,genre:form.genres[0],creation:form.creation_type});if(form.themes[0])filters.set('theme',form.themes[0]);if(form.format)filters.set('format',form.format);navigate(`/browse?${filters}`);}catch(error){reportSaveError(error);}finally{setPublishing(false);}};
   const updateQueue=(i:number,update:Partial<QueueItem>)=>setQueue(q=>q.map((item,n)=>n===i?{...item,...update}:item));
-  const uploadOne=(file:File,number:number,i:number,current:()=>boolean)=>new Promise<void>((resolve,reject)=>{
-    const request=new XMLHttpRequest();xhr.current=request;request.open('POST',apiUrl(`/api/studio/series/${id}/episodes`));request.withCredentials=true;request.upload.onprogress=e=>{if(current()&&e.lengthComputable)updateQueue(i,{status:e.loaded===e.total?'processing':'uploading',progress:Math.round(e.loaded/e.total*100)});};
-    request.onload=()=>{try{const result=JSON.parse(request.responseText);if(request.status>=200&&request.status<300)resolve();else reject(new Error(result.error?.message||t('failed')));}catch{reject(new Error(t('failed')));}};request.onerror=()=>reject(new Error(t('retry')));request.onabort=()=>reject(new Error(t('cancel')));const body=new FormData();body.append('number',String(number));body.append('title',file.name.replace(/\.[^.]+$/,'').replace(/[_-]/g,' ').slice(0,120));body.append('video',file,file.name);request.send(body);
-  });
+  const uploadOne=(file:File,number:number,i:number,current:()=>boolean)=>uploadEpisodeFile({seriesId:id!,file,number,transport:config.episodeUpload,current:()=>current()&&!stop.current,request:request=>{xhr.current=request;},progress:(progress,processing)=>{if(current())updateQueue(i,{status:processing?'processing':'uploading',progress});},messages:{failed:t('failed'),retry:t('retry'),cancel:t('cancel'),confirmationUnknown:t('uploadConfirmationUnknown')}});
   const readAndUpload=async(load:()=>Promise<VideoSelection&{folder:boolean}>)=>{
     if(editorLocked||!id||saving||publishing||uploading||collecting||lifecycleOpen||selectionBusy.current||config.uploadsEnabled===false)return;
     selectionBusy.current=true;const generation=++selectionGeneration.current;const current=()=>selectionGeneration.current===generation;
@@ -162,7 +160,7 @@ function SeriesEditorContent(){
           // Both servers enforce readable media, duration, codec and quota.
           updateQueue(i,{status:'uploading',progress:0});await uploadOne(f,number,i,current);if(!current())return;
           number++;updateQueue(i,{status:'uploaded',progress:100});await refreshUser();if(!current())return;refresh();
-        }catch(error){if(!current())return;updateQueue(i,{status:'failed',error:error instanceof Error?error.message:t('failed')});}
+        }catch(error){if(!current())return;updateQueue(i,{status:'failed',error:error instanceof Error?error.message:t('failed')});if(error instanceof UploadConfirmationUnknownError){stop.current=true;break;}}
       }
       if(!current())return;
       if(!stop.current)toast(t('uploadComplete'));else setQueue(items=>items.map(item=>['waiting','processing','uploading'].includes(item.status)?{...item,status:'failed',error:t('cancel')}:item));

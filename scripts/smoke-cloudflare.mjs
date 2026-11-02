@@ -11,6 +11,7 @@ const dir=await mkdtemp(path.join(tmpdir(),'aidramio-cloudflare-test-'));
 const port=Number(process.env.CLOUDFLARE_TEST_PORT||8789),base=`http://127.0.0.1:${port}`;
 const bootstrap=randomBytes(32).toString('hex');
 const password='LocalSmokePassword123!';
+const maxEpisodeBytes=200*1024**2,chunkBytes=5*1024**2;
 let child,logs='';
 async function start(production=false,testStripe=false,publicOrigin=base,missingTestPair=false){
   logs='';
@@ -51,6 +52,21 @@ async function upload(route,bytes,name,cookie,fields={},field='video',status=201
   const form=new FormData();for(const[k,v]of Object.entries(fields))form.append(k,String(v));form.append(field,new Blob([bytes]),name);
   const r=await fetch(base+route,{method:'POST',headers:{Cookie:cookie},body:form});const data=await r.json();assert.equal(r.status,status,`${route}: ${JSON.stringify(data)}`);return data;
 }
+async function chunkedEpisode(route,size,read,name,cookie,fields,{restartAfterPart=0}={}){
+  const session=(await request(route,{...fields,filename:name,size},cookie,201)).data;
+  assert.equal(session.chunkBytes,chunkBytes);assert.equal(session.partCount,Math.ceil(size/chunkBytes));
+  const sessionPath=route+'/'+session.id,expected=createHash('sha256');
+  for(let index=0;index<session.partCount;index++){
+    const offset=index*chunkBytes,bytes=read(offset,Math.min(chunkBytes,size-offset));expected.update(bytes);
+    const response=await fetch(base+`${sessionPath}/parts/${index+1}`,{method:'PUT',headers:{Cookie:cookie,'Content-Type':'application/octet-stream'},body:bytes});
+    const data=await response.json();assert.equal(response.status,200,JSON.stringify(data));assert.equal(data.partNumber,index+1);
+    if(restartAfterPart===index+1){await stop();await start();}
+  }
+  const completed=(await request(sessionPath+'/complete',{},cookie,201)).data;
+  const replay=(await request(sessionPath+'/complete',{},cookie,200)).data;
+  assert.equal(replay.id,completed.id);assert.equal(replay.owner_storage.used_bytes,completed.owner_storage.used_bytes);
+  return{episode:completed,sha256:expected.digest('hex'),sessionPath};
+}
 try{
   const primary='https://primary.example';
   await start(false,false,primary);
@@ -67,6 +83,7 @@ try{
   await stop();
   await start();
   const cfg=(await request('/api/config')).data;assert.equal(cfg.runtime,'cloudflare');assert.equal(cfg.paymentsMode,'demo');assert.equal(cfg.auth.google,true);
+  assert.equal(cfg.limits.maxEpisodeBytes,maxEpisodeBytes);assert.equal(cfg.limits.maxEpisodeSeconds,240);assert.deepEqual(cfg.episodeUpload,{mode:'chunked',chunkBytes});
   assert.ok(cfg.standardGenres.includes('romantic-comedy'));assert.ok(cfg.standardGenres.includes('medical'));
   assert.ok(cfg.storyThemes.includes('revenge'));assert.deepEqual(cfg.formats,['live-action','animation','anime-donghua','motion-comic']);
   assert.deepEqual(cfg.creationTypes,['human','ai-assisted','ai-generated']);
@@ -169,12 +186,12 @@ try{
   await upload(`/api/studio/series/${sid}/cover`,cover,'cover.jpg',publisher,{},'cover',200);
   const first=await upload(`/api/studio/series/${sid}/episodes`,video,'Episode 01.mp4',publisher,{title:'First episode',number:1});
   const second=await upload(`/api/studio/series/${sid}/episodes`,video,'Episode 02.mp4',publisher,{title:'Second episode',number:2});
-  assert.equal(first.bytes,video.length);assert.ok(first.duration>0&&first.duration<=180);
+  assert.equal(first.bytes,video.length);assert.ok(first.duration>0&&first.duration<=240);
   const used=(await request('/api/auth/me',undefined,publisher)).data.user.used_bytes;assert.equal(used,video.length*2+cover.length);
   const longfile=path.join(dir,'long.mp4');
-  execFileSync('ffmpeg',['-hide_banner','-loglevel','error','-f','lavfi','-i','color=c=black:s=16x16:r=1:d=181','-c:v','libx264','-pix_fmt','yuv420p','-movflags','+faststart',longfile]);
+  execFileSync('ffmpeg',['-hide_banner','-loglevel','error','-f','lavfi','-i','color=c=black:s=16x16:r=1:d=241','-c:v','libx264','-pix_fmt','yuv420p','-movflags','+faststart',longfile]);
   const rejected=await upload(`/api/studio/series/${sid}/episodes`,await readFile(longfile),'long.mp4',publisher,{title:'Too long',number:3},'video',422);assert.equal(rejected.error.code,'VIDEO_TOO_LONG');
-  const large=await upload(`/api/studio/series/${sid}/episodes`,Buffer.alloc(75*1024**2+1),'oversized.mp4',publisher,{title:'Too large',number:3},'video',413);assert.equal(large.error.code,'FILE_TOO_LARGE');
+  const large=(await request(`/api/studio/series/${sid}/episode-uploads`,{title:'Too large',number:3,filename:'oversized.mp4',size:maxEpisodeBytes+1},publisher,413)).data;assert.equal(large.error.code,'FILE_TOO_LARGE');
   assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.used_bytes,used);
   await request(`/api/studio/series/${sid}/status`,{status:'published'},publisher);
   const newestPath='/api/series?'+new URLSearchParams({sort:'new',language:body.language,genre:body.genres[0],theme:body.themes[0],format:body.format,creation:body.creation_type});
@@ -188,7 +205,7 @@ try{
   const image=await fetch(base+`/api/series/${sid}/cover`);assert.equal(image.headers.get('content-type'),'image/jpeg');assert.deepEqual(Buffer.from(await image.arrayBuffer()),cover);
   const free=await fetch(base+`/api/episodes/${first.id}/stream`,{headers:{Range:'bytes=0-31'}});assert.equal(free.status,206);assert.equal((await free.arrayBuffer()).byteLength,32);
   await request(`/api/episodes/${second.id}/stream`,undefined,'',403);
-  console.log('PASS: R2 covers and videos, quota accounting, publication, byte ranges, 181-second and 75 MiB rejection.');
+  console.log('PASS: R2 covers and videos, quota accounting, publication, byte ranges, 241-second and over-200 MiB rejection.');
 
   const liked=(await request(`/api/series/${sid}/like`,{liked:true},viewer,200,'PUT')).data;assert.equal(liked.likes,1);
   const duplicateLike=(await request(`/api/series/${sid}/like`,{liked:true},viewer,200,'PUT')).data;assert.equal(duplicateLike.likes,1);
@@ -306,20 +323,26 @@ try{
   const disposableId=(await request('/api/studio/series',deletionBody,publisher,201)).data.id;
   const disposablePath=`/api/studio/series/${disposableId}`;
   await upload(disposablePath+'/cover',cover,'disposable-cover.jpg',publisher,{},'cover',200);
-  // A valid MP4 free box keeps the source video playable while exercising
-  // three R2 parts. Tiny preview files never exposed unequal multipart sizes.
-  const padding=Buffer.alloc(13*1024*1024+137,0x5b),freeBox=Buffer.alloc(8);
-  freeBox.writeUInt32BE(padding.length+8,0);freeBox.write('free',4,'ascii');
-  const largeVideo=Buffer.concat([video,freeBox,padding]);
-  const disposableEpisode=await upload(disposablePath+'/episodes',largeVideo,'001_He Said I Wasn’t Smart Enough for Cambri_001.mp4',publisher,{title:'Disposable paid episode',number:1});
-  assert.equal(disposableEpisode.bytes,largeVideo.length);assert.ok(disposableEpisode.duration>0&&disposableEpisode.duration<=180);
+  // Stream an exact 200 MiB, 240-second valid MP4 as forty small requests.
+  // A free box pads the real H.264/AAC fixture without a huge Git fixture or
+  // materializing the whole file. Restart after three parts proves persistence.
+  const boundaryVideo=await readFile('tests/fixtures/cloudflare-media/boundary-video-audio-240.mp4'),freeBox=Buffer.alloc(8);
+  freeBox.writeUInt32BE(maxEpisodeBytes-boundaryVideo.length,0);freeBox.write('free',4,'ascii');
+  const prefix=Buffer.concat([boundaryVideo,freeBox]);
+  const largePart=(offset,length)=>{const bytes=Buffer.alloc(length,0x5b);if(offset<prefix.length)prefix.copy(bytes,0,offset,Math.min(prefix.length,offset+length));return bytes;};
+  const largeUpload=await chunkedEpisode(disposablePath+'/episode-uploads',maxEpisodeBytes,largePart,'001_He Said I Wasn’t Smart Enough for Cambri_001.mp4',publisher,{title:'Disposable paid episode',number:1},{restartAfterPart:3});
+  const disposableEpisode=largeUpload.episode;
+  assert.equal(disposableEpisode.bytes,maxEpisodeBytes);assert.equal(disposableEpisode.duration,240);
+  assert.equal((await request(disposablePath,undefined,publisher)).data.episodes[0].duration,240);
   const uploadedTail=await fetch(base+`/api/studio/episodes/${disposableEpisode.id}/stream`,{headers:{Cookie:publisher,Range:'bytes=-32'}});
-  assert.equal(uploadedTail.status,206);assert.deepEqual(Buffer.from(await uploadedTail.arrayBuffer()),padding.subarray(-32));
+  assert.equal(uploadedTail.status,206);assert.deepEqual(Buffer.from(await uploadedTail.arrayBuffer()),Buffer.alloc(32,0x5b));
   const uploadedComplete=await fetch(base+`/api/studio/episodes/${disposableEpisode.id}/stream`,{headers:{Cookie:publisher}});
   assert.equal(uploadedComplete.status,200);
-  assert.equal(createHash('sha256').update(Buffer.from(await uploadedComplete.arrayBuffer())).digest('hex'),createHash('sha256').update(largeVideo).digest('hex'));
+  const receivedHash=createHash('sha256');let receivedBytes=0;for await(const bytes of uploadedComplete.body){receivedBytes+=bytes.length;receivedHash.update(bytes);}
+  assert.equal(receivedBytes,maxEpisodeBytes);assert.equal(receivedHash.digest('hex'),largeUpload.sha256);
   await request(disposablePath+'/status',{status:'published'},publisher);
-  const disposableBytes=cover.length+largeVideo.length;
+  assert.equal((await request(`/api/series/${disposableId}`,undefined,publisher)).data.episodes[0].duration,240);
+  const disposableBytes=cover.length+maxEpisodeBytes;
   assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.used_bytes,used+disposableBytes);
   await request(`/api/series/${disposableId}/like`,{liked:true},viewer,200,'PUT');
   await request(`/api/series/${disposableId}/save`,{},viewer);
@@ -381,6 +404,7 @@ try{
   await request(`/api/episodes/${disposableEpisode.id}/unlock`,{},viewer,404);
   await request(disposablePath,deletionConfirmation(),publisher,404,'DELETE');
   assert.equal((await request('/api/studio',undefined,publisher)).data.stats.sales,2,'Deletion must retain historical creator sales.');
+  console.log('PASS: exact 200 MiB / 240-second upload uses forty 5 MiB requests, survives restart, replays completion once, and preserves full-file SHA-256 and exact quota.');
   console.log('PASS: permanent paid-series deletion enforces private fresh confirmations, removes R2 media and quota exactly, denies restoration, and retains financial receipts and historical sales.');
 
   await stop();await start(true,true,base,true);

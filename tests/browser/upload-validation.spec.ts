@@ -58,7 +58,7 @@ test('invalid and overlong episodes show server errors while the next valid file
     await expect(page.getByRole('button',{name:'Choose a folder',exact:true})).toBeEnabled({timeout:60000});
     expect(writes).toHaveLength(3);
     await expect(page.locator('.queue-row').nth(0)).toContainText('Please choose a valid MP4, MOV, or WebM video.');
-    await expect(page.locator('.queue-row').nth(1)).toContainText('Episodes must be 3 minutes or less.');
+    await expect(page.locator('.queue-row').nth(1)).toContainText('Episodes must be 4 minutes or less.');
     await expect(page.locator('.queue-row').nth(2)).toContainText('Uploaded');
     expect(await Promise.all(responses)).toEqual([{status:422,code:'INVALID_VIDEO'},{status:422,code:'VIDEO_TOO_LONG'},{status:201,code:undefined}]);
     const result=await(await page.request.get(`/api/studio/series/${id}`)).json();expect(result.episodes).toHaveLength(1);expect(result.episodes[0].number).toBe(1);expect(result.episodes[0].title).toBe('03 valid');

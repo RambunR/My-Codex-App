@@ -1,6 +1,7 @@
 import {useEffect,type RefObject} from 'react';
 import {api,post,ApiError} from './api';
 import type {PlaybackReceipt} from '../shared/analytics';
+import {MAX_EPISODE_SECONDS} from '../shared/config';
 
 // Media requests can be preloads and seeks. Measure visible, advancing playback
 // instead, and flush on pause/navigation so short episodes still report time.
@@ -21,7 +22,7 @@ export function usePlaybackAnalytics(videoRef:RefObject<HTMLVideoElement|null>,e
     };
     const flush=(keepalive=false)=>{
       if(!sessionId||excluded)return;
-      const watchedMs=Math.min(180_000,Math.floor(baselineMs+activeMs));
+      const watchedMs=Math.min(MAX_EPISODE_SECONDS*1000,Math.floor(baselineMs+activeMs));
       if(watchedMs<=sentMs)return;
       const priorSent=sentMs;sentMs=watchedMs;
       const targetSession=sessionId;

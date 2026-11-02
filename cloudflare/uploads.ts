@@ -35,5 +35,5 @@ const storage:multer.StorageEngine={
   },
   _removeFile(_req,file,callback){getRuntime().env.MEDIA.delete(file.path).then(()=>callback(null)).catch(callback);},
 };
-export const upload=multer({storage,limits:{fileSize:MAX_EPISODE_BYTES,files:1,fields:8,fieldSize:10000}});
+export const upload=multer({storage,limits:{fileSize:MAX_EPISODE_BYTES+1,files:1,fields:8,fieldSize:10000}});
 export const coverUpload=multer({storage,limits:{fileSize:5*1024*1024,files:1,fields:2}});

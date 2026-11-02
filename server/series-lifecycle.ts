@@ -6,6 +6,7 @@ import {purchaseTable,usingTestPaymentState} from './payment-state.js';
 import {deleteObject} from './storage.js';
 import {scheduleMediaCleanup} from './background.js';
 import {assertSeriesWritable} from './moderation.js';
+import {playbackTimeSql} from './playback-times.js';
 
 type Row=Record<string,any>;
 const CONFIRMATION_LIFETIME=10*60_000;
@@ -31,7 +32,7 @@ function financialMode(){return usingTestPaymentState()||config.sandbox||config.
 function purchases(table:'purchases'|'test_purchases',id:string){return one(`SELECT COUNT(*) AS paid_unlocks,COUNT(DISTINCT p.user_id) AS paid_viewers FROM ${table} p JOIN episodes e ON e.id=p.episode_id WHERE e.series_id=? AND p.price_micros>0`,id)!;}
 function summary(series:Row){
   const episodes=one('SELECT COUNT(*) AS n,COALESCE(SUM(bytes),0) AS bytes FROM episodes WHERE series_id=?',series.id)!;
-  const views=one('SELECT COALESCE(SUM(p.watched_ms),0) AS watched_ms,COUNT(*) AS views FROM playback_sessions p JOIN episodes e ON e.id=p.episode_id WHERE e.series_id=? AND p.counted_view=1',series.id)!;
+  const views=one(`SELECT COALESCE(SUM(${playbackTimeSql()}),0) AS watched_ms,COUNT(*) AS views FROM playback_sessions p JOIN episodes e ON e.id=p.episode_id WHERE e.series_id=? AND p.counted_view=1`,series.id)!;
   const paid=purchases(purchaseTable() as 'purchases'|'test_purchases',series.id),real=purchases('purchases',series.id),test=purchases('test_purchases',series.id);
   const affected=one('SELECT COUNT(DISTINCT user_id) AS n FROM (SELECT p.user_id FROM purchases p JOIN episodes e ON e.id=p.episode_id WHERE e.series_id=? AND p.price_micros>0 UNION SELECT p.user_id FROM test_purchases p JOIN episodes e ON e.id=p.episode_id WHERE e.series_id=? AND p.price_micros>0)',series.id,series.id)!.n;
   return{episode_count:Number(episodes.n),views:Number(series.views),likes:Number(one('SELECT COUNT(*) AS n FROM series_likes WHERE series_id=?',series.id)!.n),paid_unlocks:Number(paid.paid_unlocks),paid_viewers:Number(paid.paid_viewers),total_watch_seconds:Number(views.watched_ms)/1000,avg_watch_seconds:views.views?Number(views.watched_ms)/1000/Number(views.views):0,media_bytes:Number(series.cover_bytes)+Number(episodes.bytes),financial_mode:financialMode(),real_paid_unlocks:Number(real.paid_unlocks),real_paid_viewers:Number(real.paid_viewers),test_paid_unlocks:Number(test.paid_unlocks),test_paid_viewers:Number(test.paid_viewers),affected_paid_viewers:Number(affected)};
@@ -94,6 +95,7 @@ export async function deleteSeriesPermanently(actorId:string,seriesId:string,inp
     run('DELETE FROM progress WHERE episode_id IN (SELECT id FROM episodes WHERE series_id=?)',seriesId);
     run('DELETE FROM saves WHERE series_id=?',seriesId);run('DELETE FROM series_likes WHERE series_id=?',seriesId);
     run('DELETE FROM series_classifications WHERE series_id=?',seriesId);run('DELETE FROM series_publications WHERE series_id=?',seriesId);
+    run('DELETE FROM episode_durations WHERE episode_id IN (SELECT id FROM episodes WHERE series_id=?)',seriesId);
     run('DELETE FROM episodes WHERE series_id=? AND NOT EXISTS (SELECT 1 FROM purchases p WHERE p.episode_id=episodes.id) AND NOT EXISTS (SELECT 1 FROM test_purchases p WHERE p.episode_id=episodes.id)',seriesId);
     run("UPDATE episodes SET title='Deleted episode',duration=1,bytes=1,storage_key='',original_name='' WHERE series_id=?",seriesId);
     run("UPDATE series SET title='Deleted series',description='',language='en',genres='[]',creation_type='human',price_cents=10,free_episodes=0,cover_key='',cover_bytes=0,status='archived',views=0,featured=0,demo=0,updated_at=datetime('now') WHERE id=?",seriesId);

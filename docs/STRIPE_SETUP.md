@@ -33,7 +33,7 @@ Stripe also offers a **paid custom Checkout-domain feature** for putting the Str
 
 ## Payment rules and financial separation
 
-- Dramio Pass costs **HK$88 once**, separately from USD wallet funding. It is not a subscription and adds no wallet credit. Test activation permits publisher uploads under the normal **5 GiB**, **180-second** and **75 MiB** limits.
+- Dramio Pass costs **HK$88 once**, separately from USD wallet funding. It is not a subscription and adds no wallet credit. Test activation permits publisher uploads under the normal **5 GiB**, **240-second** and **200 MiB** limits.
 - Wallet deposits start at **US$5**, with custom amounts up to two decimal places. The technical ceiling is US$999,999.99, subject to Stripe/account acceptance limits.
 - Episode prices start at **US$0.10**. Publishers choose initial free episodes. A paid test unlock deducts its server price once and records **70% publisher / 30% platform** earnings.
 - Test balances, pass ownership, payments, purchases and ledgers use `test_accounts`, `test_payments`, `test_purchases` and `test_ledger` in the same database, linked to existing user IDs. Real financial records and entitlements remain separate and unchanged.

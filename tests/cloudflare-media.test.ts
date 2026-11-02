@@ -61,6 +61,7 @@ function replaceAtomType(bytes:Buffer,type:string,index=0){const result=Buffer.f
 test('Cloudflare rejects long AAC audio when the movie and video tracks declare one second',async()=>{await rejected(fixture,'VIDEO_TOO_LONG');});
 test('Cloudflare rejects an ordinary over-limit H.264 video',async()=>{await rejected(await readFile(new URL('./fixtures/cloudflare-media/long-video.mp4',import.meta.url)),'VIDEO_TOO_LONG');});
 test('Cloudflare accepts a legitimate 180-second H.264/AAC export with encoder priming',async()=>{const bytes=await readFile(new URL('./fixtures/cloudflare-media/boundary-video-audio-180.mp4',import.meta.url));bindVideo(bytes);assert.equal((await prepareVideo('tmp/fixture')).duration,180);});
+test('Cloudflare accepts a legitimate 240-second H.264/AAC export at the new duration boundary',async()=>{const bytes=await readFile(new URL('./fixtures/cloudflare-media/boundary-video-audio-240.mp4',import.meta.url));bindVideo(bytes);assert.equal((await prepareVideo('tmp/fixture')).duration,240);});
 test('Cloudflare accepts a valid short H.264 video without audio and valid short H.264/AAC',async()=>{
   for(const bytes of [silentVideo,shortAudio]){bindVideo(bytes);const result=await prepareVideo('tmp/fixture');assert(result.duration>0&&result.duration<=2);assert.equal(result.bytes,bytes.length);}
 });
