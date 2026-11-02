@@ -33,6 +33,14 @@ export const MIN_WALLET_FUNDING_CENTS = 500;
 // Documented eight-digit USD PaymentIntent amount supported by this integration.
 export const MAX_WALLET_FUNDING_CENTS = 99_999_999;
 export type Locale = typeof LANGUAGES[number]['code'];
+export interface PublisherProfile {id:string;display_name:string;registered_at:string;managed:boolean;is_official:boolean}
+export interface AdminPublisherProfile extends PublisherProfile {created_at:string;updated_at:string;series_count:number}
+export interface PublisherPage {
+  publisher:PublisherProfile;
+  stats:{series_count:number;episode_count:number;views:number;tracked_views:number;likes:number;total_watch_seconds:number;avg_watch_seconds:number};
+  series:Series[];
+  pagination:{page:number;page_size:number;total:number;total_pages:number};
+}
 export interface User {
   id: string; name: string; email: string; role: 'viewer' | 'publisher' | 'admin'; publisher_active: number;
   wallet_micros: number; earnings_micros: number; quota_bytes: number; used_bytes: number; language: string;
@@ -43,8 +51,9 @@ export interface User {
   dramio_pass?: {active:boolean;test:boolean;purchased_at:string|null};
 }
 export interface Series {
-  id: string; title: string; description: string; language: string; genres: string[]; cover: string; creator_id: string;
+  id: string; title: string; description: string; language: string; genres: string[]; cover: string; creator_id?: string;
   creator_name: string; creation_type: 'human' | 'ai-assisted' | 'ai-generated'; price_cents: number; free_episodes: number;
+  publisher_id?:string;publisher?:PublisherProfile;publisher_profile_id?:string|null;
   episode_count: number; views: number; saves: number; status: string; featured: number; created_at: string; published_at?: string;
   likes: number; liked: boolean;
   saved?: boolean; demo?: number; subtitle_languages?: string[]; first_episode_id?: string;

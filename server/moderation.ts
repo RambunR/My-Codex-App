@@ -2,6 +2,7 @@ import {randomUUID} from 'node:crypto';
 import {one,all,run,transaction} from './db.js';
 import {assert} from './errors.js';
 import {config} from './config.js';
+import {publisherNameSql} from './publisher-profile-sql.js';
 
 type Row=Record<string,any>;
 export interface ModerationState {taken_down:boolean;reason:string|null;updated_at:string|null}
@@ -74,14 +75,14 @@ export function listAdminSeries(actorId:string,filters:AdminSeriesFilters={}){
   const status=filters.status??'all',page=filters.page??1,limit=filters.limit??20;
   assert(states.has(status),400,'INVALID_FILTER','Choose a valid series status.');
   assert(Number.isSafeInteger(page)&&page>=1&&page<=100000&&Number.isSafeInteger(limit)&&limit>=1&&limit<=50,400,'INVALID_PAGE','Choose a valid page and a page size from 1 to 50.');
-  const conditions:string[]=['NOT EXISTS (SELECT 1 FROM series_deletions d WHERE d.series_id=s.id)'],params:any[]=[config.platformOwnerUserId,config.officialCreatorName];
-  if(q){conditions.push('(s.title LIKE ? OR u.creator_name LIKE ?)');params.push('%'+q+'%','%'+q+'%');}
+  const conditions:string[]=['NOT EXISTS (SELECT 1 FROM series_deletions d WHERE d.series_id=s.id)'],params:any[]=[];
+  if(q){conditions.push(`(s.title LIKE ? OR (${publisherNameSql()}) LIKE ?)`);params.push('%'+q+'%','%'+q+'%');}
   if(status==='taken_down')conditions.push('COALESCE(m.taken_down,0)=1');
   else if(status!=='all'){conditions.push('s.status=?');params.push(status);}
   const where=conditions.length?' WHERE '+conditions.join(' AND '):'';
-  const source=" FROM series s JOIN (SELECT id,CASE WHEN id=? THEN COALESCE(NULLIF(?,''),name) ELSE name END AS creator_name FROM users) u ON u.id=s.creator_id LEFT JOIN series_moderation m ON m.series_id=s.id";
+  const source=" FROM series s JOIN users u ON u.id=s.creator_id LEFT JOIN series_moderation m ON m.series_id=s.id";
   const total=Number(one('SELECT COUNT(*) AS n'+source+where,...params)!.n);
-  const series=all(`SELECT s.*,u.creator_name,COALESCE(m.taken_down,0) AS taken_down,m.reason AS moderation_reason,m.updated_at AS moderated_at,
+  const series=all(`SELECT s.*,${publisherNameSql()} AS creator_name,COALESCE(m.taken_down,0) AS taken_down,m.reason AS moderation_reason,m.updated_at AS moderated_at,
     (SELECT COUNT(*) FROM episodes e WHERE e.series_id=s.id) AS episode_count,
     (SELECT COUNT(*) FROM purchases p JOIN episodes e ON e.id=p.episode_id WHERE e.series_id=s.id) AS paid_unlocks,
     (SELECT COUNT(*) FROM test_purchases p JOIN episodes e ON e.id=p.episode_id WHERE e.series_id=s.id) AS test_unlocks`+source+where+' ORDER BY s.updated_at DESC,s.rowid DESC LIMIT ? OFFSET ?',...params,limit,(page-1)*limit);

@@ -144,6 +144,31 @@ try{
   assert.equal((await request('/api/auth/me',undefined,viewer)).data.user.wallet_micros,10_000_000);
   console.log('PASS: scrypt authentication, first-admin bootstrap, authorization, activation, and replay-safe funding.');
 
+  // Public publisher profiles are attribution records under the same admin
+  // login, never additional authentication accounts or financial owners.
+  await request('/api/admin/publishers',undefined,'',403);
+  await request('/api/admin/publishers',undefined,viewer,403);
+  await request('/api/admin/publishers',undefined,publisher,403);
+  const adminBeforeProfiles=(await request('/api/auth/me',undefined,admin)).data.user;
+  const profileUsersBefore=(await request('/api/admin',undefined,admin)).data.users.length;
+  const initialPublishers=(await request('/api/admin/publishers',undefined,admin)).data;
+  const officialPublisher=initialPublishers.publishers.find(profile=>profile.id===initialPublishers.default_publisher_id);
+  assert.ok(officialPublisher);assert.equal(officialPublisher.is_official,true);assert.equal(officialPublisher.managed,true);
+  assert.equal(officialPublisher.display_name,'LingYingDrama Offical');
+  await request('/api/admin/publishers',{display_name:'Unauthorized Publisher',registered_at:'2020-04-23'},publisher,403);
+  await request('/api/admin/publishers',{display_name:'Invalid Date Publisher',registered_at:'2020-02-30'},admin,400);
+  const managedPublisher=(await request('/api/admin/publishers',{display_name:'Local Managed Publisher',registered_at:'2020-04-23'},admin,201)).data.publisher;
+  await request(`/api/admin/publishers/${managedPublisher.id}`,{display_name:'Unauthorized Edit'},viewer,403,'PATCH');
+  const editedPublisher=(await request(`/api/admin/publishers/${managedPublisher.id}`,{display_name:'Local Managed Publisher Revised',registered_at:'2021-05-24'},admin,200,'PATCH')).data.publisher;
+  assert.equal(editedPublisher.id,managedPublisher.id);assert.equal(editedPublisher.display_name,'Local Managed Publisher Revised');assert.equal(editedPublisher.registered_at,'2021-05-24');
+  assert.deepEqual((await request('/api/auth/me',undefined,admin)).data.user,adminBeforeProfiles);
+  assert.equal((await request('/api/admin',undefined,admin)).data.users.length,profileUsersBefore);
+  const emptyPublisher=(await request(`/api/publishers/${managedPublisher.id}`)).data;
+  assert.deepEqual(Object.keys(emptyPublisher.publisher).sort(),['display_name','id','is_official','managed','registered_at']);
+  assert.equal(emptyPublisher.stats.series_count,0);assert.equal(emptyPublisher.stats.total_watch_seconds,0);assert.deepEqual(emptyPublisher.series,[]);
+  assert.equal(JSON.stringify(emptyPublisher).includes('admin@example.test'),false);
+  console.log('PASS: administrator publisher profiles validate public dates, deny non-admin edits, expose no login data, and never create accounts or change balances.');
+
   assert.deepEqual(cfg.passPromotion,{enabled:true});
   await request('/api/admin/promotions',undefined,viewer,403);
   await request('/api/payments/promotion/quote',{promo_code:'LINGYING58'},'',401);
@@ -186,6 +211,32 @@ try{
   assert.deepEqual((await request(`/api/studio/series/${sid}`,undefined,publisher)).data.series.themes,body.themes);
   const video=await readFile('public/demo-preview.mp4');
   const cover=await readFile('public/images/midnight.jpg');
+  const profileSeriesBody={...body,title:'Managed Publisher Showcase',language:'en',genres:['comedy'],themes:[],format:'live-action',free_episodes:1};
+  const profileSeriesId=(await request('/api/studio/series',profileSeriesBody,admin,201)).data.id;
+  const profileSeriesPath=`/api/studio/series/${profileSeriesId}`;
+  const defaultAttribution=(await request(profileSeriesPath,undefined,admin)).data.series;
+  assert.equal(defaultAttribution.publisher_id,officialPublisher.id);assert.equal(defaultAttribution.creator_name,officialPublisher.display_name);assert.equal(defaultAttribution.creator_id,adminBeforeProfiles.id);
+  await request(profileSeriesPath,{...profileSeriesBody,publisher_profile_id:managedPublisher.id},admin,200,'PATCH');
+  const selectedAttribution=(await request(profileSeriesPath,undefined,admin)).data.series;
+  assert.equal(selectedAttribution.publisher_id,managedPublisher.id);assert.equal(selectedAttribution.publisher_profile_id,managedPublisher.id);assert.equal(selectedAttribution.creator_name,editedPublisher.display_name);assert.equal(selectedAttribution.creator_id,adminBeforeProfiles.id);
+  await request('/api/studio/series',{...body,title:'Forged Managed Publisher',publisher_profile_id:managedPublisher.id},publisher,403);
+  await request(`/api/studio/series/${sid}`,{...body,publisher_profile_id:managedPublisher.id},publisher,403,'PATCH');
+  await request(`/api/studio/series/${sid}`,{...body,publisher_profile_id:managedPublisher.id},admin,403,'PATCH');
+  await upload(profileSeriesPath+'/cover',cover,'profile-cover.jpg',admin,{},'cover',200);
+  await upload(profileSeriesPath+'/episodes',video,'Profile 001.mp4',admin,{title:'Profile episode 001',number:1});
+  await request(profileSeriesPath+'/status',{status:'published'},admin);
+  const profilePublished=(await request(`/api/series/${profileSeriesId}`)).data.series;
+  assert.equal(profilePublished.creator_name,editedPublisher.display_name);assert.equal(profilePublished.publisher_id,managedPublisher.id);assert.equal('creator_id' in profilePublished,false);
+  const managedPublicProfile=(await request(`/api/publishers/${managedPublisher.id}`)).data;
+  assert.equal(managedPublicProfile.publisher.registered_at,editedPublisher.registered_at);assert.equal(managedPublicProfile.stats.series_count,1);assert.equal(managedPublicProfile.stats.episode_count,1);assert.equal(managedPublicProfile.stats.likes,0);assert.equal(managedPublicProfile.stats.views,0);
+  assert.equal(managedPublicProfile.series[0].id,profileSeriesId);assert.equal(managedPublicProfile.pagination.total,1);
+  assert.ok((await request('/api/series?'+new URLSearchParams({q:editedPublisher.display_name}))).data.series.some(series=>series.id===profileSeriesId));
+  await request(profileSeriesPath+'/status',{status:'archived'},admin);
+  const archivedPublicProfile=(await request(`/api/publishers/${managedPublisher.id}`)).data;
+  assert.equal(archivedPublicProfile.stats.series_count,0);assert.deepEqual(archivedPublicProfile.series,[]);
+  await request(profileSeriesPath+'/status',{status:'published'},admin);
+  assert.equal((await request(`/api/publishers/${managedPublisher.id}`)).data.stats.series_count,1);
+  console.log('PASS: Cloudflare publisher selection keeps financial ownership, blocks impersonation, updates public attribution/search and excludes hidden releases.');
   await upload(`/api/studio/series/${sid}/cover`,cover,'cover.jpg',publisher,{},'cover',200);
   const first=await upload(`/api/studio/series/${sid}/episodes`,video,'Episode 01.mp4',publisher,{title:'First episode',number:1});
   const second=await upload(`/api/studio/series/${sid}/episodes`,video,'Episode 02.mp4',publisher,{title:'Second episode',number:2});
@@ -223,6 +274,13 @@ try{
   const analytics=(await request(`/api/studio/series/${sid}/analytics?period=7d`,undefined,publisher)).data;
   assert.equal(analytics.totals.views,1);assert.equal(analytics.totals.avgWatchSeconds,3.2);assert.equal(analytics.totals.likes,1);assert.equal(analytics.daily.length,7);
   assert.equal(analytics.episodes.find(episode=>episode.id===first.id).views,1);
+  const ordinaryPublisherId=publicSeries.series.publisher_id;
+  assert.ok(ordinaryPublisherId);assert.notEqual(ordinaryPublisherId,p.data.user.id);assert.equal('creator_id' in publicSeries.series,false);
+  const ordinaryPublisherProfile=(await request(`/api/publishers/${ordinaryPublisherId}`)).data;
+  assert.equal(ordinaryPublisherProfile.publisher.display_name,'Local Publisher');assert.equal(ordinaryPublisherProfile.publisher.managed,false);
+  assert.equal(ordinaryPublisherProfile.stats.series_count,1);assert.equal(ordinaryPublisherProfile.stats.episode_count,2);assert.equal(ordinaryPublisherProfile.stats.views,1);assert.equal(ordinaryPublisherProfile.stats.tracked_views,1);assert.equal(ordinaryPublisherProfile.stats.likes,1);assert.equal(ordinaryPublisherProfile.stats.total_watch_seconds,3.2);assert.equal(ordinaryPublisherProfile.stats.avg_watch_seconds,3.2);
+  assert.equal(ordinaryPublisherProfile.series[0].id,sid);assert.equal(JSON.stringify(ordinaryPublisherProfile).includes('publisher@example.test'),false);
+  await request(`/api/publishers/${p.data.user.id}`,undefined,'',404);
   console.log('PASS: durable likes, anonymous qualified playback, exact watch time, and owner-only series/episode analytics.');
 
   await Promise.all(Array.from({length:8},()=>request(`/api/episodes/${second.id}/unlock`,{},viewer)));
@@ -259,6 +317,7 @@ try{
   const removed=(await request(moderationPath,{action:'takedown',reason:'Local runtime review of a series with an existing paid viewer.'},admin)).data;
   assert.equal(removed.taken_down,true);assert.equal(removed.alreadyApplied,false);
   assert.equal((await request(newestPath)).data.series.some(series=>series.id===sid),false);
+  await request(`/api/publishers/${ordinaryPublisherId}`,undefined,'',404);
   for(const identity of ['',viewer,publisher,admin]){
     await request(`/api/series/${sid}`,undefined,identity,404);
     await request(`/api/series/${sid}/cover`,undefined,identity,404);
@@ -297,6 +356,7 @@ try{
   const beforeHideAnalytics=(await request(`/api/studio/series/${sid}/analytics?period=7d`,undefined,publisher)).data;
   await request(`/api/studio/series/${sid}/status`,{status:'archived'},publisher);
   assert.equal((await request(newestPath)).data.series.some(series=>series.id===sid),false);
+  await request(`/api/publishers/${ordinaryPublisherId}`,undefined,admin,404);
   for(const identity of ['',viewer,publisher,admin]){
     await request(`/api/series/${sid}`,undefined,identity,404);
     await request(`/api/series/${sid}/cover`,undefined,identity,404);
@@ -493,6 +553,14 @@ try{
   assert.equal((await request(`/api/studio/series/${sid}`,undefined,admin)).data.series.taken_down,false);
   const retainedClassification=(await request(`/api/studio/series/${sid}`,undefined,publisher)).data.series;
   assert.deepEqual(retainedClassification.themes,body.themes);assert.equal(retainedClassification.format,body.format);
+  assert.equal(retainedClassification.publisher_id,ordinaryPublisherId);
+  const restartedPublisher=(await request(`/api/publishers/${managedPublisher.id}`)).data;
+  assert.equal(restartedPublisher.publisher.display_name,editedPublisher.display_name);assert.equal(restartedPublisher.publisher.registered_at,editedPublisher.registered_at);assert.equal(restartedPublisher.stats.series_count,1);assert.equal(restartedPublisher.series[0].id,profileSeriesId);
+  const restartedPublisherAdmin=(await request('/api/admin/publishers',undefined,admin)).data;
+  assert.equal(restartedPublisherAdmin.default_publisher_id,officialPublisher.id);assert.equal(restartedPublisherAdmin.publishers.find(profile=>profile.id===managedPublisher.id).created_at,managedPublisher.created_at);
+  const restartedOrdinaryPublisher=(await request(`/api/publishers/${ordinaryPublisherId}`)).data;
+  assert.equal(restartedOrdinaryPublisher.stats.likes,1);assert.equal(restartedOrdinaryPublisher.stats.views,1);assert.equal(restartedOrdinaryPublisher.stats.total_watch_seconds,3.2);
+  console.log('PASS: edited managed profiles, public IDs, real engagement totals and series attribution survive Cloudflare restarts and payment-mode changes.');
   assert.ok((await request(newestPath)).data.series.some(s=>s.id===sid));
   await request('/api/auth/google/start',undefined,'',503);
   assert.equal((await request('/api/auth/me',undefined,viewer)).data.user.wallet_micros,4_890_000);

@@ -10,6 +10,7 @@ process.env.DATA_DIR=dir;process.env.NODE_ENV='test';process.env.SEED_DEMO='fals
 const {one,all,run,transaction,db}=await import('../server/db');
 const moderation=await import('../server/moderation');
 const {config}=await import('../server/config');
+const {initializePublisherProfiles}=await import('../server/publisher-profiles');
 const {unlockEpisode}=await import('../server/finance');
 const {startPlayback,recordPlayback}=await import('../server/analytics');
 const admin='moderation-admin',owner='moderation-owner',viewer='moderation-viewer';
@@ -116,17 +117,23 @@ test('query aliases cannot inject SQL and a schema reinitialization preserves mo
   assert.equal(moderation.seriesIsTakenDown(drama.id),true);assert.equal(moderation.adminModerationEvents(admin,drama.id).length,1);assert.ok(one('SELECT id FROM users WHERE id=?',admin));
 });
 
-test('administrative creator search uses the configured official alias without changing user identity',()=>{
+test('administrative creator search uses the initialized official profile without changing user identity or re-seeding edits',()=>{
   const saved={ownerId:config.platformOwnerUserId,name:config.officialCreatorName};
   try{
     config.platformOwnerUserId=owner;config.officialCreatorName='LingYingDrama Offical';
+    initializePublisherProfiles();
     const drama=fixture(),found=moderation.listAdminSeries(admin,{q:'LingYingDrama Offical',limit:50});
     assert.ok(found.series.some(series=>series.id===drama.id));assert.ok(found.series.every(series=>series.creator_name==='LingYingDrama Offical'));
     assert.equal(one('SELECT name FROM users WHERE id=?',owner)!.name,owner);
     config.platformOwnerUserId=viewer;
-    assert.equal(moderation.listAdminSeries(admin,{q:'LingYingDrama Offical'}).total,0);
+    initializePublisherProfiles();
+    assert.ok(moderation.listAdminSeries(admin,{q:'LingYingDrama Offical',limit:50}).series.some(series=>series.id===drama.id));
     config.platformOwnerUserId=owner;config.officialCreatorName='';
-    assert.equal(moderation.listAdminSeries(admin,{q:owner,limit:50}).series[0].creator_name,owner);
+    run("UPDATE publisher_profiles SET display_name='Renamed official profile' WHERE id='official'");
+    initializePublisherProfiles();
+    assert.equal(moderation.listAdminSeries(admin,{q:'LingYingDrama Offical'}).total,0);
+    assert.equal(moderation.listAdminSeries(admin,{q:'Renamed official profile',limit:50}).series[0].creator_name,'Renamed official profile');
+    assert.equal(one('SELECT legacy_owner_id FROM publisher_profiles WHERE id=?','official')!.legacy_owner_id,owner);
   }finally{config.platformOwnerUserId=saved.ownerId;config.officialCreatorName=saved.name;}
 });
 

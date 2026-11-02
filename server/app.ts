@@ -33,13 +33,15 @@ import {episodeDurationSql,legacyEpisodeDuration,writeEpisodeDuration} from './e
 import {responseSecurityHeaders} from '../shared/security-headers.js';
 import {registerEpisodeBatch,episodeBatchRevision,assertEpisodeBatchWritable,deleteSingleEpisode} from './episode-batch.js';
 import {WALLET_FUNDING_OPTIONS} from '../shared/funding-rewards.js';
+import {initializePublisherProfiles,registerPublisherProfiles,seriesPublisher,assignSeriesPublisher,publisherProfileIdSchema} from './publisher-profiles.js';
+import {publisherNameSql} from './publisher-profile-sql.js';
 
 const language = z.enum(LANGUAGES.map(x => x.code) as [string, ...string[]]);
 const id = (req: Request, field = 'id') => String(req.params[field] || '');
 const registration = z.object({ name: z.string().trim().min(2).max(60), email: z.email().max(254).transform(s => s.toLowerCase()), password: z.string().min(10).max(128), language: language.default('en') });
 const seriesSchema = z.object({ title: z.string().trim().min(SERIES_LIMITS.titleMin).max(SERIES_LIMITS.titleMax), description: z.string().trim().min(SERIES_LIMITS.synopsisMin).max(SERIES_LIMITS.synopsisMax), language,
   genres: z.array(z.enum(GENRES)).min(SERIES_LIMITS.genresMin).max(SERIES_LIMITS.genresMax).refine(values=>new Set(values).size===values.length,'Choose each genre only once.'), creation_type: z.enum(CREATION_TYPES).default('human'),
-  themes:themesSchema.optional(),format:formatSchema.optional(),
+  themes:themesSchema.optional(),format:formatSchema.optional(),publisher_profile_id:publisherProfileIdSchema,
   price_cents: z.number().int().min(SERIES_LIMITS.priceMin).max(SERIES_LIMITS.priceMax), free_episodes: z.number().int().min(SERIES_LIMITS.freeMin).max(SERIES_LIMITS.freeMax),
 });
 function ownSeries(req: Request, seriesId = id(req)) {
@@ -57,9 +59,10 @@ const catalogSelect = `SELECT s.*,u.name AS creator_name,COALESCE(sp.published_a
  (SELECT COUNT(*) FROM series_likes sl WHERE sl.series_id=s.id) AS likes
  FROM series s JOIN users u ON u.id=s.creator_id LEFT JOIN series_publications sp ON sp.series_id=s.id`;
 function serializeSeries(s: Record<string, any>, userId?: string, privateView=false) {
-  const { cover_key, cover_bytes, ...safe } = s;
+  const { cover_key, cover_bytes,creator_id,...safe } = s;
+  const {publisher,publisher_profile_id}=seriesPublisher(s);
   const genres=JSON.parse(s.genres);
-  return { ...safe,creator_name:creatorDisplayName(s.creator_id,s.creator_name||''),genres,...seriesClassification(s.id,genres),cover: cover_key?.startsWith('public:') ? cover_key.slice(7) : cover_key ? apiUrl(`/api/${privateView?'studio/series':'series'}/${s.id}/cover`) : '/images/placeholder.svg',
+  return { ...safe,...(privateView?{creator_id}:{}),creator_name:publisher.display_name,publisher_id:publisher.id,publisher,publisher_profile_id,genres,...seriesClassification(s.id,genres),cover: cover_key?.startsWith('public:') ? cover_key.slice(7) : cover_key ? apiUrl(`/api/${privateView?'studio/series':'series'}/${s.id}/cover`) : '/images/placeholder.svg',
     ...(privateView?{taken_down:moderationState(s.id).taken_down,moderation_reason:moderationState(s.id).reason}:{}),
     likes:Number(s.likes??one('SELECT COUNT(*) AS n FROM series_likes WHERE series_id=?',s.id)!.n),
     liked:!!(userId&&one('SELECT 1 FROM series_likes WHERE user_id=? AND series_id=?',userId,s.id)),
@@ -80,6 +83,7 @@ function playbackViewer(req:Request,res:Response,create=false):string|undefined 
 
 export function createApp() {
   ensurePlatformOwnerAccess();
+  initializePublisherProfiles();
   if(one("SELECT 1 FROM series_media_deletions WHERE status='pending' LIMIT 1")||one("SELECT 1 FROM episode_upload_sessions WHERE status<>'complete' AND (status<>'cancelled' OR cleanup_pending=1) LIMIT 1"))void finishInBackground(scheduleMediaCleanup()).catch(()=>{});
   const app = express();
   app.disable('x-powered-by');
@@ -155,6 +159,7 @@ export function createApp() {
   registerGoogleAuth(app);
   registerAppleAuth(app);
   registerEmailAuth(app);
+  registerPublisherProfiles(app,{catalogSelect,serializeSeries});
   app.get('/api/health', (_req,res) => res.json({ ok: true, database: !!one('SELECT 1 AS ready') }));
   app.get('/api/config', async (_req,res) => {initializePromotions();if(config.payments==='stripe'&&stripeConfigured())await ensureStripeWebhookReady(stripe);return res.json({ brand: 'LingYing', languages: LANGUAGES, genres: GENRES,standardGenres:STANDARD_GENRES,storyThemes:STORY_THEMES,formats:SERIES_FORMATS,creationTypes:CREATION_TYPES, passPromotion:{enabled:true},paymentsMode: config.payments,paymentsReady:paymentsReady(),paymentsConfigured:stripeConfigured(),paymentSetup:stripeWebhookReadiness(),sandbox:config.sandbox,paymentsTestMode:stripeTestPayments()||config.payments==='demo',payoutsEnabled:config.payoutsEnabled&&!stripeTestPayments(),uploadsEnabled:!config.sandbox,usdToHkd: config.usdToHkd,
     limits: { maxEpisodeSeconds: MAX_EPISODE_SECONDS, maxEpisodeBytes: MAX_EPISODE_BYTES, quotaBytes: DEFAULT_QUOTA_BYTES, activationHkd: 88, minimumPriceUsd: 0.1, creatorShare: 0.7, minimumPayoutHkd: 20,minWalletFundingUsd:MIN_WALLET_FUNDING_CENTS/100,maxWalletFundingUsd:MAX_WALLET_FUNDING_CENTS/100 },walletFunding:WALLET_FUNDING_OPTIONS, demo: config.seed,episodeUpload:{mode:chunkedEpisodeUploadsEnabled()?'chunked':'multipart',chunkBytes:EPISODE_UPLOAD_CHUNK_BYTES}, runtime: (config as any).runtime || 'node', videoFormats: (config as any).videoFormats || ['mp4','mov','webm','m4v'], auth:{google:googleEnabled(),apple:appleEnabled(),email:emailAuthEnabled()} });});
@@ -183,7 +188,7 @@ export function createApp() {
   app.get('/api/series', (req,res) => {
     const query = z.object({ q: z.string().max(120).optional(), language: language.optional(), genre: z.enum(GENRES).optional(),theme:z.enum(STORY_THEMES).optional(),format:z.enum(SERIES_FORMATS).optional(), sort: z.enum(['popular','new','saved']).optional(), saved: z.enum(['true']).optional(), creation: z.enum(CREATION_TYPES).optional() }).parse(req.query);
     const conditions = ["s.status='published'",publicSeriesAllowedSql('s')]; const params: any[] = [];
-    if (query.q) { conditions.push('(s.title LIKE ? OR s.description LIKE ? OR (CASE WHEN s.creator_id=? THEN ? ELSE u.name END) LIKE ?)'); params.push(`%${query.q}%`,`%${query.q}%`,config.platformOwnerUserId,config.officialCreatorName,`%${query.q}%`); }
+    if (query.q) { conditions.push(`(s.title LIKE ? OR s.description LIKE ? OR (${publisherNameSql()}) LIKE ?)`); params.push(`%${query.q}%`,`%${query.q}%`,`%${query.q}%`); }
     if (query.language) { conditions.push('s.language=?'); params.push(query.language); }
     if(query.genre==='animation')conditions.push(`(EXISTS(SELECT 1 FROM json_each(s.genres) old_genre WHERE old_genre.value='animation') OR (${SERIES_FORMAT_SQL}) IN ('animation','anime-donghua','motion-comic'))`);
     else if(query.genre){conditions.push('EXISTS(SELECT 1 FROM json_each(s.genres) chosen_genre WHERE chosen_genre.value=?)');params.push(query.genre);}
@@ -320,6 +325,7 @@ export function createApp() {
     const b=seriesSchema.parse(req.body);const seriesId=crypto.randomUUID();
     transaction(()=>{run('INSERT INTO series (id,creator_id,title,description,language,genres,creation_type,price_cents,free_episodes) VALUES (?,?,?,?,?,?,?,?,?)',seriesId,req.user!.id,b.title,b.description,b.language,JSON.stringify(b.genres),b.creation_type,b.price_cents,b.free_episodes);
       writeSeriesClassification(seriesId,b.genres,b);
+      assignSeriesPublisher(req.user!.id,one('SELECT * FROM series WHERE id=?',seriesId)!,b.publisher_profile_id,{creating:true});
     });
     res.status(201).json({ id:seriesId });
   });
@@ -330,6 +336,7 @@ export function createApp() {
       // Preserve proven legacy format when an older editor changes only genre metadata.
       const classificationInput=b.format===undefined&&beforeClassification.format==='animation'&&!b.genres.includes('animation')?{...b,format:beforeClassification.format}:b;
       writeSeriesClassification(id(req),beforeGenres,classificationInput);
+      assignSeriesPublisher(req.user!.id,before,b.publisher_profile_id);
       if(req.user!.role==='admin')recordSeriesMetadataEdit(req.user!.id,id(req),'Administrator updated series details.',{before:{title:before.title,description:before.description,language:before.language,genres:beforeGenres,creation_type:before.creation_type,price_cents:before.price_cents,free_episodes:before.free_episodes,...beforeClassification},after:{...b,...seriesClassification(id(req),b.genres)}});
     });res.json({ok:true});
   });

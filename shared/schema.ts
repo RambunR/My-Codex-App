@@ -2,6 +2,7 @@ import {APPLE_AUTH_SCHEMA} from './apple-schema.js';
 import {ACCOUNT_EMAIL_SCHEMA} from './email-schema.js';
 import {FUNDING_REWARD_SCHEMA} from './funding-reward-schema.js';
 import {EPISODE_BATCH_SCHEMA} from './episode-batch-schema.js';
+import {PUBLISHER_PROFILE_SCHEMA} from './publisher-profile-schema.js';
 import {FUNDING_RISK_SCHEMA} from './funding-risk-schema.js';
 
 export const DATABASE_SCHEMA = `
@@ -252,5 +253,6 @@ ${APPLE_AUTH_SCHEMA}
 ${ACCOUNT_EMAIL_SCHEMA}
 ${FUNDING_REWARD_SCHEMA}
 ${EPISODE_BATCH_SCHEMA}
+${PUBLISHER_PROFILE_SCHEMA}
 ${FUNDING_RISK_SCHEMA}
 `;

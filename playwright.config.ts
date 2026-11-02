@@ -1,4 +1,8 @@
 import {defineConfig} from '@playwright/test';
+import {randomUUID} from 'node:crypto';
+// Inherited by test workers so real local demo sessions can be shared across
+// files without carrying credentials into a later Playwright/server run.
+process.env.LINGYING_BROWSER_RUN_ID??=randomUUID();
 export default defineConfig({
   testDir:'./tests/browser',fullyParallel:false,workers:1,timeout:45000,
   use:{baseURL:'http://127.0.0.1:3001',browserName:'chromium',headless:true,launchOptions:{executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox']},screenshot:'only-on-failure',trace:'retain-on-failure'},

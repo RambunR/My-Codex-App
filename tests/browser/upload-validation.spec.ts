@@ -3,11 +3,12 @@ import {mkdtemp,mkdir,copyFile,writeFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
+import {demoAdminSession} from './helpers/admin-session';
 
 const draft={title:'Upload validation fixture',description:'A complete original series used to verify browser-independent episode validation.',language:'en',genres:['drama'],creation_type:'human',price_cents:10,free_episodes:1};
 const episodeRoute=/\/api\/studio\/series\/[^/]+\/episodes$/;
 async function editor(page:Page){
-  const login=await page.request.post('/api/auth/login',{data:{email:'admin@demo.aidramio.test',password:'DemoPass123!'}});expect(login.ok()).toBe(true);const user=(await login.json()).user;
+  const user=await demoAdminSession(page);
   const created=await page.request.post('/api/studio/series',{data:{...draft,title:`Upload validation ${Date.now()}`}});expect(created.status()).toBe(201);const{id}=await created.json();
   await page.goto(`/studio/series/${id}`);await expect(page.getByRole('button',{name:'Choose a folder',exact:true})).toBeEnabled();return{id,user};
 }
