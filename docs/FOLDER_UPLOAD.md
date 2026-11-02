@@ -16,6 +16,14 @@ On browsers supporting directory drag-and-drop, the upload area recursively read
 
 If directory drop is unavailable, use **Choose a folder**. Manual **Choose video files** and loose-file drops retain the formats supported by the current deployment; the MP4-only rule applies specifically to folder batches. Currently the Cloudflare uploader accepts browser-ready H.264/AAC MP4/MOV files; the standalone Node server can also process supported WebM input.
 
+## Video checks during a batch
+
+The browser checks the file-size limit before sending each episode. It does not require the browser's local video decoder to read every file first. The former twelve-second metadata probe could stop a valid file with “Unable to read video” before any upload request was sent; browser codec support, media errors or probe timeouts did not establish that the server would reject the file.
+
+The server remains authoritative: Cloudflare validates MP4 structure, movie/video/audio durations and H.264/AAC codecs; Node uses FFprobe before conversion. Both reject unreadable media and videos longer than 180 seconds. Size, quota and authorization checks remain enforced. A rejected file shows the server's reason and the remaining batch continues. Browser regressions cover a 34-file batch with a failing local decoder and genuine server rejection of invalid/overlong files.
+
+For a partially successful batch, use **Choose video files** to retry only failed files. New uploads append after the latest episode number; selecting the whole folder again does not replace or deduplicate existing episodes.
+
 ## Large uploads on Cloudflare
 
 The Cloudflare adapter streams each file into private R2 multipart storage using exact 5 MiB parts, with only the final part allowed to be smaller. It splits incoming network chunks at that boundary and waits for each storage write before continuing. Part sizes must not depend on the browser's or proxy's stream boundaries: R2 rejects unequal non-final parts, which previously caused HTTP 500 errors for larger valid episodes even though small test videos worked. Unicode filenames do not determine storage keys.

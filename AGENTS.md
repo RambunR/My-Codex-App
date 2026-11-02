@@ -71,6 +71,8 @@ Account records and financial transactions live in the SQLite-backed Durable Obj
 
 Cloudflare episode uploads use R2 multipart storage. All non-final parts must be the same exact 5 MiB size, independent of incoming network chunk boundaries. Preserve bounded buffering, write backpressure, multipart aborts, single callback completion and active-upload accounting. Validate upload changes with uneven-chunk multipart regressions and the large MP4 path in the local Cloudflare smoke; tiny preview fixtures alone do not exercise this failure. See [folder and large uploads](docs/FOLDER_UPLOAD.md).
 
+Do not restore a mandatory browser video-metadata/decoder gate before episode POSTs. Browser errors or the former twelve-second timeout produced false batch failures before authoritative validation. Keep the immediate input-size check and both servers' strict duration, media/codec, quota and ownership validation. Test a long batch with browser metadata decoding unavailable, plus real server rejection and continuation; accepting an upload request must not imply accepting an invalid episode.
+
 ## Creator series visibility and permanent deletion
 
 Creators can archive a published series to hide it and republish it while retaining its first-publication date, analytics and paid entitlements. Hidden content must be unavailable through public routes even to its owner or paid viewers; owner-only Studio preview is separate and does not count views. Administrative takedowns continue to prevent creator bypasses.

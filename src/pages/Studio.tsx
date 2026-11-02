@@ -94,7 +94,6 @@ function Stat({icon,label,value,detail,progress}:{icon:React.ReactNode;label:str
 
 interface QueueItem {name:string;path?:string;status:'waiting'|'uploading'|'processing'|'uploaded'|'failed';progress:number;error?:string}
 const defaultForm={title:'',description:'',language:'en',genres:['romance'],themes:[] as string[],format:'live-action' as string|null,creation_type:'human',price_cents:30,free_episodes:2};
-function videoDuration(file:File):Promise<number>{return new Promise((resolve,reject)=>{const v=document.createElement('video');const url=URL.createObjectURL(file);const timer=window.setTimeout(()=>finish(new Error('Unable to read video.')),12000);const finish=(error?:Error)=>{window.clearTimeout(timer);const d=v.duration;v.removeAttribute('src');v.load();URL.revokeObjectURL(url);error?reject(error):resolve(d);};v.preload='metadata';v.onloadedmetadata=()=>finish();v.onerror=()=>finish(new Error('Unable to read video.'));v.src=url;});}
 export function SeriesEditor(){return <AuthGate><SeriesEditorContent/></AuthGate>;}
 function SeriesEditorContent(){
   const{id}=useParams();const{t,locale}=useI18n();const{user,refreshUser,toast,config}=useApp();const navigate=useNavigate();const[params]=useSearchParams();const isAdmin=user?.role==='admin';const adminReturn=isAdmin&&params.get('from')==='admin';const backTo=adminReturn?'/admin?tab=content':'/studio';const backLabel=t(adminReturn?'contentAdmin':'mySeries');const{data,loading,error,refresh}=useApi<{series:Series&{taken_down?:boolean;moderation_reason?:string};episodes:Episode[];owner_storage?:{used_bytes:number;quota_bytes:number}}>(id?`/api/studio/series/${id}`:undefined);
@@ -158,9 +157,9 @@ function SeriesEditorContent(){
       for(let i=0;i<result.videos.length;i++){
         if(stop.current||!current())break;const f=result.videos[i].file;
         try{
-          if(f.size>MAX_EPISODE_BYTES)throw new Error(t('fileTooLarge'));updateQueue(i,{status:'processing'});
-          const duration=await videoDuration(f);if(!current()||stop.current)break;
-          if(!Number.isFinite(duration)||duration<=0||duration>180)throw new Error(t('invalidVideo'));
+          if(f.size>MAX_EPISODE_BYTES)throw new Error(t('fileTooLarge'));
+          // Browser metadata decoding can fail for an otherwise valid upload.
+          // Both servers enforce readable media, duration, codec and quota.
           updateQueue(i,{status:'uploading',progress:0});await uploadOne(f,number,i,current);if(!current())return;
           number++;updateQueue(i,{status:'uploaded',progress:100});await refreshUser();if(!current())return;refresh();
         }catch(error){if(!current())return;updateQueue(i,{status:'failed',error:error instanceof Error?error.message:t('failed')});}
