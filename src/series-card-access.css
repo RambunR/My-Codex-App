@@ -1,0 +1,11 @@
+.series-card .series-card-info > p {
+  flex-wrap: wrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.series-card .series-card-info > p > .series-free-label {
+  color: #8ee2aa;
+  font-weight: 600;
+  min-width: 0;
+  max-width: 100%;
+}
