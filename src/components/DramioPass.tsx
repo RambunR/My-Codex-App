@@ -44,7 +44,7 @@ function AdminUploadAccess({canUpload,held}:{canUpload:boolean;held:boolean}){
     <span className="admin-account-access-icon" aria-hidden="true"><ShieldCheck size={43} strokeWidth={1.4}/><Sparkles size={17}/></span>
     <div className="admin-account-access-copy">
       <div className="admin-account-access-heading"><h2 id="admin-account-access-title">{label('adminAccessTitle')}</h2><span className={`admin-account-upload-status ${canUpload?'is-enabled':'is-paused'}`} role="status">{canUpload?<Check size={13} aria-hidden="true"/>:<ShieldCheck size={13} aria-hidden="true"/>}{label(canUpload?'adminUploadEnabled':'adminUploadHeld')}</span></div>
-      <p>{label('adminUploadIncluded')}</p>
+      <p>{label('adminUploadIncluded')} {t('adminUnlimitedStorageBody')}</p>
       <div className="admin-account-actions"><Link className="button secondary" to="/admin?tab=content"><ShieldCheck size={16} aria-hidden="true"/>{label('adminOpenContent')}<ArrowUpRight size={15} aria-hidden="true"/></Link><Link className="button secondary" to="/studio"><Clapperboard size={16} aria-hidden="true"/>{label('adminOpenStudio')}<ArrowUpRight size={15} aria-hidden="true"/></Link>{canUpload?<Link className="button primary" to="/studio/new"><Upload size={16} aria-hidden="true"/>{label('adminUploadDrama')}<ArrowUpRight size={15} aria-hidden="true"/></Link>:<button className="button primary" type="button" disabled><Upload size={16} aria-hidden="true"/>{label('adminUploadDrama')}</button>}</div>
     </div>
   </section>;

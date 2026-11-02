@@ -1,3 +1,4 @@
+import {getOwnerStorage,withinStorageQuota} from './storage-quota.js';
 import { upload, coverUpload } from './uploads.js';
 import express, { type Request, type Response, type NextFunction } from 'express';
 import multer from 'multer';
@@ -55,7 +56,7 @@ function ownSeries(req: Request, seriesId = id(req)) {
 function writableSeries(req:Request,seriesId=id(req)){
   const s=ownSeries(req,seriesId);if(req.user!.role!=='admin')assertSeriesWritable(seriesId);return s;
 }
-function ownerStorage(series:Record<string,any>){return one<{quota_bytes:number;used_bytes:number}>('SELECT quota_bytes,used_bytes FROM users WHERE id=?',series.creator_id)!;}
+function ownerStorage(series:Record<string,any>){return getOwnerStorage(series.creator_id);}
 const catalogSelect = `SELECT s.*,u.name AS creator_name,COALESCE(sp.published_at,s.created_at) AS published_at,
  (${seriesAccessTypeSql()}) AS access_type,
  (SELECT id FROM episodes e WHERE e.series_id=s.id ORDER BY number LIMIT 1) AS first_episode_id,
@@ -355,7 +356,7 @@ export function createApp() {
     try {
       coverOwnerId=ownSeries(req).creator_id;
       processed=await prepareCover(req.file.path);saved=true;await putObject(processed.path,key,'image/webp');
-      const old=transaction(()=>{const s=writableSeries(req);assertPaymentAccountClear(s.creator_id);const u=ownerStorage(s);assert(u.used_bytes-s.cover_bytes+reservedEpisodeUploadBytes(s.creator_id)+processed!.bytes<=u.quota_bytes,413,'QUOTA_EXCEEDED','This cover exceeds your storage allowance.');run('UPDATE users SET used_bytes=used_bytes-?+? WHERE id=?',s.cover_bytes,processed!.bytes,s.creator_id);run('UPDATE series SET cover_key=?,cover_bytes=? WHERE id=?',key,processed!.bytes,s.id);return s.cover_key;});
+      const old=transaction(()=>{const s=writableSeries(req);assertPaymentAccountClear(s.creator_id);const u=ownerStorage(s);assert(withinStorageQuota(u,u.used_bytes-s.cover_bytes+reservedEpisodeUploadBytes(s.creator_id)+processed!.bytes),413,'QUOTA_EXCEEDED','This cover exceeds your storage allowance.');run('UPDATE users SET used_bytes=used_bytes-?+? WHERE id=?',s.cover_bytes,processed!.bytes,s.creator_id);run('UPDATE series SET cover_key=?,cover_bytes=? WHERE id=?',key,processed!.bytes,s.id);return s.cover_key;});
       saved=false;
       if(old)void finishInBackground(queueUnreferencedSeriesMedia(id(req),coverOwnerId,old)).catch(()=>console.warn('Old cover cleanup remains pending.'));res.json({cover:apiUrl(`/api/studio/series/${id(req)}/cover`),user:getUser(req.user!.id),owner_storage:ownerStorage(ownSeries(req))});
     } catch(error) { if(saved)try{await queueUnreferencedSeriesMedia(id(req),coverOwnerId,key);}catch{console.warn('Uncommitted cover cleanup could not be queued.');}throw error; }
@@ -368,9 +369,9 @@ export function createApp() {
       assert(req.file.size<=MAX_EPISODE_BYTES,413,'FILE_TOO_LARGE',`Episodes must be ${MAX_EPISODE_BYTES/1024**2} MiB or less.`);target=writableSeries(req);key=`videos/${target.creator_id}/${crypto.randomUUID()}.mp4`;
       const body=z.object({title:z.string().trim().min(1).max(120),number:z.coerce.number().int().min(1).max(1000)}).parse(req.body);
       assert(!one('SELECT id FROM episodes WHERE series_id=? AND number=?',id(req),body.number),409,'EPISODE_EXISTS','An episode with this number already exists.');
-      const u=ownerStorage(target);assert(u.used_bytes+reservedEpisodeUploadBytes(target.creator_id)+req.file.size<=u.quota_bytes,413,'QUOTA_EXCEEDED','Not enough storage. Request an increase from your studio.');
+      const u=ownerStorage(target);assert(withinStorageQuota(u,u.used_bytes+reservedEpisodeUploadBytes(target.creator_id)+req.file.size),413,'QUOTA_EXCEEDED','Not enough storage. Request an increase from your studio.');
       processed=await prepareVideo(req.file.path);saved=true;await putObject(processed.path,key,'video/mp4');
-      const episodeId=transaction(()=>{const s=writableSeries(req);assertPaymentAccountClear(s.creator_id);const user=ownerStorage(s);assert(user.used_bytes+reservedEpisodeUploadBytes(s.creator_id)+processed!.bytes<=user.quota_bytes,413,'QUOTA_EXCEEDED','Not enough storage. Request an increase.');
+      const episodeId=transaction(()=>{const s=writableSeries(req);assertPaymentAccountClear(s.creator_id);const user=ownerStorage(s);assert(withinStorageQuota(user,user.used_bytes+reservedEpisodeUploadBytes(s.creator_id)+processed!.bytes),413,'QUOTA_EXCEEDED','Not enough storage. Request an increase.');
         assert(!one('SELECT id FROM episodes WHERE series_id=? AND number=?',id(req),body.number),409,'EPISODE_EXISTS','An episode with this number already exists.');
         const eid=crypto.randomUUID();run('INSERT INTO episodes (id,series_id,title,number,duration,bytes,storage_key,original_name) VALUES (?,?,?,?,?,?,?,?)',eid,id(req),body.title,body.number,legacyEpisodeDuration(processed!.duration),processed!.bytes,key,req.file!.originalname.slice(0,255));writeEpisodeDuration(eid,processed!.duration);run('UPDATE users SET used_bytes=used_bytes+? WHERE id=?',processed!.bytes,s.creator_id);return eid;});
       saved=false;res.status(201).json({id:episodeId,user:getUser(req.user!.id),owner_storage:ownerStorage(target),duration:processed.duration,bytes:processed.bytes});
@@ -399,6 +400,7 @@ export function createApp() {
     });res.json({ok:true});
   });
   app.post('/api/studio/storage-requests', requirePublisher, (req,res) => {
+    assert(!req.user!.storage_unlimited,400,'STORAGE_UNLIMITED','Administrator upload storage is already unlimited.');
     const b=z.object({requested_gb:z.number().int().min(6).max(1000),reason:z.string().trim().min(10).max(1000)}).parse(req.body);
     assert(!one("SELECT id FROM storage_requests WHERE user_id=? AND status='pending'",req.user!.id),409,'REQUEST_PENDING','You already have a storage request awaiting review.');
     assert(b.requested_gb*1024**3>req.user!.quota_bytes,400,'INVALID_QUOTA','Request a larger total storage allowance.');
@@ -449,7 +451,7 @@ export function createApp() {
       sales:one(`SELECT COUNT(*) AS n,COALESCE(SUM(price_micros),0) AS gross_micros,COALESCE(SUM(platform_micros),0) AS platform_micros FROM ${purchaseTable()}`),activation_hkd:one(`SELECT COALESCE(SUM(amount_cents),0)/100.0 AS n FROM ${paymentTable()} WHERE kind='activation' AND status='paid'`)!.n},
     storageRequests:all('SELECT r.*,u.name,u.email,u.quota_bytes,u.used_bytes FROM storage_requests r JOIN users u ON u.id=r.user_id ORDER BY r.created_at DESC'),
     withdrawals:stripeTestPayments()?[]:all('SELECT w.*,u.name,u.email,u.stripe_account_id FROM withdrawals w JOIN users u ON u.id=w.user_id ORDER BY w.created_at DESC'),
-    users:all('SELECT id,name,email,role,publisher_active,quota_bytes,used_bytes FROM users ORDER BY created_at DESC LIMIT 200').map(user=>usingTestPaymentState()?{...user,role:getUser(user.id)!.role,publisher_active:getUser(user.id)!.publisher_active}:user),
+    users:all('SELECT id,name,email,role,publisher_active,quota_bytes,used_bytes FROM users ORDER BY created_at DESC LIMIT 200').map(user=>{const current=usingTestPaymentState()?{...user,role:getUser(user.id)!.role,publisher_active:getUser(user.id)!.publisher_active}:user;return{...current,storage_unlimited:current.role==='admin'};}),
   }));
   app.post('/api/admin/storage-requests/:id', requireAdmin, (req,res) => {
     const {approve}=z.object({approve:z.boolean()}).parse(req.body);

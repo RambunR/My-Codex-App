@@ -155,6 +155,9 @@ try{
   await request('/api/admin/publishers',undefined,viewer,403);
   await request('/api/admin/publishers',undefined,publisher,403);
   const adminBeforeProfiles=(await request('/api/auth/me',undefined,admin)).data.user;
+  assert.equal(adminBeforeProfiles.storage_unlimited,true);
+  assert.equal(adminBeforeProfiles.quota_bytes,5*1024**3,'Unlimited access must not inflate the persisted quota.');
+  assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.storage_unlimited,false);
   const profileUsersBefore=(await request('/api/admin',undefined,admin)).data.users.length;
   const initialPublishers=(await request('/api/admin/publishers',undefined,admin)).data;
   const officialPublisher=initialPublishers.publishers.find(profile=>profile.id===initialPublishers.default_publisher_id);
@@ -228,6 +231,8 @@ try{
   const profileSeriesBody={...body,title:'Managed Publisher Showcase',language:'en',genres:['comedy'],themes:[],format:'live-action',free_episodes:1};
   const profileSeriesId=(await request('/api/studio/series',{...profileSeriesBody,subtitle_languages:allSubtitleLanguages},admin,201)).data.id;
   const profileSeriesPath=`/api/studio/series/${profileSeriesId}`;
+  assert.equal((await request(profileSeriesPath,undefined,admin)).data.owner_storage.storage_unlimited,true);
+  assert.equal((await request(`/api/studio/series/${sid}`,undefined,admin)).data.owner_storage.storage_unlimited,false,'Storage follows the publisher owner, not the administrator actor.');
   const defaultAttribution=(await request(profileSeriesPath,undefined,admin)).data.series;
   assert.equal(defaultAttribution.publisher_id,officialPublisher.id);assert.equal(defaultAttribution.creator_name,officialPublisher.display_name);assert.equal(defaultAttribution.creator_id,adminBeforeProfiles.id);
   assert.equal(defaultAttribution.cover_aspect_ratio,'9:16');
@@ -238,8 +243,10 @@ try{
   await request('/api/studio/series',{...body,title:'Forged Managed Publisher',publisher_profile_id:managedPublisher.id},publisher,403);
   await request(`/api/studio/series/${sid}`,{...body,publisher_profile_id:managedPublisher.id},publisher,403,'PATCH');
   await request(`/api/studio/series/${sid}`,{...body,publisher_profile_id:managedPublisher.id},admin,403,'PATCH');
-  await upload(profileSeriesPath+'/cover',cover,'profile-cover.jpg',admin,{},'cover',200);
-  await upload(profileSeriesPath+'/episodes',video,'Profile 001.mp4',admin,{title:'Profile episode 001',number:1});
+  const adminCoverUpload=await upload(profileSeriesPath+'/cover',cover,'profile-cover.jpg',admin,{},'cover',200);
+  assert.equal(adminCoverUpload.owner_storage.storage_unlimited,true);
+  const adminVideoUpload=await upload(profileSeriesPath+'/episodes',video,'Profile 001.mp4',admin,{title:'Profile episode 001',number:1});
+  assert.equal(adminVideoUpload.owner_storage.storage_unlimited,true);
   await request(profileSeriesPath+'/status',{status:'published'},admin);
   const profilePublished=(await request(`/api/series/${profileSeriesId}`)).data.series;
   assert.equal(profilePublished.creator_name,editedPublisher.display_name);assert.equal(profilePublished.publisher_id,managedPublisher.id);assert.equal('creator_id' in profilePublished,false);
@@ -247,6 +254,11 @@ try{
   assert.equal(managedPublicProfile.publisher.registered_at,editedPublisher.registered_at);assert.equal(managedPublicProfile.stats.series_count,1);assert.equal(managedPublicProfile.stats.episode_count,1);assert.equal(managedPublicProfile.stats.likes,0);assert.equal(managedPublicProfile.stats.views,0);
   assert.equal(managedPublicProfile.series[0].id,profileSeriesId);assert.equal(managedPublicProfile.pagination.total,1);
   assert.deepEqual(profilePublished.subtitle_languages,allSubtitleLanguages);assert.deepEqual(managedPublicProfile.series[0].subtitle_languages,allSubtitleLanguages);
+  const adminChunk=await chunkedEpisode(profileSeriesPath+'/episode-uploads',video.length,(offset,length)=>video.subarray(offset,offset+length),'Profile 002.mp4',admin,{title:'Profile episode 002',number:2});
+  assert.equal(adminChunk.episode.owner_storage.storage_unlimited,true);
+  assert.equal(adminChunk.episode.owner_storage.used_bytes,cover.length+video.length*2);
+  assert.equal(adminChunk.episode.owner_storage.quota_bytes,5*1024**3);
+  console.log('PASS: administrator storage policy is serialized for covers, direct/chunked episodes and replays, tracks actual bytes, and follows the owner.');
   await request(profileSeriesPath,{...profileSeriesBody,subtitle_languages:[]},admin,200,'PATCH');
   assert.deepEqual((await request(profileSeriesPath,undefined,admin)).data.series.subtitle_languages,[]);
   assert.deepEqual((await request(`/api/series/${profileSeriesId}`)).data.series.subtitle_languages,[]);
@@ -605,6 +617,7 @@ try{
   const retainedLocalCatalogue=(await request('/api/series')).data.series;
   assert.ok(series.every(sample=>retainedLocalCatalogue.some(item=>item.id===sample.id)),'Production-mode local restarts must preserve disposable sample fixtures outside the production canonical host.');
   assert.equal((await request(profileSeriesPath,undefined,admin)).data.series.cover_aspect_ratio,'16:9');
+  assert.equal((await request(profileSeriesPath,undefined,admin)).data.owner_storage.storage_unlimited,true);
   assert.equal((await request(`/api/series/${profileSeriesId}`)).data.series.cover_aspect_ratio,'16:9');
   assert.deepEqual((await request(profileSeriesPath,undefined,admin)).data.series.subtitle_languages,profileSubtitles);
   assert.deepEqual((await request(`/api/series/${profileSeriesId}`)).data.series.subtitle_languages,profileSubtitles);

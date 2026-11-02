@@ -69,7 +69,8 @@ test('administrator can edit another creator privately and upload own drama with
   await expect(page).toHaveURL(/\/studio\/new\?from=admin/);
   await expect(page.locator('#series-title')).toBeEditable();
   await expect(page.getByRole('button',{name:'Choose a folder',exact:true})).toBeDisabled();
-  await expect(page.getByText('No Creator Pass payment is required for administrators.',{exact:false})).toBeVisible();
+  await expect(page.getByText('Admin-owned series have unlimited total storage.',{exact:false})).toBeVisible();
+  await expect(page.getByText('Administrators do not need a paid Creator Pass.',{exact:false})).toBeVisible();
   await page.goto('/studio');
   await expect(page.getByRole('link',{name:'New series',exact:true}).first()).toBeVisible();
   await expect(page.locator('.content-admin-upload-note')).toContainText('LingYingDrama Offical');

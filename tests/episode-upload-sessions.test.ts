@@ -204,3 +204,34 @@ test('a part finishing after series deletion is not recorded and its durable ses
   await sending;beforePart=undefined;const service=await import('../server/episode-upload-sessions');await service.cleanupExpiredEpisodeUploads();
   assert.equal(one('SELECT COUNT(*) AS n FROM episode_upload_parts WHERE session_id=?',session.id)!.n,0);assert.equal(service.reservedEpisodeUploadBytes(f.owner.id),0);assert.equal(used(f),0);
 });
+
+test('administrator-owned chunked uploads reserve and account actual bytes above quota with safe completion replay',async()=>{
+  const f=fixture(),prior=6*1024**3;run("UPDATE users SET role='admin',publisher_active=0,quota_bytes=0,used_bytes=? WHERE id=?",prior,f.owner.id);
+  const before=financial(),bytes=Buffer.from('Administrator episode beyond any numeric quota'),session=await start(f,bytes.length),second=await start(f,17,2),service=await import('../server/episode-upload-sessions');
+  assert.equal(service.reservedEpisodeUploadBytes(f.owner.id),bytes.length+17);assert.equal(used(f),prior);
+  await request(partRoute(f,session.id,1),bytes,f.owner,200,'PUT');const first=(await request(completeRoute(f,session.id),{},f.owner,201)).data;
+  assert.equal(first.owner_storage.storage_unlimited,true);assert.equal(first.user.storage_unlimited,true);assert.equal(first.owner_storage.quota_bytes,0);assert.equal(first.owner_storage.used_bytes,prior+bytes.length);assert.equal(service.reservedEpisodeUploadBytes(f.owner.id),17);
+  const replay=(await request(completeRoute(f,session.id),{},f.owner)).data;assert.equal(replay.id,first.id);assert.equal(used(f),prior+bytes.length);assert.deepEqual(financial(),before);
+  await request(f.route+'/'+second.id,undefined,f.owner,200,'DELETE');assert.equal(service.reservedEpisodeUploadBytes(f.owner.id),0);assert.equal(used(f),prior+bytes.length);
+  await request(f.route,input(MAX_EPISODE_BYTES+1,3),f.owner,413);
+});
+
+test('an administrator uploading to a publisher-owned series still obeys that owner quota and reservations',async()=>{
+  const f=fixture();run('UPDATE users SET quota_bytes=0 WHERE id=?',f.owner.id);
+  const denied=await request(f.route,input(17),f.admin,413);assert.equal(denied.data.error.code,'QUOTA_EXCEEDED');assert.equal(used(f),0);
+  run('UPDATE users SET quota_bytes=17 WHERE id=?',f.owner.id);const session=await start(f,17,1,f.admin);await request(f.route,input(1,2),f.admin,413);await request(f.route+'/'+session.id,undefined,f.admin,200,'DELETE');
+});
+
+test('a role removed while chunked media validates cannot commit beyond the retained publisher quota',async()=>{
+  const f=fixture();run("UPDATE users SET role='admin',quota_bytes=0 WHERE id=?",f.owner.id);const{session}=await uploadSmall(f);
+  beforeValidate=async()=>{run("UPDATE users SET role='publisher',publisher_active=1 WHERE id=?",f.owner.id);};
+  const result=await request(completeRoute(f,session.id),{},f.owner,413);assert.equal(result.data.error.code,'QUOTA_EXCEEDED');assert.equal(used(f),0);assert.equal(one('SELECT COUNT(*) AS n FROM episodes WHERE series_id=?',f.series)!.n,0);
+  const service=await import('../server/episode-upload-sessions');assert.equal(service.reservedEpisodeUploadBytes(f.owner.id),0);
+});
+
+test('unlimited administrator chunked uploads retain duration validation and financial hold guards',async()=>{
+  const f=fixture();run("UPDATE users SET role='admin',quota_bytes=0 WHERE id=?",f.owner.id);const{session}=await uploadSmall(f);validationDuration=241;
+  const invalid=await request(completeRoute(f,session.id),{},f.owner,422);assert.equal(invalid.data.error.code,'VIDEO_TOO_LONG');assert.equal(used(f),0);
+  const hold=randomUUID();run('INSERT INTO payment_risk_cases (id,table_group,livemode,kind,provider_object_id,user_id,status) VALUES (?,?,?,?,?,?,?)',hold,'default',0,'dispute','unlimited-chunk-hold-'+hold,f.owner.id,'open');
+  try{await request(f.route,input(17,2),f.owner,423);}finally{run("UPDATE payment_risk_cases SET status='resolved' WHERE id=?",hold);}
+});

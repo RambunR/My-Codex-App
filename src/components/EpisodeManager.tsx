@@ -4,12 +4,12 @@ import {api,post,ApiError} from '../api';
 import {useApp} from '../context';
 import {useI18n} from '../i18n';
 import {Button,Loading,Modal} from '../ui';
-import {bytes,usd,type Episode} from '../../shared/config';
+import {bytes,usd,type Episode,type StorageUsage} from '../../shared/config';
 import {batchEpisodeTitle,MAX_EPISODE_BATCH_BASE_NAME} from '../../shared/episode-batch';
 import '../episode-manager.css';
 
 interface ManagedSeries {id:string;title:string;status:string;free_episodes:number;price_cents:number}
-export interface EpisodeMutationResult {ok:boolean;episodes:Episode[];episodes_revision:string;cleanup_pending?:boolean;owner_storage?:{used_bytes:number;quota_bytes:number}}
+export interface EpisodeMutationResult {ok:boolean;episodes:Episode[];episodes_revision:string;cleanup_pending?:boolean;owner_storage?:StorageUsage}
 interface DeletePreview {
   series:{id:string;title:string};
   summary:{episode_count:number;views:number;total_watch_seconds:number;media_bytes:number;real_paid_unlocks:number;test_paid_unlocks:number;paid_episode_count:number};

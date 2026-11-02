@@ -1,3 +1,4 @@
+import {getOwnerStorage} from './storage-quota.js';
 import crypto from 'node:crypto';
 import type {Express,Request} from 'express';
 import {z} from 'zod';
@@ -60,7 +61,7 @@ function audit(actorId:string,seriesId:string,action:'rename'|'reorder'|'delete'
   run('INSERT INTO episode_batch_events (id,series_id,actor_id,action,snapshot_json) VALUES (?,?,?,?,?)',crypto.randomUUID(),seriesId,actorId,action,JSON.stringify(snapshot));
 }
 const editorial=(episodes:Row[])=>episodes.map(({id,title,number})=>({id,title,number}));
-function stateResponse(req:Request,series:Row){return{episodes:publicEpisodes(series.id),episodes_revision:episodeBatchRevision(series.id),user:getUser(req.user!.id),owner_storage:one('SELECT used_bytes,quota_bytes FROM users WHERE id=?',series.creator_id)};}
+function stateResponse(req:Request,series:Row){return{episodes:publicEpisodes(series.id),episodes_revision:episodeBatchRevision(series.id),user:getUser(req.user!.id),owner_storage:getOwnerStorage(series.creator_id)};}
 function verifyDeletion(req:Request,input:z.infer<typeof mutationSchema>&{action:'delete'}){
   const state=selection(req,input),proof=one('SELECT * FROM episode_batch_confirmations WHERE token_hash=? AND series_id=? AND actor_id=?',hash(input.confirmation_token),state.series.id,req.user!.id);
   assert(proof&&proof.revision===state.revision&&proof.selection_hash===selectionHash(input.episode_ids),400,'EPISODE_BATCH_CONFIRM_INVALID','Review the selected episodes again before deleting.');

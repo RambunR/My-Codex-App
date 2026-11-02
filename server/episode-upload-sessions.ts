@@ -1,3 +1,5 @@
+import {getOwnerStorage,withinStorageQuota} from './storage-quota.js';
+import type {StorageUsage} from '../shared/config.js';
 import crypto from 'node:crypto';
 import express,{type Express,type Request} from 'express';
 import {z} from 'zod';
@@ -14,7 +16,7 @@ import {legacyEpisodeDuration,writeEpisodeDuration} from './episode-duration.js'
 export const EPISODE_UPLOAD_CHUNK_BYTES=5*1024*1024;
 const LIFETIME=60*60_000;
 type Row=Record<string,any>;
-interface Helpers {writableSeries(req:Request,seriesId?:string):Row;ownerStorage(series:Row):{used_bytes:number;quota_bytes:number}}
+interface Helpers {writableSeries(req:Request,seriesId?:string):Row;ownerStorage(series:Row):StorageUsage}
 const locks=new Map<string,Promise<void>>();
 async function locked<T>(id:string,work:()=>Promise<T>):Promise<T>{
   const previous=locks.get(id)||Promise.resolve();let release!:()=>void;const current=new Promise<void>(resolve=>{release=resolve;});locks.set(id,current);
@@ -55,7 +57,7 @@ export async function cleanupExpiredEpisodeUploads(limit=10,now=Date.now(),stora
 }
 function response(session:Row){
   const episode=one('SELECT e.id,COALESCE(d.seconds,e.duration) AS duration,e.bytes FROM episodes e LEFT JOIN episode_durations d ON d.episode_id=e.id WHERE e.id=?',session.episode_id);assert(episode,404,'NOT_FOUND','Uploaded episode no longer exists.');
-  return{...episode,user:getUser(session.actor_id),owner_storage:one('SELECT used_bytes,quota_bytes FROM users WHERE id=?',session.creator_id)};
+  return{...episode,user:getUser(session.actor_id),owner_storage:getOwnerStorage(session.creator_id)};
 }
 let rawRequests=0;
 export function registerEpisodeUploadSessions(app:Express,helpers:Helpers,storage:EpisodeUploadStorage=episodeUploadStorage){
@@ -71,7 +73,7 @@ export function registerEpisodeUploadSessions(app:Express,helpers:Helpers,storag
       assert(!one('SELECT id FROM episodes WHERE series_id=? AND number=?',series.id,body.number),409,'EPISODE_EXISTS','An episode with this number already exists.');
       assert(!one("SELECT id FROM episode_upload_sessions WHERE series_id=? AND number=? AND status<>'complete' AND (status<>'cancelled' OR cleanup_pending=1)",series.id,body.number),409,'EPISODE_UPLOAD_EXISTS','This episode already has an upload in progress.');
       assert(Number(one("SELECT COUNT(*) AS n FROM episode_upload_sessions WHERE creator_id=? AND status<>'complete' AND (status<>'cancelled' OR cleanup_pending=1)",series.creator_id)!.n)<3,503,'SERVER_BUSY','Finish or cancel an existing upload before starting another.');
-      assert(owner.used_bytes+reservedEpisodeUploadBytes(series.creator_id)+body.size<=owner.quota_bytes,413,'QUOTA_EXCEEDED','Not enough storage. Request an increase from your studio.');
+      assert(withinStorageQuota(owner,owner.used_bytes+reservedEpisodeUploadBytes(series.creator_id)+body.size),413,'QUOTA_EXCEEDED','Not enough storage. Request an increase from your studio.');
       const key=`videos/${series.creator_id}/${episodeId}.mp4`,filename=body.filename.split(/[\\/]/).at(-1)!.replace(/[\u0000-\u001f]/g,'');
       run('INSERT INTO episode_upload_sessions (id,series_id,actor_id,creator_id,object_key,episode_id,title,number,filename,total_bytes,created_at_ms,expires_at_ms) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',uploadId,series.id,req.user!.id,series.creator_id,key,episodeId,body.title,body.number,filename,body.size,now,now+LIFETIME);
       return one('SELECT * FROM episode_upload_sessions WHERE id=?',uploadId)!;
@@ -131,7 +133,7 @@ export function registerEpisodeUploadSessions(app:Express,helpers:Helpers,storag
         assert(media.duration<=MAX_EPISODE_SECONDS,422,'VIDEO_TOO_LONG',`Episodes must be ${MAX_EPISODE_SECONDS/60} minutes or less.`);
         transaction(()=>{
           const latest=owned(req),series=writable(req,latest,helpers);assert(latest.status==='completing',409,'UPLOAD_CLOSED','This upload was cancelled.');const owner=helpers.ownerStorage(series);
-          assert(owner.used_bytes+reservedEpisodeUploadBytes(series.creator_id,latest.id)+media.bytes<=owner.quota_bytes,413,'QUOTA_EXCEEDED','Not enough storage. Request an increase.');
+          assert(withinStorageQuota(owner,owner.used_bytes+reservedEpisodeUploadBytes(series.creator_id,latest.id)+media.bytes),413,'QUOTA_EXCEEDED','Not enough storage. Request an increase.');
           assert(!one('SELECT id FROM episodes WHERE series_id=? AND number=?',series.id,latest.number),409,'EPISODE_EXISTS','An episode with this number already exists.');
           run('INSERT INTO episodes (id,series_id,title,number,duration,bytes,storage_key,original_name) VALUES (?,?,?,?,?,?,?,?)',latest.episode_id,series.id,latest.title,latest.number,legacyEpisodeDuration(media.duration),media.bytes,latest.object_key,latest.filename);writeEpisodeDuration(latest.episode_id,media.duration);
           run('UPDATE users SET used_bytes=used_bytes+? WHERE id=?',media.bytes,series.creator_id);

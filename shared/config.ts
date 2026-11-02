@@ -46,9 +46,10 @@ export interface PublisherPage {
   series:Series[];
   pagination:{page:number;page_size:number;total:number;total_pages:number};
 }
-export interface User {
+export interface StorageUsage {used_bytes:number;quota_bytes:number;storage_unlimited?:boolean}
+export interface User extends StorageUsage {
   id: string; name: string; email: string; role: 'viewer' | 'publisher' | 'admin'; publisher_active: number;
-  wallet_micros: number; earnings_micros: number; quota_bytes: number; used_bytes: number; language: string;
+  wallet_micros: number; earnings_micros: number; language: string;
   stripe_account_id?: string; connected?: boolean;
   creator_display_name?: string;
   email_verified?: boolean;
