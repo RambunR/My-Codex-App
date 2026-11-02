@@ -16,6 +16,12 @@ On browsers supporting directory drag-and-drop, the upload area recursively read
 
 If directory drop is unavailable, use **Choose a folder**. Manual **Choose video files** and loose-file drops retain the formats supported by the current deployment; the MP4-only rule applies specifically to folder batches. Currently the Cloudflare uploader accepts browser-ready H.264/AAC MP4/MOV files; the standalone Node server can also process supported WebM input.
 
+## Large uploads on Cloudflare
+
+The Cloudflare adapter streams each file into private R2 multipart storage using exact 5 MiB parts, with only the final part allowed to be smaller. It splits incoming network chunks at that boundary and waits for each storage write before continuing. Part sizes must not depend on the browser's or proxy's stream boundaries: R2 rejects unequal non-final parts, which previously caused HTTP 500 errors for larger valid episodes even though small test videos worked. Unicode filenames do not determine storage keys.
+
+The upload tests exercise uneven incoming chunks, boundary sizes and failed/aborted multipart writes. The local Cloudflare integration check uploads and reads a valid MP4 larger than two parts, verifies exact bytes and quota, then checks permanent deletion and restart persistence. The 180-second, 75 MiB and publisher quota limits remain enforced.
+
 The client bounds a batch to 1,000 accepted videos and 20,000 encountered entries. Larger folders receive a clear request to choose a smaller subfolder. All folder hints, summaries and error messages are available in the platform's 21 interface languages.
 
 Implementation: [folder selection and directory traversal](../src/folder-upload.ts), [creator editor](../src/pages/Studio.tsx). These helpers operate on browser File objects and never open a user-supplied filesystem path on the server.

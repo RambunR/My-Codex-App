@@ -306,9 +306,20 @@ try{
   const disposableId=(await request('/api/studio/series',deletionBody,publisher,201)).data.id;
   const disposablePath=`/api/studio/series/${disposableId}`;
   await upload(disposablePath+'/cover',cover,'disposable-cover.jpg',publisher,{},'cover',200);
-  const disposableEpisode=await upload(disposablePath+'/episodes',video,'Disposable 01.mp4',publisher,{title:'Disposable paid episode',number:1});
+  // A valid MP4 free box keeps the source video playable while exercising
+  // three R2 parts. Tiny preview files never exposed unequal multipart sizes.
+  const padding=Buffer.alloc(13*1024*1024+137,0x5b),freeBox=Buffer.alloc(8);
+  freeBox.writeUInt32BE(padding.length+8,0);freeBox.write('free',4,'ascii');
+  const largeVideo=Buffer.concat([video,freeBox,padding]);
+  const disposableEpisode=await upload(disposablePath+'/episodes',largeVideo,'001_He Said I Wasn’t Smart Enough for Cambri_001.mp4',publisher,{title:'Disposable paid episode',number:1});
+  assert.equal(disposableEpisode.bytes,largeVideo.length);assert.ok(disposableEpisode.duration>0&&disposableEpisode.duration<=180);
+  const uploadedTail=await fetch(base+`/api/studio/episodes/${disposableEpisode.id}/stream`,{headers:{Cookie:publisher,Range:'bytes=-32'}});
+  assert.equal(uploadedTail.status,206);assert.deepEqual(Buffer.from(await uploadedTail.arrayBuffer()),padding.subarray(-32));
+  const uploadedComplete=await fetch(base+`/api/studio/episodes/${disposableEpisode.id}/stream`,{headers:{Cookie:publisher}});
+  assert.equal(uploadedComplete.status,200);
+  assert.equal(createHash('sha256').update(Buffer.from(await uploadedComplete.arrayBuffer())).digest('hex'),createHash('sha256').update(largeVideo).digest('hex'));
   await request(disposablePath+'/status',{status:'published'},publisher);
-  const disposableBytes=cover.length+video.length;
+  const disposableBytes=cover.length+largeVideo.length;
   assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.used_bytes,used+disposableBytes);
   await request(`/api/series/${disposableId}/like`,{liked:true},viewer,200,'PUT');
   await request(`/api/series/${disposableId}/save`,{},viewer);
