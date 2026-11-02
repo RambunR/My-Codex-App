@@ -23,6 +23,7 @@ import { startPlayback,recordPlayback,readSeriesAnalytics } from './analytics.js
 import { LANGUAGES, GENRES, MAX_EPISODE_BYTES, DEFAULT_QUOTA_BYTES,MIN_WALLET_FUNDING_CENTS,MAX_WALLET_FUNDING_CENTS } from '../shared/config.js';
 import {SERIES_LIMITS} from '../shared/series-validation.js';
 import {STANDARD_GENRES,STORY_THEMES,SERIES_FORMATS,CREATION_TYPES} from '../shared/taxonomy.js';
+import {passPromotionOffer} from '../shared/pass-promotion.js';
 import {themesSchema,formatSchema,seriesClassification,writeSeriesClassification,SERIES_FORMAT_SQL} from './taxonomy.js';
 
 const language = z.enum(LANGUAGES.map(x => x.code) as [string, ...string[]]);
@@ -127,7 +128,7 @@ export function createApp() {
   registerAppleAuth(app);
   registerEmailAuth(app);
   app.get('/api/health', (_req,res) => res.json({ ok: true, database: !!one('SELECT 1 AS ready') }));
-  app.get('/api/config', async (_req,res) => {if(config.payments==='stripe'&&stripeConfigured())await ensureStripeWebhookReady(stripe);return res.json({ brand: 'LingYing', languages: LANGUAGES, genres: GENRES,standardGenres:STANDARD_GENRES,storyThemes:STORY_THEMES,formats:SERIES_FORMATS,creationTypes:CREATION_TYPES, paymentsMode: config.payments,paymentsReady:paymentsReady(),paymentsConfigured:stripeConfigured(),paymentSetup:stripeWebhookReadiness(),sandbox:config.sandbox,paymentsTestMode:stripeTestPayments()||config.payments==='demo',payoutsEnabled:config.payoutsEnabled&&!stripeTestPayments(),uploadsEnabled:!config.sandbox,usdToHkd: config.usdToHkd,
+  app.get('/api/config', async (_req,res) => {if(config.payments==='stripe'&&stripeConfigured())await ensureStripeWebhookReady(stripe);return res.json({ brand: 'LingYing', languages: LANGUAGES, genres: GENRES,standardGenres:STANDARD_GENRES,storyThemes:STORY_THEMES,formats:SERIES_FORMATS,creationTypes:CREATION_TYPES, passPromotion:passPromotionOffer(config.passPromotionEnabled),paymentsMode: config.payments,paymentsReady:paymentsReady(),paymentsConfigured:stripeConfigured(),paymentSetup:stripeWebhookReadiness(),sandbox:config.sandbox,paymentsTestMode:stripeTestPayments()||config.payments==='demo',payoutsEnabled:config.payoutsEnabled&&!stripeTestPayments(),uploadsEnabled:!config.sandbox,usdToHkd: config.usdToHkd,
     limits: { maxEpisodeSeconds: 180, maxEpisodeBytes: MAX_EPISODE_BYTES, quotaBytes: DEFAULT_QUOTA_BYTES, activationHkd: 88, minimumPriceUsd: 0.1, creatorShare: 0.7, minimumPayoutHkd: 20,minWalletFundingUsd:MIN_WALLET_FUNDING_CENTS/100,maxWalletFundingUsd:MAX_WALLET_FUNDING_CENTS/100 }, demo: config.seed, runtime: (config as any).runtime || 'node', videoFormats: (config as any).videoFormats || ['mp4','mov','webm','m4v'], auth:{google:googleEnabled(),apple:appleEnabled(),email:emailAuthEnabled()} });});
   app.get('/api/auth/me', (req,res) => res.json({ user: req.user || null }));
   app.post('/api/auth/register', rateLimit('register', 12, 15 * 60_000), async (req,res) => {
@@ -221,10 +222,10 @@ export function createApp() {
       FROM progress p JOIN episodes e ON e.id=p.episode_id JOIN series s ON s.id=e.series_id JOIN users u ON u.id=s.creator_id WHERE p.user_id=? AND s.status='published' AND ${publicSeriesAllowedSql('s')} ORDER BY p.updated_at DESC LIMIT 50`,req.user!.id);
     const seen=new Set(); res.json({ history: rows.filter(s=>{if(seen.has(s.id))return false;seen.add(s.id);return true;}).map(s=>serializeSeries(s,req.user!.id)) });
   });
-  app.get('/api/wallet', requireAuth, (req,res) => res.json({ user: getUser(req.user!.id), ledger: all(`SELECT * FROM ${ledgerTable()} WHERE user_id=? ORDER BY created_at DESC,rowid DESC LIMIT 100`,req.user!.id), payments: all(`SELECT id,kind,amount_cents,currency,status,created_at FROM ${paymentTable()} WHERE user_id=? ORDER BY created_at DESC LIMIT 30`,req.user!.id) }));
+  app.get('/api/wallet', requireAuth, (req,res) => res.json({ user: getUser(req.user!.id), ledger: all(`SELECT l.*,p.amount_cents AS payment_amount_cents,p.currency AS payment_currency FROM ${ledgerTable()} l LEFT JOIN ${paymentTable()} p ON p.id=l.reference_id AND p.user_id=l.user_id AND p.kind='activation' WHERE l.user_id=? ORDER BY l.created_at DESC,l.rowid DESC LIMIT 100`,req.user!.id), payments: all(`SELECT id,kind,amount_cents,currency,status,created_at FROM ${paymentTable()} WHERE user_id=? ORDER BY created_at DESC LIMIT 30`,req.user!.id) }));
   app.post('/api/payments/checkout', requireAuth, rateLimit('checkout',20,60_000), async (req,res) => {
-    const body=z.discriminatedUnion('kind',[z.object({kind:z.literal('activation')}),z.object({kind:z.literal('funding'),amount_cents:z.number().int().min(MIN_WALLET_FUNDING_CENTS).max(MAX_WALLET_FUNDING_CENTS)})]).and(z.object({language:language.optional()})).parse(req.body);
-    res.json(await createCheckout(req.user!.id,body.kind,body.kind==='funding'?body.amount_cents:8800,body.language));
+    const body=z.discriminatedUnion('kind',[z.object({kind:z.literal('activation'),promo_code:z.string().trim().min(1).max(64).optional()}),z.object({kind:z.literal('funding'),amount_cents:z.number().int().min(MIN_WALLET_FUNDING_CENTS).max(MAX_WALLET_FUNDING_CENTS),promo_code:z.never().optional()})]).and(z.object({language:language.optional()})).parse(req.body);
+    res.json(await createCheckout(req.user!.id,body.kind,body.kind==='funding'?body.amount_cents:8800,body.language,body.promo_code));
   });
   app.post('/api/payments/:id/cancel',requireAuth,rateLimit('checkout-cancel',30,60_000),async(req,res)=>{
     res.json(await cancelCheckout(req.user!.id,id(req)));
@@ -402,7 +403,7 @@ export function errorHandler(error: any, _req: Request, res: Response, _next: Ne
   if(res.headersSent)return;
   if(error instanceof ZodError){res.status(400).json({error:{code:'VALIDATION',message:error.issues[0]?.message || 'Check the information you entered.',fields:error.issues.map(x=>({path:x.path.join('.'),message:x.message}))}});return;}
   if(error instanceof multer.MulterError){res.status(413).json({error:{code:'FILE_TOO_LARGE',message:error.code==='LIMIT_FILE_SIZE'?'This file is too large. Episodes: 75 MB maximum. Covers: 5 MB maximum.':'Upload one file at a time.'}});return;}
-  if(error instanceof AppError){res.status(error.status).json({error:{code:error.code,message:error.message}});return;}
+  if(error instanceof AppError){res.status(error.status).json({error:{code:error.code,message:error.message,...(error.details?{details:error.details}:{})}});return;}
   if(error instanceof Stripe.errors.StripeError){res.status(502).json({error:{code:'PAYMENT_PROVIDER_ERROR',message:'The payment provider could not complete this request. Please try again shortly.'}});return;}
   console.error(error);res.status(500).json({error:{code:'INTERNAL',message:'Something went wrong. Please try again.'}});
 }

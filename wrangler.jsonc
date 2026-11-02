@@ -43,6 +43,7 @@
     "OFFICIAL_CREATOR_NAME": "LingYingDrama Offical",
     "APP_URL": "https://lingyingdrama.com",
     "PAYMENTS_MODE": "stripe",
+    "PASS_PROMOTION_ENABLED": "true",
     "STRIPE_TEST_MODE": "false",
     "STRIPE_ACTIVATION_PRICE_ID": "",
     "STRIPE_WALLET_PRODUCT_ID": "",

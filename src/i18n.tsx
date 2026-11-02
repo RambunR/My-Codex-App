@@ -5,6 +5,7 @@ import {contentAdminEnglish,contentAdminMessages} from './content-admin-locales'
 import {taxonomyEnglish,taxonomyMessages} from './taxonomy-locales';
 import {adminAccountEnglish,adminAccountMessages} from './admin-account-locales';
 import {folderUploadEnglish,folderUploadMessages} from './folder-upload-locales';
+import {passPromotionEnglish,passPromotionMessages} from './pass-promotion-locales';
 
 const en = {
   ...contentAdminEnglish,
@@ -78,6 +79,7 @@ const en = {
   ...taxonomyEnglish,
   ...adminAccountEnglish,
   ...folderUploadEnglish,
+  ...passPromotionEnglish,
 } as const;
 export type Key = keyof typeof en;
 type Dictionary = Partial<Record<Key,string>>;
@@ -152,6 +154,7 @@ for(const language of LANGUAGES){if(!contentAdminMessages[language.code])throw n
 for(const language of LANGUAGES){if(!taxonomyMessages[language.code])throw new Error(`Taxonomy translations missing: ${language.code}`);Object.assign(dictionaries[language.code],taxonomyMessages[language.code]);}
 for(const language of LANGUAGES){if(!adminAccountMessages[language.code])throw new Error(`Administrator account translations missing: ${language.code}`);Object.assign(dictionaries[language.code],adminAccountMessages[language.code]);}
 for(const language of LANGUAGES){if(!folderUploadMessages[language.code])throw new Error(`Folder upload translations missing: ${language.code}`);Object.assign(dictionaries[language.code],folderUploadMessages[language.code]);}
+for(const language of LANGUAGES){if(!passPromotionMessages[language.code])throw new Error(`Pass promotion translations missing: ${language.code}`);Object.assign(dictionaries[language.code],passPromotionMessages[language.code]);}
 // Shared scripts are deliberately kept in their chosen script; traditional and simplified Chinese are independent locales.
 const I18nContext=createContext<{locale:Locale;setLocale:(l:Locale)=>void;t:(key:Key)=>string}>({locale:'en',setLocale:()=>{},t:k=>en[k]});
 export const baseMessages=en;

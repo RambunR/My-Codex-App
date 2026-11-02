@@ -1,5 +1,5 @@
 import type {Env} from './runtime';
-export const config={port:8080,production:true,sandbox:false,stripeTestMode:false,payoutsEnabled:false,stripeAutoConfigureWebhook:false,publicUrl:'',stripeSiteOrigin:'',platformOwnerUserId:'',platformAdminEmailHash:'',officialCreatorName:'LingYingDrama Offical',appUrl:'https://aidramio.example',dataDir:'/tmp',payments:'disabled',usdToHkd:7.8,stripeKey:'',stripeWebhook:'',stripeActivationPriceId:'',stripeWalletProductId:'',googleClientId:'',googleClientSecret:'',appleClientId:'',appleTeamId:'',appleKeyId:'',applePrivateKey:'',resendApiKey:'',mailFrom:'',mailProvider:'auto',cloudflareEmailAccountId:'',cloudflareEmailApiToken:'',seed:false,ffmpeg:'',ffprobe:'',runtime:'cloudflare',videoFormats:['mp4','mov','m4v']};
+export const config={port:8080,production:true,sandbox:false,stripeTestMode:false,payoutsEnabled:false,stripeAutoConfigureWebhook:false,passPromotionEnabled:false,publicUrl:'',stripeSiteOrigin:'',platformOwnerUserId:'',platformAdminEmailHash:'',officialCreatorName:'LingYingDrama Offical',appUrl:'https://aidramio.example',dataDir:'/tmp',payments:'disabled',usdToHkd:7.8,stripeKey:'',stripeWebhook:'',stripeActivationPriceId:'',stripeWalletProductId:'',googleClientId:'',googleClientSecret:'',appleClientId:'',appleTeamId:'',appleKeyId:'',applePrivateKey:'',resendApiKey:'',mailFrom:'',mailProvider:'auto',cloudflareEmailAccountId:'',cloudflareEmailApiToken:'',seed:false,ffmpeg:'',ffprobe:'',runtime:'cloudflare',videoFormats:['mp4','mov','m4v']};
 export function configure(env:Env){
   config.production=env.ENVIRONMENT!=='development';config.payments=env.PAYMENTS_MODE||'disabled';
   config.sandbox=env.ENVIRONMENT==='sandbox';
@@ -8,6 +8,7 @@ export function configure(env:Env){
   config.stripeTestMode=env.STRIPE_TEST_MODE==='true';
   config.payoutsEnabled=env.PAYOUTS_ENABLED==='true'||!config.production&&env.PAYOUTS_ENABLED!=='false';
   config.stripeAutoConfigureWebhook=env.STRIPE_AUTO_CONFIGURE_WEBHOOK==='true';
+  config.passPromotionEnabled=env.PASS_PROMOTION_ENABLED==='true';
   if(config.production&&config.payments==='demo')throw new Error('Demo payments are prohibited in a deployed application.');
   config.stripeKey=env.STRIPE_SECRET_KEY||'';config.stripeWebhook=env.STRIPE_WEBHOOK_SECRET||'';
   config.stripeActivationPriceId=env.STRIPE_ACTIVATION_PRICE_ID||'';config.stripeWalletProductId=env.STRIPE_WALLET_PRODUCT_ID||'';

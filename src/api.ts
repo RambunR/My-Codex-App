@@ -24,13 +24,13 @@ function trustedApiUrl(value:string){
   try{const url=new URL(value,browserOrigin()||publicSiteOrigin);return url.origin===apiSiteOrigin&&apiPath(url.pathname);}catch{return false;}
 }
 export const apiCrossOrigin=(url:string):'use-credentials'|undefined=>trustedApiUrl(apiUrl(url))?'use-credentials':undefined;
-export class ApiError extends Error { constructor(public code:string,message:string,public status:number){super(message);} }
+export class ApiError extends Error { constructor(public code:string,message:string,public status:number,public details?:Record<string,unknown>){super(message);} }
 export async function api<T=any>(url:string,options:RequestInit={}) :Promise<T>{
   const headers=new Headers(options.headers);if(options.body && !(options.body instanceof FormData))headers.set('Content-Type','application/json');
   const target=apiUrl(url);
   const response=await fetch(target,{...options,headers,credentials:trustedApiUrl(target)?'include':'same-origin'});
   const data=await response.json().catch(()=>({error:{code:'NETWORK',message:'Unable to reach the server.'}}));
-  if(!response.ok)throw new ApiError(data.error?.code||'UNKNOWN',data.error?.message||'Something went wrong.',response.status);
+  if(!response.ok)throw new ApiError(data.error?.code||'UNKNOWN',data.error?.message||'Something went wrong.',response.status,data.error?.details&&typeof data.error.details==='object'&&!Array.isArray(data.error.details)?data.error.details:undefined);
   return data;
 }
 export const post=<T=any>(url:string,body:unknown={})=>api<T>(url,{method:'POST',body:JSON.stringify(body)});

@@ -98,6 +98,12 @@ CREATE TABLE IF NOT EXISTS test_purchases (
  platform_micros INTEGER NOT NULL CHECK(platform_micros >= 0),
  created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(user_id,episode_id), CHECK(price_micros=creator_micros+platform_micros)
 );
+CREATE TABLE IF NOT EXISTS activation_promotion_quotes (
+ payment_id TEXT NOT NULL, financial_mode TEXT NOT NULL CHECK(financial_mode IN ('default','test')),
+ code TEXT NOT NULL, amount_cents INTEGER NOT NULL CHECK(amount_cents > 0), currency TEXT NOT NULL CHECK(currency='hkd'),
+ regular_amount_cents INTEGER NOT NULL CHECK(regular_amount_cents > amount_cents), created_at TEXT NOT NULL DEFAULT (datetime('now')),
+ PRIMARY KEY(payment_id,financial_mode)
+);
 CREATE TABLE IF NOT EXISTS test_ledger (
  id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), kind TEXT NOT NULL, amount_micros INTEGER NOT NULL,
  reference_id TEXT NOT NULL, description TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now'))

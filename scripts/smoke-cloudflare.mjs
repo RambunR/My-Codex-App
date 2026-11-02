@@ -19,7 +19,7 @@ async function start(production=false,testStripe=false,publicOrigin=base){
   if(!production||testStripe)args.push('--var','GOOGLE_CLIENT_ID:local-test.apps.googleusercontent.com','--var','GOOGLE_CLIENT_SECRET:local-test-only-google-secret');
   if(testStripe)args.push('--var','STRIPE_SECRET_KEY:rk_test_local_cloudflare_fixture_only','--var','STRIPE_WEBHOOK_SECRET:whsec_local_cloudflare_fixture_only');
   args.push('--var',`PAYOUTS_ENABLED:${!production}`);
-  args.push('--var','STRIPE_AUTO_CONFIGURE_WEBHOOK:false');
+  args.push('--var','STRIPE_AUTO_CONFIGURE_WEBHOOK:false','--var','PASS_PROMOTION_ENABLED:true');
   // A matching but unverified local address must never gain admin access.
   args.push('--var','PLATFORM_ADMIN_EMAIL_SHA256:'+createHash('sha256').update('viewer@example.test').digest('hex'));
   child=spawn(process.execPath,args,{env:{...process.env,XDG_CONFIG_HOME:path.join(dir,'config'),WRANGLER_SEND_METRICS:'false',WRANGLER_LOG_PATH:path.join(dir,'wrangler.log')},stdio:['ignore','pipe','pipe']});
@@ -119,6 +119,23 @@ try{
   await Promise.all([0,1].map(()=>request(`/api/payments/${funding.paymentId}/demo-confirm`,{},viewer)));
   assert.equal((await request('/api/auth/me',undefined,viewer)).data.user.wallet_micros,10_000_000);
   console.log('PASS: scrypt authentication, first-admin bootstrap, authorization, activation, and replay-safe funding.');
+
+  assert.deepEqual(cfg.passPromotion,{enabled:true,code:'LINGYING58',amountHkdCents:5800,regularAmountHkdCents:8800,currency:'hkd'});
+  const promotion=(await request('/api/auth/register',{email:'promotion@example.test',name:'Local Promotion Creator',password},'',201)).cookie;
+  await request('/api/payments/checkout',{kind:'activation',promo_code:'INVALID'},promotion,400);
+  await request('/api/payments/checkout',{kind:'funding',amount_cents:500,promo_code:'LINGYING58'},promotion,400);
+  const promoted=(await request('/api/payments/checkout',{kind:'activation',promo_code:' lingying58 ',amount_cents:1},promotion)).data;
+  assert.equal(promoted.amount_cents,5800);assert.equal(promoted.currency,'hkd');
+  assert.equal((await request('/api/auth/me',undefined,promotion)).data.user.publisher_active,0);
+  await Promise.all([0,1].map(()=>request(`/api/payments/${promoted.paymentId}/demo-confirm`,{},promotion)));
+  const promotedUser=(await request('/api/auth/me',undefined,promotion)).data.user;
+  assert.equal(promotedUser.publisher_active,1);assert.equal(promotedUser.wallet_micros,0);assert.equal(promotedUser.dramio_pass.active,true);assert.ok(promotedUser.dramio_pass.purchased_at);
+  const promotedWallet=(await request('/api/wallet',undefined,promotion)).data;
+  assert.equal(promotedWallet.ledger.filter(row=>row.kind==='activation').length,1);
+  assert.equal(promotedWallet.ledger.find(row=>row.kind==='activation').payment_amount_cents,5800);
+  await request('/api/payments/checkout',{kind:'activation',promo_code:'LINGYING58'},promotion,409);
+  console.log('PASS: Cloudflare HK$58 promotion validates code, preserves exact receipt, activates once, and never funds a wallet.');
+
 
   const body={title:'Cloudflare Published Drama',description:'A real upload used to validate durable financial and media storage.',language:'zh-TW',genres:['romance'],themes:['revenge','hidden-identity'],format:'animation',creation_type:'human',price_cents:501,free_episodes:1};
   const sid=(await request('/api/studio/series',body,publisher,201)).data.id;
@@ -284,6 +301,8 @@ try{
   await request(`/api/payments/${funding.paymentId}/demo-confirm`,{},viewer,404);
   const login=await request('/api/auth/login',{email:'viewer@example.test',password});assert.match(login.headers.get('set-cookie'),/Secure/);assert.match(login.headers.get('set-cookie'),/HttpOnly/);
   const page=await fetch(base+'/studio');assert.equal(page.status,200);assert.match(await page.text(),/<div id="root"><\/div>/);
+  assert.equal((await request('/api/auth/me',undefined,promotion)).data.user.dramio_pass.active,true);
+  assert.equal((await request('/api/wallet',undefined,promotion)).data.ledger.find(row=>row.kind==='activation').payment_amount_cents,5800);
   console.log('PASS: full runtime restart retains sessions, wallet balances, purchases, and R2 media; production test payments disabled; secure cookies.');
   console.log('Cloudflare local integration smoke passed. No Cloudflare account resources were created.');
 }catch(error){console.error(error);console.error(logs.slice(-12000));process.exitCode=1;}

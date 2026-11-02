@@ -6,6 +6,7 @@ import { one, run, transaction } from './db.js';
 import { AppError,assert } from './errors.js';
 import { ACTIVATION_HKD_CENTS,MIN_WALLET_FUNDING_CENTS,MAX_WALLET_FUNDING_CENTS,LANGUAGES } from '../shared/config.js';
 import {checkoutCopy} from '../shared/checkout-copy.js';
+import {PASS_PROMOTION_CODE,PASS_PROMOTION_HKD_CENTS} from '../shared/pass-promotion.js';
 import { paymentTable,purchaseTable,ledgerTable,financeAccount,accountTable,accountIdColumn,hasEpisodePurchase } from './payment-state.js';
 import {assertPaymentAccountClear,assertPaymentPayoutsClear,recordPaymentLink} from './payment-risk.js';
 import {ensureStripeWebhookReady,stripeWebhookReadiness,resetStripeReadiness} from './stripe-readiness.js';
@@ -24,6 +25,13 @@ export function assertPayoutsEnabled(){
   assertPaymentPayoutsClear();
 }
 function canAdd(balance:number,amount:number){return Number.isSafeInteger(balance)&&balance>=0&&Number.isSafeInteger(amount)&&amount>=0&&balance<=Number.MAX_SAFE_INTEGER-amount;}
+const promotionMode=()=>config.stripeTestMode?'test':'default';
+function activationPromotion(paymentId:string){return one('SELECT * FROM activation_promotion_quotes WHERE payment_id=? AND financial_mode=?',paymentId,promotionMode());}
+function validPromotion(quote:Record<string,any>|undefined){return quote?.code===PASS_PROMOTION_CODE&&quote.amount_cents===PASS_PROMOTION_HKD_CENTS&&quote.currency==='hkd'&&quote.regular_amount_cents===ACTIVATION_HKD_CENTS;}
+function validActivationPayment(payment:Record<string,any>){
+  const quote=activationPromotion(payment.id);
+  return payment.currency==='hkd'&&(payment.amount_cents===ACTIVATION_HKD_CENTS&&!quote||payment.amount_cents===PASS_PROMOTION_HKD_CENTS&&validPromotion(quote));
+}
 export function addLedger(userId: string, kind: string, amount: number, reference: string, description: string) {
   run(`INSERT INTO ${ledgerTable()} (id,user_id,kind,amount_micros,reference_id,description) VALUES (?,?,?,?,?,?)`, crypto.randomUUID(), userId, kind, amount, reference, description);
 }
@@ -45,11 +53,13 @@ export function settlePayment(paymentId: string, expected?: { amount: number; cu
       run(`UPDATE ${accountTable()} SET wallet_micros=wallet_micros+? WHERE ${accountIdColumn()}=?`, micros, payment.user_id);
       addLedger(payment.user_id, 'funding', micros, payment.id, 'Wallet top-up');
     } else {
-      assert(payment.amount_cents===ACTIVATION_HKD_CENTS&&payment.currency==='hkd',400,'PAYMENT_MISMATCH','Dramio Pass must be HK$88.');
+      // Persisted server quotes stay payable after an offer is disabled. Client
+      // amounts and provider metadata alone never establish a valid discount.
+      assert(validActivationPayment(payment),400,'PAYMENT_MISMATCH','The Dramio Pass amount does not match its recorded quote.');
       assert(financeAccount(payment.user_id),404,'NOT_FOUND','Account not found.');
       if(config.stripeTestMode)run('UPDATE test_accounts SET publisher_active=1 WHERE user_id=?',payment.user_id);
       else run("UPDATE users SET publisher_active=1, role=CASE WHEN role='admin' THEN 'admin' ELSE 'publisher' END WHERE id=?", payment.user_id);
-      addLedger(payment.user_id, 'activation', 0, payment.id, 'Dramio Pass · HK$88 once');
+      addLedger(payment.user_id, 'activation', 0, payment.id, `Dramio Pass · HK$${payment.amount_cents/100} once${activationPromotion(payment.id)?` · ${PASS_PROMOTION_CODE}`:''}`);
     }
     run(`UPDATE ${paymentTable()} SET status='paid' WHERE id=?`, payment.id);
     return true;
@@ -98,7 +108,11 @@ export function requestWithdrawal(userId: string, amountCents: number, note = ''
     return id;
   });
 }
-export async function createCheckout(userId: string, kind: 'funding' | 'activation', cents: number, languageCode?:string) {
+export async function createCheckout(userId: string, kind: 'funding' | 'activation', cents: number, languageCode?:string,promoCode?:string) {
+  assert(promoCode===undefined||kind==='activation',400,'PROMOTION_NOT_APPLICABLE','Promotion codes apply only to Dramio Pass, not wallet deposits.');
+  const normalizedCode=promoCode?.trim().toUpperCase();
+  if(promoCode!==undefined)assert(config.passPromotionEnabled&&normalizedCode===PASS_PROMOTION_CODE,400,'INVALID_PROMOTION','This Dramio Pass promotion code is invalid or no longer available.');
+  const promotion=normalizedCode===PASS_PROMOTION_CODE;
   if(config.payments==='stripe'&&stripeConfigured())await ensureStripeWebhookReady(stripe);
   assert(paymentsReady(),503,'PAYMENTS_UNAVAILABLE','Payments are not configured yet. Please try again later.');
   assertPaymentAccountClear(userId);
@@ -110,13 +124,13 @@ export async function createCheckout(userId: string, kind: 'funding' | 'activati
   if (kind === 'activation') {
     const user = financeAccount(userId);
     assert(!user?.publisher_active, 409, 'ALREADY_ACTIVE', 'Your Dramio Pass is already active.');
-    if(config.payments==='stripe'&&config.stripeActivationPriceId){
+    if(config.payments==='stripe'&&config.stripeActivationPriceId&&!promotion){
       let price:Stripe.Price;
       try{price=await stripe!.prices.retrieve(config.stripeActivationPriceId);}catch{throw new AppError(503,'PAYMENT_CONFIG_ERROR','The Dramio Pass price is unavailable. Please contact support.');}
       assert(price.active&&price.type==='one_time'&&price.currency==='hkd'&&price.unit_amount===ACTIVATION_HKD_CENTS&&stripeModeMatches(price.livemode),503,'PAYMENT_CONFIG_ERROR','The Dramio Pass price must be HK$88 once in the correct payment mode.');
     }
   }
-  const currency=kind==='activation'?'hkd':'usd',amount=kind==='activation'?ACTIVATION_HKD_CENTS:cents;
+  const currency=kind==='activation'?'hkd':'usd',amount=kind==='activation'?(promotion?PASS_PROMOTION_HKD_CENTS:ACTIVATION_HKD_CENTS):cents;
   const requestedLanguage=languageCode||one('SELECT language FROM users WHERE id=?',userId)?.language||'en';
   const checkoutLanguage=LANGUAGES.some(language=>language.code===requestedLanguage)?requestedLanguage:'en';
   // Custom messages cover every app language. Stripe's own controls use its
@@ -131,11 +145,14 @@ export async function createCheckout(userId: string, kind: 'funding' | 'activati
         if(pending)return pending;
       }
       const id=crypto.randomUUID();run(`INSERT INTO ${paymentTable()} (id,user_id,kind,amount_cents,currency,provider) VALUES (?,?,?,?,?,?)`,id,userId,kind,amount,currency,config.payments);
-      return{id,provider_session:null};
+      if(promotion)run('INSERT INTO activation_promotion_quotes (payment_id,financial_mode,code,amount_cents,currency,regular_amount_cents) VALUES (?,?,?,?,?,?)',id,promotionMode(),PASS_PROMOTION_CODE,amount,currency,ACTIVATION_HKD_CENTS);
+      return{id,provider_session:null,amount_cents:amount,currency};
     });
     if(!payment)return{alreadyPaid:true};
     const id=payment.id as string;
-    if(config.payments==='demo')return{demo:true,paymentId:id,amount_cents:amount,currency};
+    const sameQuote=kind!=='activation'||payment.amount_cents===amount&&payment.currency===currency&&(promotion?validPromotion(activationPromotion(id)):!activationPromotion(id));
+    const assertSameQuote=()=>{if(!sameQuote)throw new AppError(409,'ACTIVATION_CHECKOUT_CONFLICT','Close your existing unpaid Dramio Pass checkout before changing its promotion.',{paymentId:id});};
+    if(config.payments==='demo'){assertSameQuote();return{demo:true,paymentId:id,amount_cents:amount,currency};}
     if(payment.provider_session){
       const existing=await stripe!.checkout.sessions.retrieve(payment.provider_session);
       if(financeAccount(userId)?.publisher_active)return{alreadyPaid:true};
@@ -143,18 +160,19 @@ export async function createCheckout(userId: string, kind: 'funding' | 'activati
       if(existing.payment_status==='paid'){
         settlePayment(id,{amount:existing.amount_total!,currency:existing.currency!,session:existing.id,livemode:existing.livemode,sessionObject:existing});return{alreadyPaid:true};
       }
-      if(existing.status==='open')return{url:existing.url,paymentId:id};
+      if(existing.status==='open'){assertSameQuote();return{url:existing.url,paymentId:id};}
       assert(existing.status!=='complete',409,'PAYMENT_PROCESSING','Your payment is still processing. Please wait before trying again.');
       run(`UPDATE ${paymentTable()} SET status='expired' WHERE id=? AND status='pending'`,id);continue;
     }
+    assertSameQuote();
     try{
-      const metadata={app:'aidramio',site:stripeSiteOrigin(),financialMode:config.stripeTestMode?'test':'default',paymentId:id,userId};
+      const metadata={app:'aidramio',site:stripeSiteOrigin(),financialMode:config.stripeTestMode?'test':'default',paymentId:id,userId,...(promotion?{promotionCode:PASS_PROMOTION_CODE,regularAmountHkdCents:String(ACTIVATION_HKD_CENTS)}:{})};
       const session=await stripe!.checkout.sessions.create({mode:'payment',payment_method_types:['card'],client_reference_id:id,metadata,payment_intent_data:{metadata},locale,
         branding_settings:{display_name:'LingYing · HK NovaXR Production'},
         custom_text:{after_submit:{message:messages.afterSubmit},...(kind==='funding'?{submit:{message:messages.submit}}:{})},
-        line_items:kind==='activation'&&config.stripeActivationPriceId?[{price:config.stripeActivationPriceId,quantity:1}]:[{price_data:{currency,unit_amount:amount,...(kind==='funding'&&config.stripeWalletProductId?{product:config.stripeWalletProductId}:{product_data:{name:kind==='activation'?'Dramio Pass':'LingYing wallet credit',...(kind==='funding'?{description:messages.description}:{})}})},quantity:1}],
-        success_url:`${publicAppUrl()}/${kind==='activation'?'studio':'wallet'}?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url:`${publicAppUrl()}/${kind==='activation'?'studio':'wallet'}?checkout=cancelled`,
+        line_items:kind==='activation'&&config.stripeActivationPriceId&&!promotion?[{price:config.stripeActivationPriceId,quantity:1}]:[{price_data:{currency,unit_amount:amount,...(kind==='funding'&&config.stripeWalletProductId?{product:config.stripeWalletProductId}:{product_data:{name:kind==='activation'?'Dramio Pass':'LingYing wallet credit',...(kind==='funding'?{description:messages.description}:promotion?{description:`Launch promotion ${PASS_PROMOTION_CODE} · HK$58 once (regular HK$88).`}:{})}})},quantity:1}],
+        success_url:`${publicAppUrl()}/${kind==='activation'?'studio':'wallet'}?checkout=success&session_id={CHECKOUT_SESSION_ID}${promotion?`&promo=${PASS_PROMOTION_CODE}`:''}`,
+        cancel_url:`${publicAppUrl()}/${kind==='activation'?'studio':'wallet'}?checkout=cancelled${promotion?`&promo=${PASS_PROMOTION_CODE}`:''}`,
       },{idempotencyKey:`checkout:${id}`});
       assert(stripeModeMatches(session.livemode),400,'PAYMENT_MODE_MISMATCH','Payment mode does not match this application.');
       run(`UPDATE ${paymentTable()} SET provider_session=? WHERE id=? AND status='pending'`,session.id,id);
