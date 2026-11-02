@@ -120,11 +120,16 @@ try{
   assert.equal((await request('/api/auth/me',undefined,viewer)).data.user.wallet_micros,10_000_000);
   console.log('PASS: scrypt authentication, first-admin bootstrap, authorization, activation, and replay-safe funding.');
 
-  assert.deepEqual(cfg.passPromotion,{enabled:true,code:'LINGYING58',amountHkdCents:5800,regularAmountHkdCents:8800,currency:'hkd'});
+  assert.deepEqual(cfg.passPromotion,{enabled:true});
+  await request('/api/admin/promotions',undefined,viewer,403);
+  await request('/api/payments/promotion/quote',{promo_code:'LINGYING58'},'',401);
+  const initialPromotions=(await request('/api/admin/promotions',undefined,admin)).data;
+  const initialLaunch=initialPromotions.promotions.find(row=>row.code==='LINGYING58');assert.equal(initialLaunch.enabled,true);assert.equal(initialLaunch.max_redemptions,null);assert.equal(initialLaunch.amount_hkd_cents,5800);
   const promotion=(await request('/api/auth/register',{email:'promotion@example.test',name:'Local Promotion Creator',password},'',201)).cookie;
   await request('/api/payments/checkout',{kind:'activation',promo_code:'INVALID'},promotion,400);
   await request('/api/payments/checkout',{kind:'funding',amount_cents:500,promo_code:'LINGYING58'},promotion,400);
-  const promoted=(await request('/api/payments/checkout',{kind:'activation',promo_code:' lingying58 ',amount_cents:1},promotion)).data;
+  const promotionQuote=(await request('/api/payments/promotion/quote',{promo_code:' lingying58 '},promotion)).data.promotion;assert.equal(promotionQuote.amountHkdCents,5800);
+  const promoted=(await request('/api/payments/checkout',{kind:'activation',promo_code:promotionQuote.code,promo_revision:promotionQuote.revision,amount_cents:1},promotion)).data;
   assert.equal(promoted.amount_cents,5800);assert.equal(promoted.currency,'hkd');
   assert.equal((await request('/api/auth/me',undefined,promotion)).data.user.publisher_active,0);
   await Promise.all([0,1].map(()=>request(`/api/payments/${promoted.paymentId}/demo-confirm`,{},promotion)));
@@ -135,6 +140,17 @@ try{
   assert.equal(promotedWallet.ledger.find(row=>row.kind==='activation').payment_amount_cents,5800);
   await request('/api/payments/checkout',{kind:'activation',promo_code:'LINGYING58'},promotion,409);
   console.log('PASS: Cloudflare HK$58 promotion validates code, preserves exact receipt, activates once, and never funds a wallet.');
+
+  const managedPromotion=(await request('/api/admin/promotions',{code:'RUNTIME25',discount_type:'percent',discount_value:25},admin,201)).data.promotion;
+  assert.equal(managedPromotion.amount_hkd_cents,6600);assert.equal(managedPromotion.max_redemptions,null);
+  await request(`/api/admin/promotions/${managedPromotion.id}`,{enabled:false},admin,200,'PATCH');
+  await request('/api/payments/promotion/quote',{promo_code:'RUNTIME25'},viewer,400);
+  await request(`/api/admin/promotions/${managedPromotion.id}`,{enabled:true,discount_type:'amount',discount_value:2000,max_redemptions:2},admin,200,'PATCH');
+  const changedQuote=(await request('/api/payments/promotion/quote',{promo_code:'RUNTIME25'},viewer)).data.promotion;assert.equal(changedQuote.amountHkdCents,6800);
+  await request('/api/payments/checkout',{kind:'activation',promo_code:'RUNTIME25',promo_revision:managedPromotion.revision},viewer,409);
+  const managedState=(await request('/api/admin/promotions',undefined,admin)).data;assert.ok(managedState.events.some(event=>event.promotion_id===managedPromotion.id));
+  console.log('PASS: Cloudflare private-code discovery, administrator CRUD/audit, disable/re-enable, exact quotes and stale-revision rejection.');
+
 
 
   const body={title:'Cloudflare Published Drama',description:'A real upload used to validate durable financial and media storage.',language:'zh-TW',genres:['romance'],themes:['revenge','hidden-identity'],format:'animation',creation_type:'human',price_cents:501,free_episodes:1};
@@ -301,6 +317,7 @@ try{
   await request(`/api/payments/${funding.paymentId}/demo-confirm`,{},viewer,404);
   const login=await request('/api/auth/login',{email:'viewer@example.test',password});assert.match(login.headers.get('set-cookie'),/Secure/);assert.match(login.headers.get('set-cookie'),/HttpOnly/);
   const page=await fetch(base+'/studio');assert.equal(page.status,200);assert.match(await page.text(),/<div id="root"><\/div>/);
+  const restartedPromotions=(await request('/api/admin/promotions',undefined,admin)).data;assert.equal(restartedPromotions.promotions.find(row=>row.id===managedPromotion.id).amount_hkd_cents,6800);assert.equal(restartedPromotions.promotions.find(row=>row.id===managedPromotion.id).max_redemptions,2);
   assert.equal((await request('/api/auth/me',undefined,promotion)).data.user.dramio_pass.active,true);
   assert.equal((await request('/api/wallet',undefined,promotion)).data.ledger.find(row=>row.kind==='activation').payment_amount_cents,5800);
   console.log('PASS: full runtime restart retains sessions, wallet balances, purchases, and R2 media; production test payments disabled; secure cookies.');

@@ -104,6 +104,26 @@ CREATE TABLE IF NOT EXISTS activation_promotion_quotes (
  regular_amount_cents INTEGER NOT NULL CHECK(regular_amount_cents > amount_cents), created_at TEXT NOT NULL DEFAULT (datetime('now')),
  PRIMARY KEY(payment_id,financial_mode)
 );
+CREATE TABLE IF NOT EXISTS managed_pass_promotions (
+ id TEXT PRIMARY KEY, code TEXT NOT NULL UNIQUE, enabled INTEGER NOT NULL CHECK(enabled IN (0,1)),
+ discount_type TEXT NOT NULL CHECK(discount_type IN ('amount','percent')), discount_value INTEGER NOT NULL CHECK(discount_value>0),
+ max_redemptions INTEGER CHECK(max_redemptions IS NULL OR max_redemptions>0), revision INTEGER NOT NULL DEFAULT 1 CHECK(revision>0),
+ created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS managed_pass_promotion_init (id INTEGER PRIMARY KEY CHECK(id=1), created_at TEXT NOT NULL DEFAULT (datetime('now')));
+CREATE TABLE IF NOT EXISTS managed_pass_promotion_quotes (
+ payment_id TEXT NOT NULL, financial_mode TEXT NOT NULL CHECK(financial_mode IN ('default','test')),
+ promotion_id TEXT NOT NULL REFERENCES managed_pass_promotions(id), code TEXT NOT NULL, revision INTEGER NOT NULL CHECK(revision>0),
+ discount_type TEXT NOT NULL CHECK(discount_type IN ('amount','percent')), discount_value INTEGER NOT NULL CHECK(discount_value>0),
+ amount_cents INTEGER NOT NULL CHECK(amount_cents>0), regular_amount_cents INTEGER NOT NULL CHECK(regular_amount_cents>amount_cents),
+ created_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY(payment_id,financial_mode)
+);
+CREATE INDEX IF NOT EXISTS managed_pass_quote_usage ON managed_pass_promotion_quotes(promotion_id,financial_mode);
+CREATE TABLE IF NOT EXISTS managed_pass_promotion_events (
+ id TEXT PRIMARY KEY, promotion_id TEXT NOT NULL REFERENCES managed_pass_promotions(id), actor_id TEXT NOT NULL REFERENCES users(id),
+ action TEXT NOT NULL CHECK(action IN ('create','update')), before_json TEXT, after_json TEXT NOT NULL,
+ created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 CREATE TABLE IF NOT EXISTS test_ledger (
  id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), kind TEXT NOT NULL, amount_micros INTEGER NOT NULL,
  reference_id TEXT NOT NULL, description TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now'))

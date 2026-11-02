@@ -1,6 +1,6 @@
 import {config} from './config.js';
-import {one,run} from './db.js';
-import {PASS_PROMOTION_CODE,PASS_PROMOTION_HKD_CENTS} from '../shared/pass-promotion.js';
+import {one,all,run} from './db.js';
+import {validPromotionPayment} from './promotions.js';
 import {ACTIVATION_HKD_CENTS} from '../shared/config.js';
 
 export interface FinanceAccount {
@@ -37,7 +37,8 @@ export function dramioPassState(userId:string,realActive:boolean,active:boolean)
   if(!active)return{active:false,test:false,purchased_at:null};
   const testOnly=usingTestPaymentState()&&!realActive;
   const table=testOnly?'test_payments':'payments';
-  const receipt=one<{provider:string;created_at:string}>(`SELECT p.provider,p.created_at FROM ${table} p WHERE p.user_id=? AND p.kind='activation' AND p.status='paid' AND p.currency='hkd' AND (p.amount_cents=? OR p.amount_cents=? AND EXISTS (SELECT 1 FROM activation_promotion_quotes q WHERE q.payment_id=p.id AND q.financial_mode=? AND q.code=? AND q.amount_cents=p.amount_cents AND q.currency=p.currency AND q.regular_amount_cents=?)) ORDER BY p.created_at DESC,p.rowid DESC LIMIT 1`,userId,ACTIVATION_HKD_CENTS,PASS_PROMOTION_HKD_CENTS,testOnly?'test':'default',PASS_PROMOTION_CODE,ACTIVATION_HKD_CENTS);
+  const candidates=all<{id:string;provider:string;created_at:string;amount_cents:number;currency:string}>(`SELECT p.id,p.provider,p.created_at,p.amount_cents,p.currency FROM ${table} p WHERE p.user_id=? AND p.kind='activation' AND p.status='paid' AND p.currency='hkd' ORDER BY p.created_at DESC,p.rowid DESC`,userId);
+  const receipt=candidates.find(payment=>payment.amount_cents===ACTIVATION_HKD_CENTS||validPromotionPayment(payment,testOnly?'test':'default'));
   let purchased_at:string|null=null;
   if(receipt){
     const raw=receipt.created_at.replace(' ','T');

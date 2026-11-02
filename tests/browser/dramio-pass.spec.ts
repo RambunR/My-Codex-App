@@ -9,10 +9,8 @@ test('Dramio Pass purchase appears on Account and persists without another payme
   await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Create account',exact:true}).last().click();
   await expect(page).toHaveURL('/account');
   const card=page.locator('.dramio-pass-card');await expect(card).toBeVisible();await expect(card).toContainText('Dramio Pass');await expect(card).toContainText('Not purchased');
-  await card.getByRole('link',{name:'Get Dramio Pass',exact:true}).click();await expect(page).toHaveURL('/studio?promo=LINGYING58');
-  // This journey retains the regular-price purchase path independently of the
-  // launch offer; the dedicated promotion test purchases the discounted Pass.
-  await page.locator('.pass-promo-applied').getByRole('button',{name:'Remove',exact:true}).click();await expect(page).toHaveURL('/studio');
+  await card.getByRole('link',{name:'Get Dramio Pass',exact:true}).click();await expect(page).toHaveURL('/studio');
+  await expect(page.locator('#pass-promo-code')).toHaveValue('');await expect(card).toHaveCount(0);
   await page.getByRole('button',{name:/Get Dramio Pass.*HK\$88/}).click();
   await expect(page.getByRole('dialog')).toContainText('HK$88.00');await page.getByRole('button',{name:'Confirm test payment'}).click();
   await expect(page.getByRole('link',{name:'New series',exact:true}).first()).toBeVisible();

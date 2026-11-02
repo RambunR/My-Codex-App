@@ -19,10 +19,8 @@ export function DramioPassCard(){
   if(!user)return null;
   const pass=user.dramio_pass;
   const active=pass?.active??!!user.publisher_active;
-  const promotion=!active&&config.passPromotion?.enabled?config.passPromotion:null;
   const exchangeRate=Number.isFinite(config.usdToHkd)&&config.usdToHkd>0?config.usdToHkd:7.8;
   const usdPrice=(cents:number)=>`US$${(cents/100/exchangeRate).toFixed(2)}`;
-  const studioLink=promotion?'/studio?'+new URLSearchParams({promo:promotion.code}).toString():'/studio';
   const administrator=user.role==='admin';
   const adminAccess=administrator?<AdminUploadAccess canUpload={!user.payment_review&&config.uploadsEnabled!==false} held={!!user.payment_review}/>:null;
   if(administrator&&!active)return adminAccess;
@@ -35,7 +33,7 @@ export function DramioPassCard(){
   return <>{adminAccess}<section className={`dramio-pass-card ${active?'dramio-pass-owned':'dramio-pass-unowned'}`} aria-labelledby="dramio-pass-title">
     <div className="dramio-pass-card-art"><DramioPassIcon size={104}/></div>
     <div className="dramio-pass-card-copy"><div className="dramio-pass-card-heading"><h2 id="dramio-pass-title">{t('dramioPass')}</h2><span className={`dramio-pass-status ${active?'active':''}`}>{active&&<Check size={12} aria-hidden="true"/>}{t(active?'passActive':'passInactive')}</span>{test&&<span className="dramio-pass-test">{t('passTest')}</span>}</div><p>{t(active?'passOwnedBody':'passInactiveBody')}</p><span className="dramio-pass-benefits">{t('passBenefits')}</span>{test&&<small className="dramio-pass-test-notice">{t('passTestBody')}</small>}{purchaseDate&&<small className="dramio-pass-purchased">{t('passPurchasedOn').replace('{date}',purchaseDate)}</small>}</div>
-    <div className="dramio-pass-card-action"><div className="dramio-pass-price">{active?<strong>{t('passActivated')}</strong>:<>{promotion&&<s className="pass-account-original" aria-label={t('passRegularPrice')}>≈ {usdPrice(promotion.regularAmountHkdCents)}</s>}<strong>≈ {usdPrice(promotion?.amountHkdCents??(config.limits.activationHkd||88)*100)}</strong>{promotion&&<span className="pass-account-promotion">{t('passPromoAccountOffer').replace('{code}',promotion.code)}</span>}</>}<span>{t('passOneTime')}</span></div><Link to={studioLink} className={`button ${active?'secondary':'primary'}`}>{t(active?'openStudio':'getDramioPass')}<ArrowUpRight size={16} aria-hidden="true"/></Link></div>
+    <div className="dramio-pass-card-action"><div className="dramio-pass-price">{active?<strong>{t('passActivated')}</strong>:<strong>≈ {usdPrice((config.limits.activationHkd||88)*100)}</strong>}<span>{t('passOneTime')}</span></div><Link to="/studio" className={`button ${active?'secondary':'primary'}`}>{t(active?'openStudio':'getDramioPass')}<ArrowUpRight size={16} aria-hidden="true"/></Link></div>
   </section></>;
 }
 

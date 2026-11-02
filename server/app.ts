@@ -23,7 +23,7 @@ import { startPlayback,recordPlayback,readSeriesAnalytics } from './analytics.js
 import { LANGUAGES, GENRES, MAX_EPISODE_BYTES, DEFAULT_QUOTA_BYTES,MIN_WALLET_FUNDING_CENTS,MAX_WALLET_FUNDING_CENTS } from '../shared/config.js';
 import {SERIES_LIMITS} from '../shared/series-validation.js';
 import {STANDARD_GENRES,STORY_THEMES,SERIES_FORMATS,CREATION_TYPES} from '../shared/taxonomy.js';
-import {passPromotionOffer} from '../shared/pass-promotion.js';
+import {initializePromotions,adminPromotions,createPromotion,updatePromotion,quotePromotion} from './promotions.js';
 import {themesSchema,formatSchema,seriesClassification,writeSeriesClassification,SERIES_FORMAT_SQL} from './taxonomy.js';
 
 const language = z.enum(LANGUAGES.map(x => x.code) as [string, ...string[]]);
@@ -128,7 +128,7 @@ export function createApp() {
   registerAppleAuth(app);
   registerEmailAuth(app);
   app.get('/api/health', (_req,res) => res.json({ ok: true, database: !!one('SELECT 1 AS ready') }));
-  app.get('/api/config', async (_req,res) => {if(config.payments==='stripe'&&stripeConfigured())await ensureStripeWebhookReady(stripe);return res.json({ brand: 'LingYing', languages: LANGUAGES, genres: GENRES,standardGenres:STANDARD_GENRES,storyThemes:STORY_THEMES,formats:SERIES_FORMATS,creationTypes:CREATION_TYPES, passPromotion:passPromotionOffer(config.passPromotionEnabled),paymentsMode: config.payments,paymentsReady:paymentsReady(),paymentsConfigured:stripeConfigured(),paymentSetup:stripeWebhookReadiness(),sandbox:config.sandbox,paymentsTestMode:stripeTestPayments()||config.payments==='demo',payoutsEnabled:config.payoutsEnabled&&!stripeTestPayments(),uploadsEnabled:!config.sandbox,usdToHkd: config.usdToHkd,
+  app.get('/api/config', async (_req,res) => {initializePromotions();if(config.payments==='stripe'&&stripeConfigured())await ensureStripeWebhookReady(stripe);return res.json({ brand: 'LingYing', languages: LANGUAGES, genres: GENRES,standardGenres:STANDARD_GENRES,storyThemes:STORY_THEMES,formats:SERIES_FORMATS,creationTypes:CREATION_TYPES, passPromotion:{enabled:true},paymentsMode: config.payments,paymentsReady:paymentsReady(),paymentsConfigured:stripeConfigured(),paymentSetup:stripeWebhookReadiness(),sandbox:config.sandbox,paymentsTestMode:stripeTestPayments()||config.payments==='demo',payoutsEnabled:config.payoutsEnabled&&!stripeTestPayments(),uploadsEnabled:!config.sandbox,usdToHkd: config.usdToHkd,
     limits: { maxEpisodeSeconds: 180, maxEpisodeBytes: MAX_EPISODE_BYTES, quotaBytes: DEFAULT_QUOTA_BYTES, activationHkd: 88, minimumPriceUsd: 0.1, creatorShare: 0.7, minimumPayoutHkd: 20,minWalletFundingUsd:MIN_WALLET_FUNDING_CENTS/100,maxWalletFundingUsd:MAX_WALLET_FUNDING_CENTS/100 }, demo: config.seed, runtime: (config as any).runtime || 'node', videoFormats: (config as any).videoFormats || ['mp4','mov','webm','m4v'], auth:{google:googleEnabled(),apple:appleEnabled(),email:emailAuthEnabled()} });});
   app.get('/api/auth/me', (req,res) => res.json({ user: req.user || null }));
   app.post('/api/auth/register', rateLimit('register', 12, 15 * 60_000), async (req,res) => {
@@ -223,9 +223,15 @@ export function createApp() {
     const seen=new Set(); res.json({ history: rows.filter(s=>{if(seen.has(s.id))return false;seen.add(s.id);return true;}).map(s=>serializeSeries(s,req.user!.id)) });
   });
   app.get('/api/wallet', requireAuth, (req,res) => res.json({ user: getUser(req.user!.id), ledger: all(`SELECT l.*,p.amount_cents AS payment_amount_cents,p.currency AS payment_currency FROM ${ledgerTable()} l LEFT JOIN ${paymentTable()} p ON p.id=l.reference_id AND p.user_id=l.user_id AND p.kind='activation' WHERE l.user_id=? ORDER BY l.created_at DESC,l.rowid DESC LIMIT 100`,req.user!.id), payments: all(`SELECT id,kind,amount_cents,currency,status,created_at FROM ${paymentTable()} WHERE user_id=? ORDER BY created_at DESC LIMIT 30`,req.user!.id) }));
+  app.post('/api/payments/promotion/quote',requireAuth,rateLimit('promotion-quote',30,60_000),(req,res)=>{
+    const body=z.object({promo_code:z.string().trim().min(1).max(64)}).strict().parse(req.body);
+    assertPaymentAccountClear(req.user!.id);const quote=quotePromotion(req.user!.id,body.promo_code);
+    const{code,amountHkdCents,regularAmountHkdCents,currency,revision}=quote;
+    res.setHeader('Cache-Control','private, no-store');res.json({promotion:{code,amountHkdCents,regularAmountHkdCents,currency,revision}});
+  });
   app.post('/api/payments/checkout', requireAuth, rateLimit('checkout',20,60_000), async (req,res) => {
-    const body=z.discriminatedUnion('kind',[z.object({kind:z.literal('activation'),promo_code:z.string().trim().min(1).max(64).optional()}),z.object({kind:z.literal('funding'),amount_cents:z.number().int().min(MIN_WALLET_FUNDING_CENTS).max(MAX_WALLET_FUNDING_CENTS),promo_code:z.never().optional()})]).and(z.object({language:language.optional()})).parse(req.body);
-    res.json(await createCheckout(req.user!.id,body.kind,body.kind==='funding'?body.amount_cents:8800,body.language,body.promo_code));
+    const body=z.discriminatedUnion('kind',[z.object({kind:z.literal('activation'),promo_code:z.string().trim().min(1).max(64).optional(),promo_revision:z.number().int().positive().max(1000000000).optional()}),z.object({kind:z.literal('funding'),amount_cents:z.number().int().min(MIN_WALLET_FUNDING_CENTS).max(MAX_WALLET_FUNDING_CENTS),promo_code:z.never().optional(),promo_revision:z.never().optional()})]).and(z.object({language:language.optional()})).parse(req.body);
+    res.json(await createCheckout(req.user!.id,body.kind,body.kind==='funding'?body.amount_cents:8800,body.language,body.promo_code,body.promo_revision));
   });
   app.post('/api/payments/:id/cancel',requireAuth,rateLimit('checkout-cancel',30,60_000),async(req,res)=>{
     res.json(await cancelCheckout(req.user!.id,id(req)));
@@ -364,6 +370,16 @@ export function createApp() {
     const episode=episodeRow(id(req));assert(episode,404,'NOT_FOUND','Episode not found.');
     // Reviewing private media creates no purchase, playback session or counted view.
     await serveObject(episode.storage_key,req,res,'video/mp4');
+  });
+  const promotionSettings=z.object({enabled:z.boolean(),discount_type:z.enum(['amount','percent']),discount_value:z.number().int().positive().max(8400),max_redemptions:z.number().int().positive().max(1000000).nullable()});
+  app.get('/api/admin/promotions',requireAdmin,(req,res)=>{res.setHeader('Cache-Control','private, no-store');res.json(adminPromotions(req.user!.id));});
+  app.post('/api/admin/promotions',requireAdmin,rateLimit('promotion-admin',60,60_000),(req,res)=>{
+    const body=promotionSettings.extend({code:z.string().trim().min(3).max(32),enabled:z.boolean().default(true),max_redemptions:z.number().int().positive().max(1000000).nullable().default(null)}).strict().parse(req.body);
+    res.status(201).json({promotion:createPromotion(req.user!.id,body)});
+  });
+  app.patch('/api/admin/promotions/:id',requireAdmin,rateLimit('promotion-admin',60,60_000),(req,res)=>{
+    const body=promotionSettings.partial().strict().refine(value=>Object.keys(value).length>0,'Choose at least one setting to update.').parse(req.body);
+    res.json({promotion:updatePromotion(req.user!.id,id(req),body)});
   });
   app.get('/api/admin', requireAdmin, (_req,res) => res.json({
     stats:{users:one('SELECT COUNT(*) AS n FROM users')!.n,publishers:one(`SELECT COUNT(*) AS n FROM users WHERE publisher_active=1${usingTestPaymentState()?' OR EXISTS(SELECT 1 FROM test_accounts t WHERE t.user_id=users.id AND t.publisher_active=1)':''}`)!.n,
