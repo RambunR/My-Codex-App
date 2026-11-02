@@ -39,6 +39,7 @@
   "vars": {
     "ENVIRONMENT": "production",
     "PLATFORM_OWNER_USER_ID": "000ca929-30da-4e8b-a2a6-2135d184fe9b",
+    "PLATFORM_ADMIN_EMAIL_SHA256": "cfc96d9ff6250477b7b34ea924d18d5fea9aeeee747a22c7af0b663a245d87b6",
     "OFFICIAL_CREATOR_NAME": "LingYingDrama Offical",
     "APP_URL": "https://lingyingdrama.com",
     "PAYMENTS_MODE": "stripe",

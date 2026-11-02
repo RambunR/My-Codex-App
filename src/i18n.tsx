@@ -3,6 +3,7 @@ import { LANGUAGES, type Locale } from '../shared/config';
 import { additionalMessages,googleAuthEnglish,googleAuthMessages,walletFundingEnglish,walletFundingMessages,sandboxEnglish,sandboxMessages,stripeTestingEnglish,stripeTestingMessages,analyticsEnglish,analyticsMessages,dramioPassEnglish,dramioPassMessages,editorValidationEnglish,editorValidationMessages,accountAuthEnglish,accountAuthMessages,livePaymentEnglish,livePaymentMessages } from './localeExtras';
 import {contentAdminEnglish,contentAdminMessages} from './content-admin-locales';
 import {taxonomyEnglish,taxonomyMessages} from './taxonomy-locales';
+import {adminAccountEnglish,adminAccountMessages} from './admin-account-locales';
 
 const en = {
   ...contentAdminEnglish,
@@ -74,6 +75,7 @@ const en = {
   fileTooLarge:'This episode exceeds the 75 MB limit.', uploadComplete:'Upload queue complete.', membersOnly:'Sign in to continue',
   ...dramioPassEnglish,
   ...taxonomyEnglish,
+  ...adminAccountEnglish,
 } as const;
 export type Key = keyof typeof en;
 type Dictionary = Partial<Record<Key,string>>;
@@ -146,6 +148,7 @@ for(const language of LANGUAGES){if(!accountAuthMessages[language.code])throw ne
 for(const language of LANGUAGES){if(!livePaymentMessages[language.code])throw new Error(`Live payment translations missing: ${language.code}`);Object.assign(dictionaries[language.code],livePaymentMessages[language.code]);}
 for(const language of LANGUAGES){if(!contentAdminMessages[language.code])throw new Error(`Content admin translations missing: ${language.code}`);Object.assign(dictionaries[language.code],contentAdminMessages[language.code]);}
 for(const language of LANGUAGES){if(!taxonomyMessages[language.code])throw new Error(`Taxonomy translations missing: ${language.code}`);Object.assign(dictionaries[language.code],taxonomyMessages[language.code]);}
+for(const language of LANGUAGES){if(!adminAccountMessages[language.code])throw new Error(`Administrator account translations missing: ${language.code}`);Object.assign(dictionaries[language.code],adminAccountMessages[language.code]);}
 // Shared scripts are deliberately kept in their chosen script; traditional and simplified Chinese are independent locales.
 const I18nContext=createContext<{locale:Locale;setLocale:(l:Locale)=>void;t:(key:Key)=>string}>({locale:'en',setLocale:()=>{},t:k=>en[k]});
 export const baseMessages=en;

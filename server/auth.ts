@@ -8,7 +8,7 @@ import type { User } from '../shared/config.js';
 import {financeAccount,usingTestPaymentState,dramioPassState} from './payment-state.js';
 import {emailVerificationState} from './email-auth.js';
 import {assertPaymentAccountClear,paymentAccountReview} from './payment-risk.js';
-import {ensurePlatformOwnerAccess,creatorDisplayName} from './owner.js';
+import {ensurePlatformOwnerAccess,ensureConfiguredAdminAccess,creatorDisplayName} from './owner.js';
 
 const scrypt = promisify(crypto.scrypt);
 export async function hashPassword(password: string) {
@@ -27,6 +27,7 @@ const digest = (token: string) => crypto.createHash('sha256').update(token).dige
 const publicFields = 'id,name,email,role,publisher_active,wallet_micros,earnings_micros,quota_bytes,used_bytes,language,stripe_account_id';
 export function getUser(id: string) {
   if(id===config.platformOwnerUserId)ensurePlatformOwnerAccess();
+  ensureConfiguredAdminAccess(id);
   const user=one<User>(`SELECT ${publicFields} FROM users WHERE id=?`,id);
   if(!user)return user;
   const account=usingTestPaymentState()?financeAccount(id)!:undefined;

@@ -1,9 +1,10 @@
 import type {Env} from './runtime';
-export const config={port:8080,production:true,sandbox:false,stripeTestMode:false,payoutsEnabled:false,stripeAutoConfigureWebhook:false,publicUrl:'',stripeSiteOrigin:'',platformOwnerUserId:'',officialCreatorName:'LingYingDrama Offical',appUrl:'https://aidramio.example',dataDir:'/tmp',payments:'disabled',usdToHkd:7.8,stripeKey:'',stripeWebhook:'',stripeActivationPriceId:'',stripeWalletProductId:'',googleClientId:'',googleClientSecret:'',appleClientId:'',appleTeamId:'',appleKeyId:'',applePrivateKey:'',resendApiKey:'',mailFrom:'',mailProvider:'auto',cloudflareEmailAccountId:'',cloudflareEmailApiToken:'',seed:false,ffmpeg:'',ffprobe:'',runtime:'cloudflare',videoFormats:['mp4','mov','m4v']};
+export const config={port:8080,production:true,sandbox:false,stripeTestMode:false,payoutsEnabled:false,stripeAutoConfigureWebhook:false,publicUrl:'',stripeSiteOrigin:'',platformOwnerUserId:'',platformAdminEmailHash:'',officialCreatorName:'LingYingDrama Offical',appUrl:'https://aidramio.example',dataDir:'/tmp',payments:'disabled',usdToHkd:7.8,stripeKey:'',stripeWebhook:'',stripeActivationPriceId:'',stripeWalletProductId:'',googleClientId:'',googleClientSecret:'',appleClientId:'',appleTeamId:'',appleKeyId:'',applePrivateKey:'',resendApiKey:'',mailFrom:'',mailProvider:'auto',cloudflareEmailAccountId:'',cloudflareEmailApiToken:'',seed:false,ffmpeg:'',ffprobe:'',runtime:'cloudflare',videoFormats:['mp4','mov','m4v']};
 export function configure(env:Env){
   config.production=env.ENVIRONMENT!=='development';config.payments=env.PAYMENTS_MODE||'disabled';
   config.sandbox=env.ENVIRONMENT==='sandbox';
   config.platformOwnerUserId=env.PLATFORM_OWNER_USER_ID||'';config.officialCreatorName=env.OFFICIAL_CREATOR_NAME||'LingYingDrama Offical';
+  config.platformAdminEmailHash=env.PLATFORM_ADMIN_EMAIL_SHA256||'';
   config.stripeTestMode=env.STRIPE_TEST_MODE==='true';
   config.payoutsEnabled=env.PAYOUTS_ENABLED==='true'||!config.production&&env.PAYOUTS_ENABLED!=='false';
   config.stripeAutoConfigureWebhook=env.STRIPE_AUTO_CONFIGURE_WEBHOOK==='true';

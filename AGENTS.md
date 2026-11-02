@@ -57,3 +57,9 @@ The older `aidramio-sandbox` Worker and `wrangler.sandbox.jsonc` are legacy reso
 Use the existing secure `CLOUDFLARE_API_TOKEN` binding against `api.cloudflare.com`. Check names/presence and operation results without printing values. Google and Stripe credentials belong in Worker Secrets; never request them in chat. Google setup is documented in `docs/GOOGLE_SIGN_IN.md`.
 
 Account records and financial transactions live in the SQLite-backed Durable Object; publisher media lives in private R2. Those records are not Git source and must not be deleted, reseeded, or included in a commit. Keep the existing migration history and use additive schema changes unless the user explicitly authorizes a data migration.
+
+## Administrator identity and upload display
+
+Preserve `PLATFORM_OWNER_USER_ID`, `OFFICIAL_CREATOR_NAME` and `PLATFORM_ADMIN_EMAIL_SHA256` on the existing main Worker. The immutable owner UUID receives audited admin access. The email hash is an additional trusted selector: it grants the matching authenticated account admin access only after a current server email-verification record or matching signed Google identity proves the current stored email. Do not grant roles from an unverified registration address, display name, request body or frontend email comparison. Keep personal administrator email addresses out of public source; use the configured normalized hash. Role changes are audited and never create a session, paid Pass, balance, quota or financial transaction.
+
+On Account, administrators receive an Administrator badge and a separate upload-access card. Publishing is included with their role; do not restore an inactive paid-Pass upsell for admins or pretend they purchased a Pass. Preserve actual paid Pass receipts. Financial review holds, upload-disable settings, storage quotas and episode limits remain enforced.

@@ -4,7 +4,7 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {spawn,execFileSync} from 'node:child_process';
 import {once} from 'node:events';
-import {randomBytes,createHmac} from 'node:crypto';
+import {randomBytes,createHmac,createHash} from 'node:crypto';
 
 // Entirely local: Miniflare emulates Durable Objects and R2. Never deploys or charges money.
 const dir=await mkdtemp(path.join(tmpdir(),'aidramio-cloudflare-test-'));
@@ -20,6 +20,8 @@ async function start(production=false,testStripe=false,publicOrigin=base){
   if(testStripe)args.push('--var','STRIPE_SECRET_KEY:rk_test_local_cloudflare_fixture_only','--var','STRIPE_WEBHOOK_SECRET:whsec_local_cloudflare_fixture_only');
   args.push('--var',`PAYOUTS_ENABLED:${!production}`);
   args.push('--var','STRIPE_AUTO_CONFIGURE_WEBHOOK:false');
+  // A matching but unverified local address must never gain admin access.
+  args.push('--var','PLATFORM_ADMIN_EMAIL_SHA256:'+createHash('sha256').update('viewer@example.test').digest('hex'));
   child=spawn(process.execPath,args,{env:{...process.env,XDG_CONFIG_HOME:path.join(dir,'config'),WRANGLER_SEND_METRICS:'false',WRANGLER_LOG_PATH:path.join(dir,'wrangler.log')},stdio:['ignore','pipe','pipe']});
   child.stdout.on('data',d=>{logs+=d;});child.stderr.on('data',d=>{logs+=d;});
   for(let n=0;n<120;n++){
@@ -101,6 +103,9 @@ try{
   assert.equal(p.data.user.role,'viewer');assert.equal(p.data.user.publisher_active,0);
   assert.deepEqual(p.data.user.dramio_pass,{active:false,test:false,purchased_at:null});
   const viewer=(await request('/api/auth/register',{email:'viewer@example.test',name:'Local Viewer',password},'',201)).cookie;
+  const claimed=(await request('/api/account',{name:'Local Viewer',language:'en',role:'admin',publisher_active:1,email_verified:true},viewer,200,'PATCH')).data.user;
+  assert.equal(claimed.role,'viewer');assert.equal(claimed.publisher_active,0);assert.equal(claimed.email_verified,false);
+  await request('/api/admin',undefined,viewer,403);await request('/api/studio/series',{},viewer,403);
   assert.deepEqual((await request('/api/account/identities',undefined,viewer)).data,{google:{linked:false},apple:{linked:false},password:true});
   await request('/api/auth/login',{email:'viewer@example.test',password:'wrong'},'',401);
   await request('/api/admin',undefined,publisher,403);
