@@ -49,7 +49,7 @@
     "PAYOUTS_ENABLED": "false",
     "STRIPE_AUTO_CONFIGURE_WEBHOOK": "true",
     "USD_TO_HKD": "7.8",
-    "SEED_CATALOG": "true",
+    "SEED_CATALOG": "false",
     "EMAIL_PROVIDER": "cloudflare",
     "CF_EMAIL_ACCOUNT_ID": "95040c4f244233138195b80657887486",
     "MAIL_FROM": "LingYing <accounts@hknovaxrproduction.com>",

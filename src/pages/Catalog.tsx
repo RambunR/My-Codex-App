@@ -8,6 +8,7 @@ import { PageTitle,SeriesCard,SectionHeading,Loading,ErrorState,Empty,AuthGate,A
 import { LANGUAGES,type Series,type Episode,usd } from '../../shared/config';
 import { STANDARD_GENRES,STORY_THEMES,SERIES_FORMATS,CREATION_TYPES } from '../../shared/taxonomy';
 import {CoverArtwork,coverFrameStyle} from '../components/CoverArtwork';
+import {SubtitleMetadata} from '../components/SubtitleMetadata';
 import '../catalog-mobile.css';
 import '../taxonomy-discovery.css';
 
@@ -73,6 +74,7 @@ export function SeriesDetail(){
       {visibleGenres(series).length>0&&<div><dt>{t('genres')}</dt><dd>{visibleGenres(series).map(g=><Link to={taxonomyLink('genre',g)} key={g}>{t(genreKey(g))}</Link>)}</dd></div>}
       {!!series.themes?.length&&<div><dt>{t('taxonomyStoryThemes' as Key)}</dt><dd>{series.themes.map(theme=><Link to={taxonomyLink('theme',theme)} key={theme}>{t(themeKey(theme))}</Link>)}</dd></div>}
       {series.format&&<div><dt>{t('taxonomyFormat' as Key)}</dt><dd><Link to={taxonomyLink('format',series.format)}>{t(formatKey(series.format))}</Link></dd></div>}
+      <SubtitleMetadata languages={series.subtitle_languages}/>
       <div><dt>{t('creationType')}</dt><dd><Link to={taxonomyLink('creation',series.creation_type)}>{series.creation_type!=='human'&&<Sparkles size={12} aria-hidden="true"/>}{t(series.creation_type)}</Link></dd></div>
     </dl>{series.publisher_id?<Link className="creator-byline creator-profile-link" to={`/publishers/${encodeURIComponent(series.publisher_id)}`} aria-label={`${t('publisherViewProfile')}: ${series.creator_name}`}><Avatar name={series.creator_name} size="small"/><span>{t('by')} <strong>{series.creator_name}</strong></span></Link>:<div className="creator-byline"><Avatar name={series.creator_name} size="small"/><span>{t('by')} <strong>{series.creator_name}</strong></span></div>}</div></section>
     <section className="episodes-section" id="episodes"><SectionHeading title={t('episodes')}><span className="muted">{series.episode_count} {t('episodes')} · {usd(series.price_cents*10000)} / {t('episode')}</span></SectionHeading><div className="episode-grid">{data.episodes.map(e=><Link className={`episode-tile ${e.free||e.unlocked?'available':''}`} key={e.id} to={`/watch/${id}/${e.id}`}><span className="episode-tile-num">{String(e.number).padStart(2,'0')}</span><div><strong>{e.title}</strong><small>{Math.floor(e.duration/60)}:{String(Math.round(e.duration%60)).padStart(2,'0')} <i/> {e.free?t('free'):e.unlocked?t('watch'):usd(series.price_cents*10000)}</small><small className="episode-view-count" title={`${engagementCount(e.views,locale,false)} ${t('views')}`}><Eye size={11} aria-hidden="true"/>{engagementCount(e.views,locale)} {t('views')}</small></div>{e.free||e.unlocked?<Play size={17}/>:<LockKeyhole size={17}/>}</Link>)}</div>{!data.episodes.length&&<Empty title={t('noEpisodes')}/>}</section>

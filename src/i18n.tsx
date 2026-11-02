@@ -11,6 +11,7 @@ import {seriesLifecycleEnglish,seriesLifecycleMessages} from './series-lifecycle
 import {bulkRewardsEnglish,bulkRewardsMessages} from './bulk-rewards-locales';
 import {publisherProfileEnglish,publisherProfileMessages} from './publisher-profile-locales';
 import {coverArtworkEnglish,coverArtworkMessages} from './cover-artwork-locales';
+import {subtitleLanguageEnglish,subtitleLanguageMessages} from './subtitle-language-locales';
 
 const en = {
   ...contentAdminEnglish,
@@ -91,6 +92,7 @@ const en = {
   ...bulkRewardsEnglish,
   ...publisherProfileEnglish,
   ...coverArtworkEnglish,
+  ...subtitleLanguageEnglish,
 } as const;
 export type Key = keyof typeof en;
 type Dictionary = Partial<Record<Key,string>>;
@@ -171,6 +173,7 @@ for(const language of LANGUAGES){if(!seriesLifecycleMessages[language.code])thro
 for(const language of LANGUAGES){if(!bulkRewardsMessages[language.code])throw new Error(`Bulk and reward translations missing: ${language.code}`);Object.assign(dictionaries[language.code],bulkRewardsMessages[language.code]);}
 for(const language of LANGUAGES){if(!publisherProfileMessages[language.code])throw new Error(`Publisher profile translations missing: ${language.code}`);Object.assign(dictionaries[language.code],publisherProfileMessages[language.code]);}
 for(const language of LANGUAGES){if(!coverArtworkMessages[language.code])throw new Error(`Cover artwork translations missing: ${language.code}`);Object.assign(dictionaries[language.code],coverArtworkMessages[language.code]);}
+for(const language of LANGUAGES){if(!subtitleLanguageMessages[language.code])throw new Error(`Subtitle language translations missing: ${language.code}`);Object.assign(dictionaries[language.code],subtitleLanguageMessages[language.code]);}
 const uploadConfirmationMessages:Record<Locale,string>={
   en:'Upload confirmation was interrupted. Refresh this series before retrying the file.',
   'zh-TW':'上傳確認中斷。請重新整理此系列，再重試上傳檔案。',

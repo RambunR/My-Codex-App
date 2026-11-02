@@ -87,7 +87,7 @@ function viewMetrics(row:Record<string,any>|undefined):Pick<AnalyticsMetrics,'vi
 
 export function readSeriesAnalytics(creatorId:string,seriesId:string,input:AnalyticsRangeInput={},now=Date.now()):SeriesAnalytics {
   const series=one<{id:string;title:string;creator_id:string}>('SELECT id,title,creator_id FROM series WHERE id=?',seriesId);
-  assert(series&&!one('SELECT 1 FROM series_deletions WHERE series_id=?',seriesId),404,'NOT_FOUND','Series not found.');
+  assert(series&&!one('SELECT 1 FROM series_deletions WHERE series_id=?',seriesId)&&!one('SELECT 1 FROM retired_catalog_series WHERE series_id=?',seriesId),404,'NOT_FOUND','Series not found.');
   assert(series.creator_id===creatorId,403,'FORBIDDEN','These statistics belong to another publisher.');
   const table=purchaseTable();
   const first=one<{at_ms:number|null}>(`SELECT MIN(at_ms) AS at_ms FROM (

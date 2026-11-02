@@ -11,7 +11,7 @@ import {playbackTimeSql} from './playback-times.js';
 type Row=Record<string,any>;
 const CONFIRMATION_LIFETIME=10*60_000;
 const hash=(value:string)=>crypto.createHash('sha256').update(value).digest('hex');
-export function isSeriesDeleted(seriesId:string){return!!one('SELECT 1 FROM series_deletions WHERE series_id=?',seriesId);}
+export function isSeriesDeleted(seriesId:string){return!!one('SELECT 1 FROM series_deletions WHERE series_id=? UNION ALL SELECT 1 FROM retired_catalog_series WHERE series_id=? LIMIT 1',seriesId,seriesId);}
 function ownedSeries(actorId:string,seriesId:string){
   const actor=one('SELECT role FROM users WHERE id=?',actorId);assert(actor,401,'AUTH_REQUIRED','Sign in to continue.');
   const series=one('SELECT * FROM series WHERE id=?',seriesId);assert(series&&!isSeriesDeleted(seriesId),404,'NOT_FOUND','Series not found.');

@@ -24,6 +24,9 @@ async function start(production=false,testStripe=false,publicOrigin=base,missing
     else args.push('--var','STRIPE_TEST_SECRET_KEY:','--var','STRIPE_TEST_WEBHOOK_SECRET:');
   }
   args.push('--var',`PAYOUTS_ENABLED:${!production}`);
+  // These disposable local fixtures exercise the catalogue and playback paths.
+  // The production canonical host separately retires samples and never seeds.
+  args.push('--var','SEED_CATALOG:true');
   args.push('--var',`STRIPE_AUTO_CONFIGURE_WEBHOOK:${testStripe}`,'--var','PASS_PROMOTION_ENABLED:true');
   // A matching but unverified local address must never gain admin access.
   args.push('--var','PLATFORM_ADMIN_EMAIL_SHA256:'+createHash('sha256').update('viewer@example.test').digest('hex'));
@@ -109,6 +112,7 @@ try{
   const legacyAnimated=(await request('/api/series/tokyo-tomorrow')).data.series;
   assert.equal(legacyAnimated.format,'animation');assert.deepEqual(legacyAnimated.themes,[]);
   assert.equal(legacyAnimated.cover_aspect_ratio,'2:3');assert.ok(series.every(item=>item.cover_aspect_ratio==='2:3'),'Existing seeded cover layouts must retain their legacy ratio.');
+  assert.deepEqual(legacyAnimated.subtitle_languages,[]);assert.ok(series.every(item=>Array.isArray(item.subtitle_languages)&&item.subtitle_languages.length===0));
   assert.ok((await request('/api/series?format=animation')).data.series.some(s=>s.id==='tokyo-tomorrow'));
   assert.equal((await request('/api/series/after-midnight')).data.series.format,null);
   await request('/api/series?format=not-a-format',undefined,'',400);
@@ -208,18 +212,26 @@ try{
   const privateClassification=(await request(`/api/studio/series/${sid}`,undefined,publisher)).data.series;
   assert.deepEqual(privateClassification.themes,body.themes);assert.equal(privateClassification.format,body.format);
   assert.equal(privateClassification.cover_aspect_ratio,'9:16','New series default to a portrait layout.');
+  assert.deepEqual(privateClassification.subtitle_languages,[]);
+  const selectedSubtitles=['en','zh-TW','ja'],allSubtitleLanguages=cfg.languages.map(item=>item.code);
+  assert.equal(allSubtitleLanguages.length,21);
+  await request(`/api/studio/series/${sid}`,{...body,subtitle_languages:selectedSubtitles},publisher,200,'PATCH');
+  assert.deepEqual((await request(`/api/studio/series/${sid}`,undefined,publisher)).data.series.subtitle_languages,selectedSubtitles);
+  await request('/api/studio/series',{...body,title:'Invalid Subtitle Language',subtitle_languages:['unknown-language']},publisher,400);
   await request('/api/studio/series',{...body,title:'Invalid Cover Layout',cover_aspect_ratio:'2:3'},publisher,400);
   const {themes:omittedThemes,format:omittedFormat,...legacyBody}=body;
   await request(`/api/studio/series/${sid}`,legacyBody,publisher,200,'PATCH');
   assert.deepEqual((await request(`/api/studio/series/${sid}`,undefined,publisher)).data.series.themes,body.themes);
+  assert.deepEqual((await request(`/api/studio/series/${sid}`,undefined,publisher)).data.series.subtitle_languages,selectedSubtitles,'An older editor omitting subtitles must retain the selection.');
   const video=await readFile('public/demo-preview.mp4');
   const cover=await readFile('public/images/midnight.jpg');
   const profileSeriesBody={...body,title:'Managed Publisher Showcase',language:'en',genres:['comedy'],themes:[],format:'live-action',free_episodes:1};
-  const profileSeriesId=(await request('/api/studio/series',profileSeriesBody,admin,201)).data.id;
+  const profileSeriesId=(await request('/api/studio/series',{...profileSeriesBody,subtitle_languages:allSubtitleLanguages},admin,201)).data.id;
   const profileSeriesPath=`/api/studio/series/${profileSeriesId}`;
   const defaultAttribution=(await request(profileSeriesPath,undefined,admin)).data.series;
   assert.equal(defaultAttribution.publisher_id,officialPublisher.id);assert.equal(defaultAttribution.creator_name,officialPublisher.display_name);assert.equal(defaultAttribution.creator_id,adminBeforeProfiles.id);
   assert.equal(defaultAttribution.cover_aspect_ratio,'9:16');
+  assert.deepEqual(defaultAttribution.subtitle_languages,allSubtitleLanguages);
   await request(profileSeriesPath,{...profileSeriesBody,publisher_profile_id:managedPublisher.id},admin,200,'PATCH');
   const selectedAttribution=(await request(profileSeriesPath,undefined,admin)).data.series;
   assert.equal(selectedAttribution.publisher_id,managedPublisher.id);assert.equal(selectedAttribution.publisher_profile_id,managedPublisher.id);assert.equal(selectedAttribution.creator_name,editedPublisher.display_name);assert.equal(selectedAttribution.creator_id,adminBeforeProfiles.id);
@@ -234,6 +246,18 @@ try{
   const managedPublicProfile=(await request(`/api/publishers/${managedPublisher.id}`)).data;
   assert.equal(managedPublicProfile.publisher.registered_at,editedPublisher.registered_at);assert.equal(managedPublicProfile.stats.series_count,1);assert.equal(managedPublicProfile.stats.episode_count,1);assert.equal(managedPublicProfile.stats.likes,0);assert.equal(managedPublicProfile.stats.views,0);
   assert.equal(managedPublicProfile.series[0].id,profileSeriesId);assert.equal(managedPublicProfile.pagination.total,1);
+  assert.deepEqual(profilePublished.subtitle_languages,allSubtitleLanguages);assert.deepEqual(managedPublicProfile.series[0].subtitle_languages,allSubtitleLanguages);
+  await request(profileSeriesPath,{...profileSeriesBody,subtitle_languages:[]},admin,200,'PATCH');
+  assert.deepEqual((await request(profileSeriesPath,undefined,admin)).data.series.subtitle_languages,[]);
+  assert.deepEqual((await request(`/api/series/${profileSeriesId}`)).data.series.subtitle_languages,[]);
+  for(const invalidSubtitles of [['en','en'],['unknown-language'],[...allSubtitleLanguages,'en'],null])await request(profileSeriesPath,{...profileSeriesBody,subtitle_languages:invalidSubtitles},admin,400,'PATCH');
+  const profileSubtitles=['zh-CN','ko','pt-BR'];
+  await request(profileSeriesPath,{...profileSeriesBody,subtitle_languages:['ko','zh-CN','pt-BR']},admin,200,'PATCH');
+  await request(profileSeriesPath,profileSeriesBody,admin,200,'PATCH');
+  assert.deepEqual((await request(profileSeriesPath,undefined,admin)).data.series.subtitle_languages,profileSubtitles);
+  assert.deepEqual((await request(`/api/series/${profileSeriesId}`)).data.series.subtitle_languages,profileSubtitles);
+  assert.deepEqual((await request(`/api/publishers/${managedPublisher.id}`)).data.series[0].subtitle_languages,profileSubtitles);
+  console.log('PASS: subtitle metadata accepts all 21 supported languages, round-trips multiple selections, clears explicitly, preserves omitted values and rejects invalid lists.');
   const layoutQuotaBefore=(await request('/api/auth/me',undefined,admin)).data.user.used_bytes;
   for(const coverAspectRatio of ['1:1','16:9','9:16']){
     await request(profileSeriesPath,{...profileSeriesBody,cover_aspect_ratio:coverAspectRatio},admin,200,'PATCH');
@@ -286,6 +310,7 @@ try{
   const duplicateLike=(await request(`/api/series/${sid}/like`,{liked:true},viewer,200,'PUT')).data;assert.equal(duplicateLike.likes,1);
   const publicSeries=(await request(`/api/series/${sid}`,undefined,viewer)).data;
   assert.equal(publicSeries.series.likes,1);assert.equal(publicSeries.series.liked,true);assert.equal(publicSeries.series.saved,false);
+  assert.deepEqual(publicSeries.series.subtitle_languages,selectedSubtitles);
   assert.equal(publicSeries.series.views,0,'Metadata and byte ranges must not count as views.');
   const guestPlayback=await request(`/api/episodes/${first.id}/playback`,{});assert.match(guestPlayback.cookie,/^drama_viewer=/);
   await request(`/api/studio/series/${sid}/analytics?period=7d`,undefined,viewer,403);
@@ -574,15 +599,21 @@ try{
   assert.equal((await request(`/api/studio/series/${sid}`,undefined,admin)).data.series.taken_down,false);
   const retainedClassification=(await request(`/api/studio/series/${sid}`,undefined,publisher)).data.series;
   assert.deepEqual(retainedClassification.themes,body.themes);assert.equal(retainedClassification.format,body.format);
+  assert.deepEqual(retainedClassification.subtitle_languages,selectedSubtitles);assert.deepEqual(retainedLikes.series.subtitle_languages,selectedSubtitles);
   assert.equal(retainedClassification.cover_aspect_ratio,'9:16');
   assert.equal((await request('/api/series/tokyo-tomorrow')).data.series.cover_aspect_ratio,'2:3');
+  const retainedLocalCatalogue=(await request('/api/series')).data.series;
+  assert.ok(series.every(sample=>retainedLocalCatalogue.some(item=>item.id===sample.id)),'Production-mode local restarts must preserve disposable sample fixtures outside the production canonical host.');
   assert.equal((await request(profileSeriesPath,undefined,admin)).data.series.cover_aspect_ratio,'16:9');
   assert.equal((await request(`/api/series/${profileSeriesId}`)).data.series.cover_aspect_ratio,'16:9');
+  assert.deepEqual((await request(profileSeriesPath,undefined,admin)).data.series.subtitle_languages,profileSubtitles);
+  assert.deepEqual((await request(`/api/series/${profileSeriesId}`)).data.series.subtitle_languages,profileSubtitles);
   const restartedLayoutCover=await fetch(base+`/api/series/${profileSeriesId}/cover`);assert.deepEqual(Buffer.from(await restartedLayoutCover.arrayBuffer()),cover);
   assert.equal(retainedClassification.publisher_id,ordinaryPublisherId);
   const restartedPublisher=(await request(`/api/publishers/${managedPublisher.id}`)).data;
   assert.equal(restartedPublisher.publisher.display_name,editedPublisher.display_name);assert.equal(restartedPublisher.publisher.registered_at,editedPublisher.registered_at);assert.equal(restartedPublisher.stats.series_count,1);assert.equal(restartedPublisher.series[0].id,profileSeriesId);
   assert.equal(restartedPublisher.series[0].cover_aspect_ratio,'16:9');
+  assert.deepEqual(restartedPublisher.series[0].subtitle_languages,profileSubtitles);
   const restartedPublisherAdmin=(await request('/api/admin/publishers',undefined,admin)).data;
   assert.equal(restartedPublisherAdmin.default_publisher_id,officialPublisher.id);assert.equal(restartedPublisherAdmin.publishers.find(profile=>profile.id===managedPublisher.id).created_at,managedPublisher.created_at);
   const restartedOrdinaryPublisher=(await request(`/api/publishers/${ordinaryPublisherId}`)).data;

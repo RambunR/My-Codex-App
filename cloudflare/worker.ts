@@ -10,6 +10,7 @@ import {hashPassword,rateLimit} from '../dist/cloudflare/server/auth';
 import {configureStripe} from '../dist/cloudflare/server/finance';
 import {cleanupSeriesMedia} from '../dist/cloudflare/server/series-lifecycle';
 import {cleanupExpiredEpisodeUploads} from '../dist/cloudflare/server/episode-upload-sessions';
+import {retireBuiltInCatalogue} from '../dist/cloudflare/server/catalog-retirement';
 import {AppError,assert} from '../server/errors';
 import {bindRuntime,type Env} from './runtime';
 import {configure,config} from './config';
@@ -23,7 +24,11 @@ let listening=false;
 export class AIDramioApp {
   constructor(private ctx:DurableObjectState,private env:Env){
     bindRuntime(ctx.storage,env,p=>ctx.waitUntil(p));configure(env);configureStripe();initializeDatabase(ctx.storage);
-    if(config.seed&&!one('SELECT id FROM series LIMIT 1'))this.seedCatalogue();
+    const retirement=retireBuiltInCatalogue({environment:env.ENVIRONMENT,appUrl:env.APP_URL});
+    if(retirement.status!=='not_applicable')console.log(JSON.stringify({event:'catalog_retirement',...retirement}));
+    // Production never re-creates examples, even if a stale Dashboard variable
+    // still enables development catalogue seeding on an otherwise empty DB.
+    if(!config.production&&config.seed&&!one('SELECT id FROM series LIMIT 1'))this.seedCatalogue();
     if(!listening){
       const app=express();
       app.post('/api/admin/bootstrap',express.json({limit:'16kb'}),async(req,res,next)=>{

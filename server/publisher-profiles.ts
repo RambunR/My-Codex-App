@@ -83,7 +83,7 @@ function subjectCondition(subject:ReturnType<typeof subjectForId>,alias='s'){
 }
 function adminProfile(row:Row):AdminPublisherProfile{
   const subject={publisher:safeProfile(row),kind:'managed' as const,legacyOwnerId:row.legacy_owner_id},condition=subjectCondition(subject);
-  const count=one(`SELECT COUNT(*) AS n FROM series s WHERE NOT EXISTS(SELECT 1 FROM series_deletions d WHERE d.series_id=s.id) AND ${condition.sql}`,...condition.params)!.n;
+  const count=one(`SELECT COUNT(*) AS n FROM series s WHERE NOT EXISTS(SELECT 1 FROM series_deletions d WHERE d.series_id=s.id) AND NOT EXISTS(SELECT 1 FROM retired_catalog_series r WHERE r.series_id=s.id) AND ${condition.sql}`,...condition.params)!.n;
   return{...safeProfile(row),created_at:row.created_at,updated_at:row.updated_at,series_count:Number(count)};
 }
 interface Helpers {catalogSelect:string;serializeSeries:(series:Row,userId?:string,privateView?:boolean)=>any}

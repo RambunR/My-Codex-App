@@ -13,14 +13,14 @@ interface ModerationEventRecord {id:string;series_id:string;actor_id:string;acto
 const states=new Set(['all','draft','published','archived','taken_down']);
 
 function requireAdministrator(actorId:string){assert(one("SELECT 1 FROM users WHERE id=? AND role='admin'",actorId),403,'FORBIDDEN','Administrator access required.');}
-function requireSeries(seriesId:string){const series=one('SELECT * FROM series WHERE id=? AND NOT EXISTS (SELECT 1 FROM series_deletions d WHERE d.series_id=series.id)',seriesId);assert(series,404,'NOT_FOUND','Series not found.');return series;}
+function requireSeries(seriesId:string){const series=one('SELECT * FROM series WHERE id=? AND NOT EXISTS (SELECT 1 FROM series_deletions d WHERE d.series_id=series.id) AND NOT EXISTS (SELECT 1 FROM retired_catalog_series r WHERE r.series_id=series.id)',seriesId);assert(series,404,'NOT_FOUND','Series not found.');return series;}
 function reasonText(value:string){const reason=typeof value==='string'?value.trim():'';assert(reason.length>=10&&reason.length<=2000,400,'MODERATION_REASON_REQUIRED','Explain this moderation action in 10 to 2,000 characters.');return reason;}
 function snapshotText(snapshot:unknown){const value=JSON.stringify(snapshot);assert(typeof value==='string'&&value.length<=64*1024,400,'INVALID_MODERATION_SNAPSHOT','The moderation snapshot is invalid or too large.');return value;}
 
 /** The alias is an internal SQL identifier, never an unvalidated request value. */
 export function publicSeriesAllowedSql(alias='s'){
   assert(/^[A-Za-z_][A-Za-z0-9_]*$/.test(alias),400,'INVALID_SQL_ALIAS','Invalid series query alias.');
-  return `NOT EXISTS (SELECT 1 FROM series_deletions deletion WHERE deletion.series_id=${alias}.id) AND NOT EXISTS (SELECT 1 FROM series_moderation moderation WHERE moderation.series_id=${alias}.id AND moderation.taken_down=1)`;
+  return `NOT EXISTS (SELECT 1 FROM series_deletions deletion WHERE deletion.series_id=${alias}.id) AND NOT EXISTS (SELECT 1 FROM retired_catalog_series retired WHERE retired.series_id=${alias}.id) AND NOT EXISTS (SELECT 1 FROM series_moderation moderation WHERE moderation.series_id=${alias}.id AND moderation.taken_down=1)`;
 }
 
 export function seriesIsTakenDown(seriesId:string){return!!one('SELECT 1 FROM series_moderation WHERE series_id=? AND taken_down=1',seriesId);}
@@ -33,7 +33,7 @@ export function moderationState(seriesId:string):ModerationState{
 export function assertSeriesAvailable(seriesId:string,options:SeriesAvailabilityOptions={}):Row{
   const series=one('SELECT * FROM series WHERE id=?',seriesId);
   const ownerPreview=series&&series.status==='draft'&&options.allowOwnerPreview&&options.viewerId===series.creator_id;
-  assert(series&&!one('SELECT 1 FROM series_deletions WHERE series_id=?',seriesId)&&!seriesIsTakenDown(seriesId)&&(series.status==='published'||ownerPreview),404,'NOT_FOUND','Series not found.');
+  assert(series&&!one('SELECT 1 FROM series_deletions WHERE series_id=?',seriesId)&&!one('SELECT 1 FROM retired_catalog_series WHERE series_id=?',seriesId)&&!seriesIsTakenDown(seriesId)&&(series.status==='published'||ownerPreview),404,'NOT_FOUND','Series not found.');
   return series;
 }
 
@@ -76,7 +76,7 @@ export function listAdminSeries(actorId:string,filters:AdminSeriesFilters={}){
   const status=filters.status??'all',page=filters.page??1,limit=filters.limit??20;
   assert(states.has(status),400,'INVALID_FILTER','Choose a valid series status.');
   assert(Number.isSafeInteger(page)&&page>=1&&page<=100000&&Number.isSafeInteger(limit)&&limit>=1&&limit<=50,400,'INVALID_PAGE','Choose a valid page and a page size from 1 to 50.');
-  const conditions:string[]=['NOT EXISTS (SELECT 1 FROM series_deletions d WHERE d.series_id=s.id)'],params:any[]=[];
+  const conditions:string[]=['NOT EXISTS (SELECT 1 FROM series_deletions d WHERE d.series_id=s.id)','NOT EXISTS (SELECT 1 FROM retired_catalog_series r WHERE r.series_id=s.id)'],params:any[]=[];
   if(q){conditions.push(`(s.title LIKE ? OR (${publisherNameSql()}) LIKE ?)`);params.push('%'+q+'%','%'+q+'%');}
   if(status==='taken_down')conditions.push('COALESCE(m.taken_down,0)=1');
   else if(status!=='all'){conditions.push('s.status=?');params.push(status);}
