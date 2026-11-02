@@ -6,3 +6,5 @@
 .editor-page .upload-drop>.editor-enable-upload{margin:0 auto 18px;max-width:100%;white-space:normal;line-height:1.6}
 .editor-page .upload-drop>.editor-upload-ready{display:flex;align-items:center;justify-content:center;gap:6px;color:#b8e3c8}
 @media(max-width:600px){.editor-validation-summary{font-size:10px;padding:12px 14px}.editor-field-error{font-size:9px}.editor-page .upload-drop>.editor-enable-upload{font-size:10px;gap:7px;padding:10px 13px}}
+
+.editor-page .folder-upload-hint{max-width:48ch;margin-inline:auto;overflow-wrap:anywhere}.editor-page .folder-reading{display:flex;align-items:center;justify-content:center;gap:8px}.folder-selection-summary{margin:15px 0;line-height:1.7;overflow-wrap:anywhere}
