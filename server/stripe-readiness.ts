@@ -17,7 +17,7 @@ export function resetStripeReadiness(){generation++;signature='';expiresAt=0;pen
 export function stripeWebhookReadiness():StripeWebhookReadiness{return{...state};}
 class ReadinessFailure extends Error {constructor(readonly code:string){super(code);}}
 function requireCondition(condition:unknown,code:string):asserts condition{if(!condition)throw new ReadinessFailure(code);}
-function configSignature(client:Stripe|null){return JSON.stringify([config.stripeAutoConfigureWebhook,config.production,config.sandbox,config.payments,config.stripeTestMode,config.stripeKey,config.appUrl,!!client]);}
+function configSignature(client:Stripe|null){return JSON.stringify([config.stripeAutoConfigureWebhook,config.production,config.sandbox,config.payments,config.stripeTestMode,config.stripeKey,config.stripeWebhook,config.appUrl,!!client]);}
 function failureCode(error:unknown){
   if(error instanceof ReadinessFailure)return error.code;
   const e=error&&typeof error==='object'?error as {statusCode?:number;type?:string}:{};
@@ -70,6 +70,13 @@ export async function ensureStripeWebhookReady(client:Stripe|null):Promise<boole
   if(!config.stripeAutoConfigureWebhook){resetStripeReadiness();return true;}
   const current=configSignature(client);
   if(signature!==current){resetStripeReadiness();signature=current;}
+  if(config.stripeTestMode||config.sandbox){
+    // This validates selection, not webhook delivery. Test credentials must never
+    // reach the account/endpoint automation that is deliberately live-only.
+    const valid=config.payments==='stripe'&&/^(sk|rk)_test_/.test(config.stripeKey)&&config.stripeWebhook.startsWith('whsec_')&&!!client;
+    state=valid?{status:'ready',code:'STRIPE_TEST_CONFIGURATION'}:{status:'error',code:'STRIPE_READINESS_CONFIG'};
+    return valid;
+  }
   if(pending)return pending;
   if(expiresAt>Date.now()&&(state.status==='ready'||state.status==='error'))return state.status==='ready';
   const token=generation;state={status:'pending'};

@@ -8,7 +8,8 @@ import { ACTIVATION_HKD_CENTS,MIN_WALLET_FUNDING_CENTS,MAX_WALLET_FUNDING_CENTS,
 import {checkoutCopy} from '../shared/checkout-copy.js';
 import {PASS_PROMOTION_CODE,PASS_PROMOTION_HKD_CENTS} from '../shared/pass-promotion.js';
 import {quotePromotion,storePromotionQuote,promotionSnapshot,validPromotionPayment} from './promotions.js';
-import { paymentTable,purchaseTable,ledgerTable,financeAccount,accountTable,accountIdColumn,hasEpisodePurchase } from './payment-state.js';
+import { paymentTable,purchaseTable,ledgerTable,financeAccount,accountTable,accountIdColumn,hasEpisodePurchase,usingTestPaymentState } from './payment-state.js';
+import {verifiedStripeEventContext} from './stripe-event-context.js';
 import {assertPaymentAccountClear,assertPaymentPayoutsClear,recordPaymentLink} from './payment-risk.js';
 import {ensureStripeWebhookReady,stripeWebhookReadiness,resetStripeReadiness} from './stripe-readiness.js';
 import {assertSeriesAvailable} from './moderation.js';
@@ -16,9 +17,9 @@ import {assertSeriesAvailable} from './moderation.js';
 export let stripe = config.stripeKey ? new Stripe(config.stripeKey, {httpClient:Stripe.createFetchHttpClient()}) : null;
 const stripeLocales:Record<string,Stripe.Checkout.SessionCreateParams.Locale>={en:'en','zh-TW':'zh-TW','zh-CN':'zh',ja:'ja',ko:'ko',id:'id','pt-BR':'pt-BR',es:'es-419',vi:'vi',th:'th',fil:'fil',tr:'tr',ru:'ru',fr:'fr',de:'de',ms:'ms'};
 export function configureStripe(){stripe=config.stripeKey?new Stripe(config.stripeKey,{httpClient:Stripe.createFetchHttpClient()}):null;resetStripeReadiness();}
-export function stripeModeMatches(livemode:unknown){return typeof livemode==='boolean'&&livemode===/^(sk|rk)_live_/.test(config.stripeKey);}
+export function stripeModeMatches(livemode:unknown){return typeof livemode==='boolean'&&livemode===(verifiedStripeEventContext()?.livemode??/^(sk|rk)_live_/.test(config.stripeKey));}
 export function stripeTestPayments(){return config.stripeTestMode||config.sandbox||config.payments==='stripe'&&/^(sk|rk)_test_/.test(config.stripeKey);}
-export function stripeConfigured(){return Boolean(stripe&&/^(sk|rk)_(live|test)_/.test(config.stripeKey)&&config.stripeWebhook.startsWith('whsec_')&&(config.sandbox||config.stripeTestMode?/^(sk|rk)_test_/.test(config.stripeKey):!config.production||/^(sk|rk)_live_/.test(config.stripeKey)));}
+export function stripeConfigured(){return verifiedStripeEventContext()?.configured??Boolean(stripe&&/^(sk|rk)_(live|test)_/.test(config.stripeKey)&&config.stripeWebhook.startsWith('whsec_')&&(config.sandbox||config.stripeTestMode?/^(sk|rk)_test_/.test(config.stripeKey):!config.production||/^(sk|rk)_live_/.test(config.stripeKey)));}
 export function paymentsReady(){return config.payments==='demo'&&!config.production||config.payments==='stripe'&&stripeConfigured()&&(!config.stripeAutoConfigureWebhook||stripeWebhookReadiness().status==='ready');}
 export function assertPayoutsEnabled(){
   assert(!stripeTestPayments(),503,'TEST_PAYOUTS_DISABLED','Payouts are unavailable during Stripe test payments.');
@@ -37,7 +38,7 @@ export function settlePayment(paymentId: string, expected?: { amount: number; cu
   return transaction(() => {
     const payment = one(`SELECT * FROM ${paymentTable()} WHERE id=?`, paymentId);
     assert(payment, 404, 'NOT_FOUND', 'Payment not found.');
-    if(payment.provider==='stripe')assert(expected&&stripeConfigured()&&stripeModeMatches(expected.livemode)&&(!config.production||config.sandbox||config.stripeTestMode||expected.livemode===true),400,'PAYMENT_MODE_MISMATCH','Payment mode does not match this application.');
+    if(payment.provider==='stripe')assert(expected&&stripeConfigured()&&stripeModeMatches(expected.livemode)&&(!config.production||config.sandbox||usingTestPaymentState()||expected.livemode===true),400,'PAYMENT_MODE_MISMATCH','Payment mode does not match this application.');
     if(config.production)assert(payment.provider==='stripe',400,'PAYMENT_MODE_MISMATCH','Test payments cannot fund production accounts.');
     if (expected) assert(payment.provider_session === expected.session && payment.amount_cents === expected.amount && payment.currency === expected.currency, 400, 'PAYMENT_MISMATCH', 'Payment details do not match.');
     if(expected?.sessionObject)recordPaymentLink(payment.id,expected.sessionObject);
@@ -55,7 +56,7 @@ export function settlePayment(paymentId: string, expected?: { amount: number; cu
       // amounts and provider metadata alone never establish a valid discount.
       assert(validActivationPayment(payment),400,'PAYMENT_MISMATCH','The Dramio Pass amount does not match its recorded quote.');
       assert(financeAccount(payment.user_id),404,'NOT_FOUND','Account not found.');
-      if(config.stripeTestMode)run('UPDATE test_accounts SET publisher_active=1 WHERE user_id=?',payment.user_id);
+      if(usingTestPaymentState())run('UPDATE test_accounts SET publisher_active=1 WHERE user_id=?',payment.user_id);
       else run("UPDATE users SET publisher_active=1, role=CASE WHEN role='admin' THEN 'admin' ELSE 'publisher' END WHERE id=?", payment.user_id);
       addLedger(payment.user_id, 'activation', 0, payment.id, `Dramio Pass · HK$${payment.amount_cents/100} once${promotionSnapshot(payment.id)?` · ${promotionSnapshot(payment.id)!.code}`:''}`);
     }

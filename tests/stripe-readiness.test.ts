@@ -10,7 +10,7 @@ process.env.DATA_DIR=directory;process.env.NODE_ENV='test';
 const {config}=await import('../server/config');
 const {REQUIRED_STRIPE_EVENTS,resetStripeReadiness,stripeWebhookReadiness,ensureStripeWebhookReady}=await import('../server/stripe-readiness');
 const originalNow=Date.now;let now=1_000_000;
-function configure(){Object.assign(config,{production:true,sandbox:false,payments:'stripe',stripeTestMode:false,stripeAutoConfigureWebhook:true,stripeKey:'rk_live_readiness_fixture',appUrl:'https://lingyingdrama.com',publicUrl:'https://viewer.example.test',stripeSiteOrigin:'https://old-financial-identity.example.test'});}
+function configure(){Object.assign(config,{production:true,sandbox:false,payments:'stripe',stripeTestMode:false,stripeAutoConfigureWebhook:true,stripeKey:'rk_live_readiness_fixture',stripeWebhook:'whsec_readiness_fixture',appUrl:'https://lingyingdrama.com',publicUrl:'https://viewer.example.test',stripeSiteOrigin:'https://old-financial-identity.example.test'});}
 beforeEach(()=>{configure();now=1_000_000;Date.now=()=>now;resetStripeReadiness();});
 after(async()=>{Date.now=originalNow;await rm(directory,{recursive:true,force:true});});
 type Endpoint=Stripe.WebhookEndpoint;
@@ -30,6 +30,22 @@ function safeError(code:string){assert.deepEqual(stripeWebhookReadiness(),{statu
 
 test('disabled automation bypasses all remote operations and leaves readiness unchecked',async()=>{
   config.stripeAutoConfigureWebhook=false;const f=fixture();assert.equal(await ensureStripeWebhookReady(f.client),true);assert.equal(await ensureStripeWebhookReady(null),true);assert.equal(f.calls.length,0);assert.deepEqual(stripeWebhookReadiness(),{status:'unchecked'});
+});
+
+test('explicit test mode keeps automation enabled without calling live account or endpoint APIs',async()=>{
+  config.stripeTestMode=true;config.stripeKey='rk_test_readiness_fixture';const f=fixture();
+  assert.equal(await ensureStripeWebhookReady(f.client),true);assert.deepEqual(stripeWebhookReadiness(),{status:'ready',code:'STRIPE_TEST_CONFIGURATION'});assert.equal(f.calls.length,0);
+  config.stripeWebhook='';assert.equal(await ensureStripeWebhookReady(f.client),false);safeError('STRIPE_READINESS_CONFIG');assert.equal(f.calls.length,0);
+  config.stripeWebhook='whsec_restored_fixture';assert.equal(await ensureStripeWebhookReady(f.client),true);assert.equal(f.calls.length,0);
+  config.stripeTestMode=false;config.stripeKey='rk_live_readiness_fixture';assert.equal(await ensureStripeWebhookReady(f.client),true);assert.deepEqual(stripeWebhookReadiness(),{status:'ready'});assert.equal(operations(f,'account').length,1);
+});
+
+test('test readiness rejects a live key, missing API key, missing signing secret or missing client',async()=>{
+  config.stripeTestMode=true;
+  for(const patch of [{stripeKey:'rk_live_readiness_fixture'},{stripeKey:''},{stripeKey:'rk_test_readiness_fixture',stripeWebhook:''}]){
+    resetStripeReadiness();Object.assign(config,{stripeKey:'rk_test_readiness_fixture',stripeWebhook:'whsec_readiness_fixture'},patch);const f=fixture();assert.equal(await ensureStripeWebhookReady(f.client),false);safeError('STRIPE_READINESS_CONFIG');assert.equal(f.calls.length,0);
+  }
+  config.stripeKey='rk_test_readiness_fixture';config.stripeWebhook='whsec_readiness_fixture';assert.equal(await ensureStripeWebhookReady(null),false);safeError('STRIPE_READINESS_CONFIG');
 });
 
 test('only explicitly enabled production live Stripe with an HTTPS API origin can make remote calls',async()=>{

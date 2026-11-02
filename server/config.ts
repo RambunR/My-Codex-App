@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
+import {selectStripeSettings} from '../shared/stripe-settings.js';
 
 if (existsSync('.env')) process.loadEnvFile('.env');
 export const config = {
@@ -19,10 +20,7 @@ export const config = {
   dataDir: path.resolve(process.env.DATA_DIR || './data'),
   payments: process.env.PAYMENTS_MODE || (process.env.NODE_ENV === 'production' ? 'disabled' : 'demo'),
   usdToHkd: Number(process.env.USD_TO_HKD || 7.8),
-  stripeKey: process.env.STRIPE_SECRET_KEY || '',
-  stripeWebhook: process.env.STRIPE_WEBHOOK_SECRET || '',
-  stripeActivationPriceId:process.env.STRIPE_ACTIVATION_PRICE_ID||'',
-  stripeWalletProductId:process.env.STRIPE_WALLET_PRODUCT_ID||'',
+  ...selectStripeSettings(process.env,process.env.STRIPE_TEST_MODE==='true'),
   googleClientId: process.env.GOOGLE_CLIENT_ID || '',
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
   appleClientId: process.env.APPLE_CLIENT_ID || '',

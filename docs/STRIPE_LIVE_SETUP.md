@@ -10,6 +10,8 @@ The test-payment notice reflects the server's payment configuration. Hiding the 
 
 The setup steps below are a reference for initial configuration or credential rotation. Do not re-enter verified credentials, create another endpoint or repeat the subscription change for the deployment already verified above.
 
+For routine testing, use [the one-variable mode switch](STRIPE_MODE_SWITCH.md). Store `STRIPE_TEST_SECRET_KEY` and `STRIPE_TEST_WEBHOOK_SECRET` alongside the existing live pair. `STRIPE_TEST_MODE=true` selects testing; `false` selects production. `STRIPE_AUTO_CONFIGURE_WEBHOOK=true` can stay enabled in both modes. Saving this capability does not itself select testing or authorize a real charge.
+
 ## 1. Open the correct Stripe environment
 
 1. Sign in to the Stripe account already used for LingYing. Select its **Live** environment, outside the testing Sandbox/Test environment. Test and live API keys, products, prices and webhook destinations are separate, even within the same account.
@@ -82,7 +84,7 @@ The endpoint must respond directly with HTTP 2xx after valid signed delivery. St
 
 Open **Cloudflare → Workers & Pages → `lingying` → Settings → Variables and Secrets**. Use the main application, not the temporary **`aidramio`** compatibility gateway or the old sandbox. Do not create another Worker or database.
 
-1. First set the ordinary text variable **`PAYMENTS_MODE`** to **`disabled`**, and apply/deploy the setting. Checkout will be unavailable while the two credential bindings are replaced, avoiding a mixed test/live configuration.
+1. For initial live setup or replacement of live credentials, first set **`PAYMENTS_MODE=disabled`** and apply/deploy while changing the pair. Routine test/production switching does not replace these live bindings: save the dedicated test pair and change only `STRIPE_TEST_MODE`, as described in the mode-switch guide.
 2. In Stripe's **Live** environment, open **Developers → API keys**. Reveal or create the live server API key and copy it directly into Cloudflare as an encrypted **Secret** named **`STRIPE_SECRET_KEY`**. A standard live secret key begins with `sk_live_`; an appropriately permissioned restricted live key begins with `rk_live_`. A `pk_live_` publishable key is not the server key. Restricted keys must allow the operations this integration uses; an insufficiently permitted key can pass local presence checks yet fail when opening Checkout.
 3. Copy the live destination's `whsec_...` value directly into an encrypted **Secret** named **`STRIPE_WEBHOOK_SECRET`** on the same Worker.
 4. Save/apply the changes. Do not rename these bindings, put their values into ordinary text variables, paste them into chat, or enter them in shell-command arguments. Cloudflare will not display an existing Secret value after it is saved; verify the binding names and operation results instead.
@@ -91,7 +93,7 @@ No Stripe publishable key is required by this website's current hosted Checkout 
 
 ## 4. Set the live application variables
 
-While **`PAYMENTS_MODE=disabled`**, set the following ordinary text variables on **`lingying`** and keep the tracked **`wrangler.jsonc`** configuration in sync before the next code deployment. Explicit Wrangler variables can overwrite Dashboard changes even when deployment uses `--keep-vars`.
+For initial setup while **`PAYMENTS_MODE=disabled`**, set the following ordinary text variables on **`lingying`**. `STRIPE_TEST_MODE` is deliberately Dashboard-owned and omitted from tracked `wrangler.jsonc.vars`; supported `--keep-vars` deployments retain its selected value. Keep the other tracked settings consistent with the intended deployment, because explicit Wrangler variables can overwrite Dashboard changes even with `--keep-vars`.
 
 | Binding | Live value |
 |---|---|
@@ -104,7 +106,7 @@ While **`PAYMENTS_MODE=disabled`**, set the following ordinary text variables on
 | `STRIPE_ACTIVATION_PRICE_ID` | Empty string, unless a verified matching live price is configured |
 | `STRIPE_WALLET_PRODUCT_ID` | Empty string, unless a verified matching live product is configured |
 
-**Keep both optional test catalogue IDs cleared.** The historical catalogue IDs belong to test mode and cannot be used with a live key. Keeping these two variables as empty strings also overrides their previous configured values. No Stripe Dashboard product creation is required: without optional catalogue IDs, the server supplies a one-time **HK$88 Dramio Pass** line item and an exact **USD wallet-credit** line item for the amount the viewer selected, with a **US$5 minimum**. They are not subscriptions.
+**Keep the two live catalogue fields above empty unless verified live references are intended.** Historical test IDs cannot be used with a live key. Dedicated testing has separate optional `STRIPE_TEST_ACTIVATION_PRICE_ID` and `STRIPE_TEST_WALLET_PRODUCT_ID` fields; they may remain empty for inline test pricing. Keeping the live fields empty also overrides their previous configured values. No Stripe Dashboard product creation is required: without optional catalogue IDs, the server supplies a one-time **HK$88 Dramio Pass** line item and an exact **USD wallet-credit** line item for the amount the viewer selected, with a **US$5 minimum**. They are not subscriptions.
 
 If you prefer saved live products, create them in the Live environment and use only their live IDs. The Dramio Pass price must be active, one-time, **HKD 8,800 cents**; the wallet uses its selected USD amount rather than a fixed US$5 price. Do not copy the test product/price IDs into these fields.
 
@@ -130,7 +132,7 @@ After the release's risk-hold handling and payout pause are implemented and chec
    ```
 
    With the automatic readiness helper enabled, `paymentsReady` requires matching configured credentials and a successful live account/endpoint check. It does not prove a matching signing secret, signed delivery or paid settlement. If `paymentSetup.status` is `error`, use its safe code above. If `paymentsTestMode` remains true, a test key or test setting remains active. Recheck the same Worker's bindings and the deployed source configuration.
-3. Reload Wallet and Creator studio. The test-payment notice should be absent. Check Dramio Pass still displays **HK$88 once**, and Wallet accepts a custom USD amount of **at least US$5**.
+3. Reload Wallet and Creator studio. The test-payment notice should be absent. Check the regular Dramio Pass still bills **HK$88 once** unless a valid code was explicitly applied, and Wallet accepts a custom USD amount of **at least US$5**. USD Pass displays are indicative; the quote states the actual HKD charge.
 4. If a live Checkout Session is opened for verification, check the amount, currency and merchant branding, then cancel it without submitting a card. The authenticated owner-only `POST /api/payments/:id/cancel` endpoint expires its own unpaid Stripe Session; it rejects another user's payment and must never expire a paid Session. Cancellation does not fund the wallet or create a funding ledger entry. After expiration, the owner-only `GET /api/payments/:id/status` can show the recorded payment status and verified webhook receipts. Wait for an actual Stripe-signed `checkout.session.expired` receipt with `endpoint_host: "lingyingdrama.com"`; that demonstrates live signed delivery to the custom domain without a charge. An expired status alone could have been set by the cancellation API and is not webhook proof. No-cost checks still cannot establish paid settlement or full refund behavior. Do not use `4242` or other test cards in live Checkout.
 5. A complete live payment test requires a deliberately authorized real purchase. It is a separate money action: this setup guide does not perform one. After such a purchase, verify the actual matching event is **Delivered** with HTTP 200 in the live destination, the application credited the exact amount once, and refreshing/replaying does not duplicate credit. A Checkout success page alone does not prove webhook delivery because the app can also reconcile a Session server-side.
 

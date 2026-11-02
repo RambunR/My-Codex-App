@@ -2,6 +2,7 @@ import {config} from './config.js';
 import {one,all,run} from './db.js';
 import {validPromotionPayment} from './promotions.js';
 import {ACTIVATION_HKD_CENTS} from '../shared/config.js';
+import {verifiedStripeEventContext} from './stripe-event-context.js';
 
 export interface FinanceAccount {
   wallet_micros:number;
@@ -11,7 +12,7 @@ export interface FinanceAccount {
 
 // Test Checkout uses the same identities and content, while its financial state
 // is kept out of the balances, entitlements and activation used for live money.
-export function usingTestPaymentState(){return config.stripeTestMode===true;}
+export function usingTestPaymentState(){return verifiedStripeEventContext()?.testState??config.stripeTestMode===true;}
 export function paymentTable(){return usingTestPaymentState()?'test_payments':'payments';}
 export function purchaseTable(){return usingTestPaymentState()?'test_purchases':'purchases';}
 export function ledgerTable(){return usingTestPaymentState()?'test_ledger':'ledger';}

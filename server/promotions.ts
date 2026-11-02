@@ -4,12 +4,14 @@ import {config} from './config.js';
 import {assert} from './errors.js';
 import {ACTIVATION_HKD_CENTS} from '../shared/config.js';
 import {PASS_PROMOTION_CODE,PASS_PROMOTION_HKD_CENTS,MIN_PASS_HKD_CENTS,type AdminPromotion,type PassPromotionQuote} from '../shared/pass-promotion.js';
+import {verifiedStripeEventContext} from './stripe-event-context.js';
 
 type Row=Record<string,any>;
 export interface PromotionInput {code:string;enabled:boolean;discount_type:'amount'|'percent';discount_value:number;max_redemptions:number|null}
 export interface ManagedPromotionQuote extends PassPromotionQuote {id:string;discount_type:'amount'|'percent';discount_value:number}
-const mode=()=>config.stripeTestMode?'test':'default';
-const table=()=>config.stripeTestMode?'test_payments':'payments';
+const testing=()=>verifiedStripeEventContext()?.testState??config.stripeTestMode;
+const mode=()=>testing()?'test':'default';
+const table=()=>testing()?'test_payments':'payments';
 function requireAdministrator(id:string){assert(one("SELECT 1 FROM users WHERE id=? AND role='admin'",id),403,'FORBIDDEN','Administrator access required.');}
 export function discountedAmount(type:string,value:number){
   if(type==='amount'&&Number.isSafeInteger(value)&&value>0&&value<=ACTIVATION_HKD_CENTS-MIN_PASS_HKD_CENTS)return ACTIVATION_HKD_CENTS-value;

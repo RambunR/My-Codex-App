@@ -12,14 +12,18 @@ const port=Number(process.env.CLOUDFLARE_TEST_PORT||8789),base=`http://127.0.0.1
 const bootstrap=randomBytes(32).toString('hex');
 const password='LocalSmokePassword123!';
 let child,logs='';
-async function start(production=false,testStripe=false,publicOrigin=base){
+async function start(production=false,testStripe=false,publicOrigin=base,missingTestPair=false){
   logs='';
   const args=['node_modules/wrangler/bin/wrangler.js','dev','--local','--port',String(port),'--local-upstream',new URL(base).host,'--upstream-protocol','http','--inspector-port',String(port+400),'--persist-to',path.join(dir,'state'),
     '--var',`ENVIRONMENT:${production?'production':'development'}`,'--var',`PAYMENTS_MODE:${testStripe?'stripe':production?'disabled':'demo'}`,'--var',`STRIPE_TEST_MODE:${testStripe}`,'--var',`APP_URL:${base}`,'--var',`PUBLIC_APP_URL:${publicOrigin}`,'--var',`STRIPE_SITE_ORIGIN:${base}`,'--var',`BOOTSTRAP_TOKEN:${bootstrap}`];
   if(!production||testStripe)args.push('--var','GOOGLE_CLIENT_ID:local-test.apps.googleusercontent.com','--var','GOOGLE_CLIENT_SECRET:local-test-only-google-secret');
-  if(testStripe)args.push('--var','STRIPE_SECRET_KEY:rk_test_local_cloudflare_fixture_only','--var','STRIPE_WEBHOOK_SECRET:whsec_local_cloudflare_fixture_only');
+  if(testStripe){
+    args.push('--var','STRIPE_SECRET_KEY:rk_live_local_cloudflare_fixture_only','--var','STRIPE_WEBHOOK_SECRET:whsec_local_cloudflare_live_fixture_only');
+    if(!missingTestPair)args.push('--var','STRIPE_TEST_SECRET_KEY:rk_test_local_cloudflare_fixture_only','--var','STRIPE_TEST_WEBHOOK_SECRET:whsec_local_cloudflare_fixture_only');
+    else args.push('--var','STRIPE_TEST_SECRET_KEY:','--var','STRIPE_TEST_WEBHOOK_SECRET:');
+  }
   args.push('--var',`PAYOUTS_ENABLED:${!production}`);
-  args.push('--var','STRIPE_AUTO_CONFIGURE_WEBHOOK:false','--var','PASS_PROMOTION_ENABLED:true');
+  args.push('--var',`STRIPE_AUTO_CONFIGURE_WEBHOOK:${testStripe}`,'--var','PASS_PROMOTION_ENABLED:true');
   // A matching but unverified local address must never gain admin access.
   args.push('--var','PLATFORM_ADMIN_EMAIL_SHA256:'+createHash('sha256').update('viewer@example.test').digest('hex'));
   child=spawn(process.execPath,args,{env:{...process.env,XDG_CONFIG_HOME:path.join(dir,'config'),WRANGLER_SEND_METRICS:'false',WRANGLER_LOG_PATH:path.join(dir,'wrangler.log')},stdio:['ignore','pipe','pipe']});
@@ -269,9 +273,15 @@ try{
   assert.deepEqual(await moderationFinance(),beforeModerationFinance);
   console.log('PASS: Cloudflare SQL moderation hides purchased content, preserves private admin review and audit history, blocks publisher republication, and restores access without changing money.');
 
+  await stop();await start(true,true,base,true);
+  const missingTest=(await request('/api/config')).data;
+  assert.equal(missingTest.paymentsTestMode,true);assert.equal(missingTest.paymentsReady,false);assert.equal(missingTest.paymentsConfigured,false);
+  await request('/api/payments/checkout',{kind:'funding',amount_cents:500},viewer,503);
+  assert.equal((await request('/api/auth/me',undefined,viewer)).data.user.wallet_micros,0);
+  console.log('PASS: one test-mode flag with missing dedicated test keys disables new Checkout rather than selecting saved live credentials.');
   await stop();await start(true,true);
   const stripeTest=(await request('/api/config')).data;
-  assert.equal(stripeTest.paymentsMode,'stripe');assert.equal(stripeTest.paymentsTestMode,true);assert.equal(stripeTest.paymentsReady,true);assert.equal(stripeTest.sandbox,false);assert.equal(stripeTest.uploadsEnabled,true);assert.equal(stripeTest.auth.google,true);
+  assert.equal(stripeTest.paymentSetup.status,'ready');assert.equal(stripeTest.paymentSetup.code,'STRIPE_TEST_CONFIGURATION');assert.equal(stripeTest.paymentsMode,'stripe');assert.equal(stripeTest.paymentsTestMode,true);assert.equal(stripeTest.paymentsReady,true);assert.equal(stripeTest.sandbox,false);assert.equal(stripeTest.uploadsEnabled,true);assert.equal(stripeTest.auth.google,true);
   assert.equal((await request('/api/auth/me',undefined,viewer)).data.user.wallet_micros,0);
   assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.earnings_micros,0);
   assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.publisher_active,1);

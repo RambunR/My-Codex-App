@@ -4,13 +4,14 @@ import {one,all,run,transaction} from './db.js';
 import {assert} from './errors.js';
 import {stripeSiteOrigin} from './origins.js';
 import {usingTestPaymentState,paymentTable,accountTable,accountIdColumn,ledgerTable,financeAccount} from './payment-state.js';
+import {verifiedStripeEventContext} from './stripe-event-context.js';
 
 type Row=Record<string,any>;
 export interface PaymentSessionLink {id:string;livemode?:boolean;amount_total?:number|null;currency?:string|null;payment_intent?:unknown}
 export interface PaymentRiskEvent {id:string;type:string;livemode:boolean;created?:number;data:{object:any}}
 export interface PaymentReviewDecision {decision:'reconciled'|'platform_loss'|'provider_reversed';note:string;wallet_debit_cents?:number}
 const events=new Set(['charge.refunded','charge.dispute.created','charge.dispute.closed','charge.dispute.funds_withdrawn','charge.dispute.funds_reinstated']);
-const partition=()=>({group:usingTestPaymentState()?'test':'default',live:/^(sk|rk)_live_/.test(config.stripeKey)?1:0});
+const partition=()=>({group:usingTestPaymentState()?'test':'default',live:Number(verifiedStripeEventContext()?.livemode??/^(sk|rk)_live_/.test(config.stripeKey))});
 const objectId=(value:unknown):string|null=>{const id=typeof value==='string'?value:value&&typeof value==='object'&&(value as any).id;return typeof id==='string'&&/^[A-Za-z0-9_-]{2,255}$/.test(id)?id:null;};
 const cents=(value:unknown):number|null=>typeof value==='number'&&Number.isSafeInteger(value)&&value>=0?value:null;
 const currency=(value:unknown)=>typeof value==='string'&&/^[a-z]{3}$/.test(value)?value:'';

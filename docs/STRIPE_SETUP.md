@@ -1,8 +1,8 @@
-# Historical Stripe testing and isolated test instructions
+# Stripe testing on the existing LingYing website
 
 **Live card Checkout is enabled on [LingYing](https://lingyingdrama.com)** with `PAYMENTS_MODE=stripe`, `STRIPE_TEST_MODE=false`, `STRIPE_AUTO_CONFIGURE_WEBHOOK=true`, optional test catalogue IDs cleared, and `PAYOUTS_ENABLED=false`. Deployment, public health/configuration and the live account/endpoint readiness check passed on 31 October 2026 at 19:39 Hong Kong time. Exactly one live US$5 Checkout displayed US$5.00, was cancelled without card entry/payment submission, and produced an actual signed expiration receipt at the custom domain at 19:40:49 Hong Kong time. The wallet remained zero with no funding ledger entry. Completed paid settlement remains unverified. Follow [STRIPE_LIVE_SETUP.md](STRIPE_LIVE_SETUP.md) for the current setup, seven Snapshot events and unpaid Checkout cancellation checks. Do not submit a test card to the live website.
 
-The remainder records the previous test setup and how to test **only in an explicitly isolated/authorized test deployment**. It must not be used to switch the public website back to test payments. The owner specifically requested one public website, not another public Stripe testing site.
+The owner now authorizes a single mode switch on this same website. Follow [the current mode-switch guide](STRIPE_MODE_SWITCH.md): keep the live pair saved, add the dedicated test pair, and select `STRIPE_TEST_MODE=true` only for an intended testing period. This changes new Checkout for all visitors; do not create another public test website. The historical details below remain useful for test events and catalogue references but do not require overwriting the live credentials.
 
 Test balances, passes, purchases and earnings stay in separate financial tables and never become live credit, real Dramio Pass ownership or payable creator revenue. Live payment mode does not alter account profiles, uploads, media or the original database namespace.
 
@@ -10,7 +10,7 @@ Test balances, passes, purchases and earnings stay in separate financial tables 
 
 During the test phase, the existing main test destination was moved from `https://aidramio.jimmy-tsoi2001.workers.dev/api/payments/webhook` to `https://lingyingdrama.com/api/payments/webhook`, preserving the destination identity and test signing secret. The owner reported saving that update; independent signed test delivery remained unverified. This describes the earlier migration, not an instruction to replace the current live Worker's credentials.
 
-An isolated test integration uses a destination in its **own Stripe testing environment**, **Your account**, **Snapshot** payloads, a compatible API version and its own `whsec_...` signing secret. The Checkout lifecycle events are:
+A test integration uses a destination in the **same Stripe testing environment as its test API key**, **Your account**, **Snapshot** payloads, a compatible API version and its own `whsec_...` signing secret. The Checkout lifecycle events are:
 
 ```text
 checkout.session.completed
@@ -19,7 +19,7 @@ checkout.session.async_payment_failed
 checkout.session.expired
 ```
 
-The current risk-hold implementation also requires `charge.refunded`, `charge.dispute.created` and `charge.dispute.closed` when testing financial-risk handling. A thin-event destination, live destination secret and Stripe CLI listener secret are not interchangeable with the test Snapshot destination. Store test Secrets only in the explicitly isolated test deployment, never by replacing the main website's live bindings.
+The current risk-hold implementation also requires `charge.refunded`, `charge.dispute.created` and `charge.dispute.closed` when testing financial-risk handling. A thin-event destination, live destination secret and Stripe CLI listener secret are not interchangeable with the test Snapshot destination. On the existing `lingying` Worker, save test values as `STRIPE_TEST_SECRET_KEY` and `STRIPE_TEST_WEBHOOK_SECRET`, retaining `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` for live payments.
 
 For an actual test event, inspect Stripe's **Event deliveries** and confirm direct HTTP 2xx, then confirm one application settlement. A success return can also reconcile the Session and does not independently establish webhook delivery. Keep legacy raw-body forwarding until the old registered destinations and old Checkout return links are retired; redirects alone do not satisfy webhook delivery.
 
@@ -39,9 +39,9 @@ Stripe also offers a **paid custom Checkout-domain feature** for putting the Str
 - Test balances, pass ownership, payments, purchases and ledgers use `test_accounts`, `test_payments`, `test_purchases` and `test_ledger` in the same database, linked to existing user IDs. Real financial records and entitlements remain separate and unchanged.
 - Test funds/earnings/passes never become real-money records when live mode is enabled. Existing real entitlements remain honored during testing. Test earnings cannot be paid out.
 
-## Try the payment flow in an isolated test environment
+## Try the payment flow after selecting test mode
 
-1. Open the explicitly authorized **test deployment**, sign in with its test account, and confirm the test-payment notice. Do not use the live public website for this flow. Google/Apple registrations must also include their intended callback URLs for the current auth configuration; that is separate from Stripe.
+1. On the existing website, select `STRIPE_TEST_MODE=true` using the saved dedicated test pair, reload, sign in, and confirm the test-payment notice. Open a fresh Checkout; an old live Checkout remains live. Google/Apple callback configuration is independent and does not change for this switch.
 2. Open **Wallet**, enter US$5 or a custom amount such as US$23.45, and press **Add funds**. Confirm Stripe displays its Sandbox/Test context before submitting payment.
 3. Use **4242 4242 4242 4242**, a future expiry such as **12/30**, CVC **123**, and a valid-format postal code if requested. Use no real card. Return to Wallet and verify the exact test credit; reload and confirm it was not duplicated.
 4. For Dramio Pass, open **Creator studio → Get Dramio Pass · HK$88** and complete its separate test Checkout. Account should show **Active / Test pass** with 5 GiB storage; the USD wallet balance must stay unchanged.
@@ -61,11 +61,11 @@ The historical test products are recorded in `stripe/catalog.test.json`. Their i
 
 The wallet's default price does not limit custom amounts: the server validates the viewer's USD cents and supplies its own `price_data.unit_amount` linked to the existing product. This buys closed-loop content credit, not a donation.
 
-API keys and endpoint signing secrets use encrypted bindings **`STRIPE_SECRET_KEY`** and **`STRIPE_WEBHOOK_SECRET`** in each deployment. The main `lingying` Worker now targets live credentials; do not replace them with test values. No key or signing secret belongs in Git, catalogue JSON, frontend code or command-line arguments.
+The existing encrypted **`STRIPE_SECRET_KEY`** and **`STRIPE_WEBHOOK_SECRET`** remain the live pair. Save test values separately as **`STRIPE_TEST_SECRET_KEY`** and **`STRIPE_TEST_WEBHOOK_SECRET`**. Keep `STRIPE_AUTO_CONFIGURE_WEBHOOK=true`: the application handles test readiness without running the live-only account/endpoint automation. No key or signing secret belongs in Git, catalogue JSON, frontend code or command-line arguments. Optional test products use `STRIPE_TEST_ACTIVATION_PRICE_ID` / `STRIPE_TEST_WALLET_PRODUCT_ID`, or leave these empty for inline pricing.
 
 After domain cutover, `APP_URL` and `PUBLIC_APP_URL` use **`https://lingyingdrama.com`**. **`STRIPE_SITE_ORIGIN` intentionally stays pinned to `https://aidramio.jimmy-tsoi2001.workers.dev` as an internal financial identity**. It supplies and validates Session `metadata.site`, allowing pending Sessions created before the browser/API domain move to settle. It is not the new webhook destination and does not tell browsers to use the old hostname. Do not rewrite this tag or convert test records for branding cleanup.
 
-In the isolated test environment, check `/api/config` for `paymentsMode: "stripe"`, `paymentsReady: true` and `paymentsTestMode: true`. The live public target instead requires `paymentsTestMode: false` and `payoutsEnabled: false`. Follow [AGENTS.md](../AGENTS.md) for updating the existing Worker while retaining its namespace, bucket and provider secrets.
+After selecting test mode, check `/api/config` for `paymentsMode: "stripe"`, `paymentsReady: true` and `paymentsTestMode: true`. Production mode instead requires `paymentsTestMode: false` and `payoutsEnabled: false`. Follow [AGENTS.md](../AGENTS.md) for updating the existing Worker while retaining its namespace, bucket and provider secrets.
 
 **Do not rerun `scripts/connect-stripe-main-test.mjs` to migrate this domain.** That historical bootstrap helper still targets the pre-rename `aidramio` Worker and old webhook URL. The name now belongs to the compatibility gateway, not the main application. Use the Dashboard endpoint-edit workflow above; the helper/catalogue require a separately reviewed update before reuse. No new test website or Sandbox is needed.
 

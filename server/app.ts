@@ -18,6 +18,7 @@ import {processRiskEvent,recordPaymentLink,adminPaymentReviews,resolvePaymentRev
 import {ensurePlatformOwnerAccess,creatorDisplayName} from './owner.js';
 import {publicSeriesAllowedSql,assertSeriesAvailable,assertSeriesWritable,moderationState,setSeriesModeration,recordSeriesMetadataEdit,adminModerationEvents,listAdminSeries} from './moderation.js';
 import {ensureStripeWebhookReady,stripeWebhookReadiness} from './stripe-readiness.js';
+import {runWithVerifiedStripeEventContext,type VerifiedStripeEventContext} from './stripe-event-context.js';
 import { paymentTable,purchaseTable,ledgerTable,hasEpisodePurchase,usingTestPaymentState } from './payment-state.js';
 import { startPlayback,recordPlayback,readSeriesAnalytics } from './analytics.js';
 import { LANGUAGES, GENRES, MAX_EPISODE_BYTES, DEFAULT_QUOTA_BYTES,MIN_WALLET_FUNDING_CENTS,MAX_WALLET_FUNDING_CENTS } from '../shared/config.js';
@@ -78,38 +79,57 @@ export function createApp() {
   app.use((req, res, next) => { res.setHeader('X-Content-Type-Options','nosniff'); res.setHeader('Referrer-Policy',req.path==='/auth'||req.path.startsWith('/api/auth/')?'no-referrer':'strict-origin-when-cross-origin'); res.setHeader('X-Frame-Options','DENY'); if(req.path==='/auth')res.setHeader('Cache-Control','no-store'); next(); });
   app.use('/api',credentialedCors);
   app.post('/api/payments/webhook', express.raw({ type: 'application/json', limit: '1mb' }), async (req, res) => {
-    // Pausing new Checkout must not drop signed refunds or existing payments.
-    assert(stripe && stripeConfigured(), 503, 'PAYMENTS_UNAVAILABLE', 'Webhook is not configured.');
-    let event;
-    try { event = await stripe.webhooks.constructEventAsync(req.body, req.headers['stripe-signature'] as string, config.stripeWebhook); }
-    catch { throw new AppError(400, 'INVALID_SIGNATURE', 'Invalid webhook signature.'); }
-    if(!stripeModeMatches(event.livemode)) {res.json({received:true,ignored:true});return;}
-    const risk=processRiskEvent(event);
-    if(risk.handled){res.json({received:true,...risk});return;}
-    const checkoutEvent=['checkout.session.completed','checkout.session.async_payment_succeeded','checkout.session.expired','checkout.session.async_payment_failed'].includes(event.type);
-    if(checkoutEvent){
-      const session=event.data.object as Stripe.Checkout.Session;
-      if(!stripeModeMatches(session.livemode)||session.metadata?.site&&session.metadata.site!==stripeSiteOrigin()){res.json({received:true,ignored:true});return;}
+    // Check both saved pairs. The UI switch selects new Checkout, not which
+    // already-issued payments or later refund/dispute events remain payable.
+    const candidates:Array<{client:Stripe;secret:string;context:VerifiedStripeEventContext}>=[];
+    if(stripe&&stripeConfigured())candidates.push({client:stripe,secret:config.stripeWebhook,context:{testState:usingTestPaymentState(),livemode:/^(sk|rk)_live_/.test(config.stripeKey),configured:true}});
+    const addSaved=(key:string,secret:string,livemode:boolean)=>{
+      if(!(livemode?/^(sk|rk)_live_/:/^(sk|rk)_test_/).test(key)||!secret.startsWith('whsec_'))return;
+      if(candidates.some(candidate=>candidate.secret===secret&&candidate.context.livemode===livemode))return;
+      candidates.push({client:new Stripe(key,{httpClient:Stripe.createFetchHttpClient()}),secret,context:{testState:!livemode,livemode,configured:true}});
+    };
+    // The legacy isolated sandbox must never start handling real-money events.
+    if(!config.sandbox)addSaved(config.stripeLiveKey,config.stripeLiveWebhook,true);
+    addSaved(config.stripeTestKey,config.stripeTestWebhook,false);
+    assert(candidates.length,503,'PAYMENTS_UNAVAILABLE','Webhook is not configured.');
+    let verified:{event:Stripe.Event;context:VerifiedStripeEventContext}|undefined,wrongMode=false;
+    for(const candidate of candidates){
+      let event:Stripe.Event;
+      try{event=await candidate.client.webhooks.constructEventAsync(req.body,req.headers['stripe-signature'] as string,candidate.secret);}
+      catch{continue;}
+      if(event.livemode!==candidate.context.livemode){wrongMode=true;continue;}
+      verified={event,context:candidate.context};break;
     }
-    if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
-      const session = event.data.object;
-      if(!stripeModeMatches(session.livemode)){res.json({received:true,ignored:true});return;}
-      if(session.metadata?.site&&session.metadata.site!==stripeSiteOrigin()){res.json({received:true,ignored:true});return;}
-      if (session.payment_status === 'paid' && session.metadata?.paymentId) {
-        if(!one(`SELECT id FROM ${paymentTable()} WHERE id=?`,session.metadata.paymentId)){res.json({received:true,ignored:true});return;}
-        settlePayment(session.metadata.paymentId, { amount: session.amount_total!, currency: session.currency!, session: session.id,livemode:session.livemode,sessionObject:session });
+    if(!verified){if(wrongMode){res.json({received:true,ignored:true});return;}throw new AppError(400,'INVALID_SIGNATURE','Invalid webhook signature.');}
+    const verifiedEvent=verified.event;
+    return runWithVerifiedStripeEventContext(verified.context,()=>{
+      const risk=processRiskEvent(verifiedEvent);
+      if(risk.handled){res.json({received:true,...risk});return;}
+      const checkoutEvent=['checkout.session.completed','checkout.session.async_payment_succeeded','checkout.session.expired','checkout.session.async_payment_failed'].includes(verifiedEvent.type);
+      if(checkoutEvent){
+        const session=verifiedEvent.data.object as Stripe.Checkout.Session;
+        if(!stripeModeMatches(session.livemode)||session.metadata?.site&&session.metadata.site!==stripeSiteOrigin()){res.json({received:true,ignored:true});return;}
       }
-    }
-    if(event.type==='checkout.session.expired'||event.type==='checkout.session.async_payment_failed'){
-      const session=event.data.object;
-      if(stripeModeMatches(session.livemode)&&session.metadata?.paymentId)run(`UPDATE ${paymentTable()} SET status=? WHERE id=? AND provider_session=? AND provider='stripe' AND status='pending'`,event.type==='checkout.session.expired'?'expired':'failed',session.metadata.paymentId,session.id);
-    }
-    if(checkoutEvent&&typeof event.id==='string'){
-      const session=event.data.object as Stripe.Checkout.Session;
-      const payment=session.metadata?.paymentId?one(`SELECT id FROM ${paymentTable()} WHERE id=? AND provider_session=? AND provider='stripe'`,session.metadata.paymentId,session.id):undefined;
-      if(payment)run('INSERT OR IGNORE INTO stripe_webhook_receipts (event_id,financial_mode,event_type,object_id,payment_id,endpoint_host) VALUES (?,?,?,?,?,?)',event.id,event.livemode?'live':'test',event.type,session.id,payment.id,String(req.headers.host||'').slice(0,255));
-    }
-    res.json({ received: true });
+      if (verifiedEvent.type === 'checkout.session.completed' || verifiedEvent.type === 'checkout.session.async_payment_succeeded') {
+        const session = verifiedEvent.data.object;
+        if(!stripeModeMatches(session.livemode)){res.json({received:true,ignored:true});return;}
+        if(session.metadata?.site&&session.metadata.site!==stripeSiteOrigin()){res.json({received:true,ignored:true});return;}
+        if (session.payment_status === 'paid' && session.metadata?.paymentId) {
+          if(!one(`SELECT id FROM ${paymentTable()} WHERE id=?`,session.metadata.paymentId)){res.json({received:true,ignored:true});return;}
+          settlePayment(session.metadata.paymentId, { amount: session.amount_total!, currency: session.currency!, session: session.id,livemode:session.livemode,sessionObject:session });
+        }
+      }
+      if(verifiedEvent.type==='checkout.session.expired'||verifiedEvent.type==='checkout.session.async_payment_failed'){
+        const session=verifiedEvent.data.object;
+        if(stripeModeMatches(session.livemode)&&session.metadata?.paymentId)run(`UPDATE ${paymentTable()} SET status=? WHERE id=? AND provider_session=? AND provider='stripe' AND status='pending'`,verifiedEvent.type==='checkout.session.expired'?'expired':'failed',session.metadata.paymentId,session.id);
+      }
+      if(checkoutEvent&&typeof verifiedEvent.id==='string'){
+        const session=verifiedEvent.data.object as Stripe.Checkout.Session;
+        const payment=session.metadata?.paymentId?one(`SELECT id FROM ${paymentTable()} WHERE id=? AND provider_session=? AND provider='stripe'`,session.metadata.paymentId,session.id):undefined;
+        if(payment)run('INSERT OR IGNORE INTO stripe_webhook_receipts (event_id,financial_mode,event_type,object_id,payment_id,endpoint_host) VALUES (?,?,?,?,?,?)',verifiedEvent.id,verifiedEvent.livemode?'live':'test',verifiedEvent.type,session.id,payment.id,String(req.headers.host||'').slice(0,255));
+      }
+      res.json({ received: true });
+    });
   });
   app.post('/api/auth/apple/callback',express.urlencoded({extended:false,limit:'16kb',parameterLimit:8}));
   app.use('/api', express.json({ limit: '128kb' }), (req, res, next) => {
