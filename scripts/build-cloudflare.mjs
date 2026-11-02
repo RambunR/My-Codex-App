@@ -3,7 +3,7 @@ import {mkdir,readFile,writeFile} from 'node:fs/promises';
 const root=process.cwd();
 const destination=path.join(root,'dist/cloudflare/server');await mkdir(destination,{recursive:true});
 const adapters=['db','config','storage','uploads','background','chunked-storage'];
-for(const name of ['app','auth','owner','cover-layout','subtitle-languages','publisher-profiles','publisher-profile-sql','catalog-retirement','series-lifecycle','episode-batch','episode-upload-sessions','episode-duration','playback-times','moderation','taxonomy','origins','google','apple','email-auth','mail','finance','funding-rewards','promotions','payment-state','payment-risk','stripe-event-context','stripe-readiness','analytics','errors']){
+for(const name of ['app','auth','owner','cover-layout','subtitle-languages','publisher-profiles','publisher-profile-sql','catalog-access','catalog-retirement','series-lifecycle','episode-batch','episode-upload-sessions','episode-duration','playback-times','moderation','taxonomy','origins','google','apple','email-auth','mail','finance','funding-rewards','promotions','payment-state','payment-risk','stripe-event-context','stripe-readiness','analytics','errors']){
   let code=await readFile(path.join(root,'server',`${name}.ts`),'utf8');
   for(const adapter of adapters)code=code.replaceAll(`'./${adapter}.js'`,`'../../../cloudflare/${adapter}'`);
   code=code.replaceAll("'../shared/","'../../../shared/");

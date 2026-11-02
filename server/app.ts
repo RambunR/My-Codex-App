@@ -26,6 +26,8 @@ import {finishInBackground,scheduleMediaCleanup} from './background.js';
 import { LANGUAGES, GENRES, MAX_EPISODE_BYTES, MAX_EPISODE_SECONDS, DEFAULT_QUOTA_BYTES,MIN_WALLET_FUNDING_CENTS,MAX_WALLET_FUNDING_CENTS } from '../shared/config.js';
 import {SERIES_LIMITS} from '../shared/series-validation.js';
 import {STANDARD_GENRES,STORY_THEMES,SERIES_FORMATS,CREATION_TYPES} from '../shared/taxonomy.js';
+import {SERIES_ACCESS_FILTERS} from '../shared/catalog-access.js';
+import {seriesAccessTypeSql,readSeriesAccessType} from './catalog-access.js';
 import {initializePromotions,adminPromotions,createPromotion,updatePromotion,quotePromotion} from './promotions.js';
 import {themesSchema,formatSchema,seriesClassification,writeSeriesClassification,SERIES_FORMAT_SQL} from './taxonomy.js';
 import {registerEpisodeUploadSessions,chunkedEpisodeUploadsEnabled,EPISODE_UPLOAD_CHUNK_BYTES,reservedEpisodeUploadBytes,cleanupExpiredEpisodeUploads} from './episode-upload-sessions.js';
@@ -55,6 +57,7 @@ function writableSeries(req:Request,seriesId=id(req)){
 }
 function ownerStorage(series:Record<string,any>){return one<{quota_bytes:number;used_bytes:number}>('SELECT quota_bytes,used_bytes FROM users WHERE id=?',series.creator_id)!;}
 const catalogSelect = `SELECT s.*,u.name AS creator_name,COALESCE(sp.published_at,s.created_at) AS published_at,
+ (${seriesAccessTypeSql()}) AS access_type,
  (SELECT id FROM episodes e WHERE e.series_id=s.id ORDER BY number LIMIT 1) AS first_episode_id,
  (SELECT COUNT(*) FROM episodes e WHERE e.series_id=s.id) AS episode_count,
  (SELECT COUNT(*) FROM saves sv WHERE sv.series_id=s.id) AS saves,
@@ -64,7 +67,7 @@ function serializeSeries(s: Record<string, any>, userId?: string, privateView=fa
   const { cover_key, cover_bytes,creator_id,...safe } = s;
   const {publisher,publisher_profile_id}=seriesPublisher(s);
   const genres=JSON.parse(s.genres);
-  return { ...safe,...(privateView?{creator_id}:{}),creator_name:publisher.display_name,publisher_id:publisher.id,publisher,publisher_profile_id,genres,...seriesClassification(s.id,genres),cover_aspect_ratio:seriesCoverAspectRatio(s.id),subtitle_languages:seriesSubtitleLanguages(s.id),cover: cover_key?.startsWith('public:') ? cover_key.slice(7) : cover_key ? apiUrl(`/api/${privateView?'studio/series':'series'}/${s.id}/cover`) : '/images/placeholder.svg',
+  return { ...safe,...(privateView?{creator_id}:{}),creator_name:publisher.display_name,publisher_id:publisher.id,publisher,publisher_profile_id,access_type:s.access_type===undefined?readSeriesAccessType(s.id):s.access_type,genres,...seriesClassification(s.id,genres),cover_aspect_ratio:seriesCoverAspectRatio(s.id),subtitle_languages:seriesSubtitleLanguages(s.id),cover: cover_key?.startsWith('public:') ? cover_key.slice(7) : cover_key ? apiUrl(`/api/${privateView?'studio/series':'series'}/${s.id}/cover`) : '/images/placeholder.svg',
     ...(privateView?{taken_down:moderationState(s.id).taken_down,moderation_reason:moderationState(s.id).reason}:{}),
     likes:Number(s.likes??one('SELECT COUNT(*) AS n FROM series_likes WHERE series_id=?',s.id)!.n),
     liked:!!(userId&&one('SELECT 1 FROM series_likes WHERE user_id=? AND series_id=?',userId,s.id)),
@@ -188,7 +191,7 @@ export function createApp() {
     run('UPDATE users SET name=?,language=? WHERE id=?', body.name, body.language, req.user!.id); res.json({ user: getUser(req.user!.id) });
   });
   app.get('/api/series', (req,res) => {
-    const query = z.object({ q: z.string().max(120).optional(), language: language.optional(), genre: z.enum(GENRES).optional(),theme:z.enum(STORY_THEMES).optional(),format:z.enum(SERIES_FORMATS).optional(), sort: z.enum(['popular','new','saved']).optional(), saved: z.enum(['true']).optional(), creation: z.enum(CREATION_TYPES).optional() }).parse(req.query);
+    const query = z.object({ q: z.string().max(120).optional(), language: language.optional(), genre: z.enum(GENRES).optional(),theme:z.enum(STORY_THEMES).optional(),format:z.enum(SERIES_FORMATS).optional(),access:z.enum(SERIES_ACCESS_FILTERS).optional(), sort: z.enum(['popular','new','saved']).optional(), saved: z.enum(['true']).optional(), creation: z.enum(CREATION_TYPES).optional() }).parse(req.query);
     const conditions = ["s.status='published'",publicSeriesAllowedSql('s')]; const params: any[] = [];
     if (query.q) { conditions.push(`(s.title LIKE ? OR s.description LIKE ? OR (${publisherNameSql()}) LIKE ?)`); params.push(`%${query.q}%`,`%${query.q}%`,`%${query.q}%`); }
     if (query.language) { conditions.push('s.language=?'); params.push(query.language); }
@@ -197,6 +200,7 @@ export function createApp() {
     if(query.theme){conditions.push('EXISTS(SELECT 1 FROM series_classifications c,json_each(c.themes) chosen_theme WHERE c.series_id=s.id AND chosen_theme.value=?)');params.push(query.theme);}
     if(query.format){conditions.push(`(${SERIES_FORMAT_SQL})=?`);params.push(query.format);}
     if (query.creation) { conditions.push('s.creation_type=?'); params.push(query.creation); }
+    if(query.access){conditions.push(`(${seriesAccessTypeSql()})=?`);params.push(query.access);}
     if (query.saved) { assert(req.user,401,'AUTH_REQUIRED','Sign in to view your list.'); conditions.push('EXISTS(SELECT 1 FROM saves sv WHERE sv.series_id=s.id AND sv.user_id=?)'); params.push(req.user.id); }
     const order = query.sort === 'new' ? 'julianday(COALESCE(sp.published_at,s.created_at)) DESC,s.rowid DESC' : query.sort === 'saved' ? 'saves DESC,s.views DESC' : 's.views DESC';
     res.json({ series: all(`${catalogSelect} WHERE ${conditions.join(' AND ')} ORDER BY ${order} LIMIT 150`, ...params).map(s => serializeSeries(s,req.user?.id)) });

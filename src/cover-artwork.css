@@ -21,12 +21,6 @@ body .ranking-row>img,body .continue-card>img,body .studio-series-image>img,body
 .cover-layout-field small,.cover-panel .cover-whole-image-hint,.cover-panel .cover-source-dimensions{line-height:1.9;overflow-wrap:anywhere;}
 .cover-panel .cover-source-dimensions{font-size:11px;color:var(--muted);margin-top:10px;}
 .cover-panel .cover-whole-image-hint{font-size:11px;margin-top:8px;}
-/* Public uploaded artwork has its own space; copy and carousel controls do not
-   sit on top of it. Demo editorial heroes retain their existing composition. */
-.home-page .hero.hero-user-artwork{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);height:auto;min-height:400px;}
-.home-page .hero-user-artwork .hero-copy{grid-column:1;grid-row:1;max-width:none;width:100%;height:auto;padding:32px;}
-.home-page .hero-user-artwork .hero-art{position:relative;inset:auto;left:auto;grid-column:2;grid-row:1 / span 2;width:100%;height:100%;min-height:400px;mask-image:none;aspect-ratio:auto;}
-.home-page .hero-user-artwork .hero-pagination{position:relative;inset:auto;grid-column:1;grid-row:2;margin:0 32px 24px;align-self:end;}
 @media(max-width:640px){
   .editor-page .editor-grid>aside>.cover-panel{grid-column:1 / -1;}
   .editor-page .editor-grid>aside .cover-panel h2{font-size:16px;}
@@ -36,8 +30,4 @@ body .ranking-row>img,body .continue-card>img,body .studio-series-image>img,body
   .detail-page .series-detail-hero:has(>.detail-cover[data-cover-aspect-ratio="16:9"]){display:flex;flex-direction:column;}
   .detail-page .detail-cover[data-cover-aspect-ratio="16:9"]{width:100%;align-self:stretch;}
   .detail-page .series-detail-hero:has(>.detail-cover[data-cover-aspect-ratio="16:9"])>.detail-info{display:flex;flex-direction:column;gap:16px;width:100%;}
-  .home-page .hero.hero-user-artwork{grid-template-columns:minmax(0,1fr);min-height:0;}
-  .home-page .hero-user-artwork .hero-art{grid-column:1;grid-row:1;min-height:0;height:280px;}
-  .home-page .hero-user-artwork .hero-copy{grid-column:1;grid-row:2;padding:24px 20px;}
-  .home-page .hero-user-artwork .hero-pagination{grid-column:1;grid-row:3;margin:0 20px 20px;}
 }

@@ -26,6 +26,8 @@ import type {StoryTheme,SeriesFormat} from './taxonomy.js';
 export {UPLOAD_COVER_ASPECT_RATIOS,COVER_ASPECT_DIMENSIONS,coverAspectRatioCss} from './cover-layout.js';
 export type {CoverAspectRatio,UploadCoverAspectRatio} from './cover-layout.js';
 import type {CoverAspectRatio} from './cover-layout.js';
+import type {SeriesAccessType} from './catalog-access.js';
+export type {SeriesAccessType} from './catalog-access.js';
 export const MAX_EPISODE_SECONDS = 240;
 export const MAX_EPISODE_BYTES = 200 * 1024 * 1024;
 export const DEFAULT_QUOTA_BYTES = 5 * 1024 * 1024 * 1024;
@@ -58,6 +60,7 @@ export interface Series {
   creator_name: string; creation_type: 'human' | 'ai-assisted' | 'ai-generated'; price_cents: number; free_episodes: number;
   publisher_id?:string;publisher?:PublisherProfile;publisher_profile_id?:string|null;
   cover_aspect_ratio?:CoverAspectRatio;
+  access_type?:SeriesAccessType|null;
   episode_count: number; views: number; saves: number; status: string; featured: number; created_at: string; published_at?: string;
   likes: number; liked: boolean;
   saved?: boolean; demo?: number; subtitle_languages?: string[]; first_episode_id?: string;
