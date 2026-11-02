@@ -87,6 +87,10 @@ Permanent series deletion requires the server's actor-bound, expiring content co
 
 Persist private-media cleanup before committing deletion, retry with bounded Durable Object alarms, and release quota exactly once after object removal. Preserve late-upload compensation, temporary-file cleanup and shared sample assets. A cleanup failure after commit must report deletion success with cleanup pending. Tests and read-only release verification do not authorize deleting or hiding real production content. See [series lifecycle](docs/SERIES_LIFECYCLE.md).
 
+## Cover artwork
+
+Cover artwork must fit the whole image with black padding, without cropping, stretching, hover zoom or fake title overlays on uploaded art. Preserve the optional `cover_aspect_ratio` metadata: new series default to 9:16, explicit choices are 9:16/1:1/16:9, and existing unassigned records retain their legacy 2:3 frame without backfilling. Omitted PATCH fields must not reset the saved layout. Exact pixel dimensions are recommendations, not admission requirements. Keep the 5 MiB limit and existing image validation/optimization; changing a layout must not rewrite image files, duplicate storage, alter quota or touch ownership/finances. See [cover artwork](docs/COVER_ARTWORK.md).
+
 ## Administrator identity and upload display
 
 Preserve `PLATFORM_OWNER_USER_ID`, `OFFICIAL_CREATOR_NAME` and `PLATFORM_ADMIN_EMAIL_SHA256` on the existing main Worker. The immutable owner UUID receives audited admin access. The email hash is an additional trusted selector: it grants the matching authenticated account admin access only after a current server email-verification record or matching signed Google identity proves the current stored email. Do not grant roles from an unverified registration address, display name, request body or frontend email comparison. Keep personal administrator email addresses out of public source; use the configured normalized hash. Role changes are audited and never create a session, paid Pass, balance, quota or financial transaction.

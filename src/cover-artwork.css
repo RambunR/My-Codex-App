@@ -1,0 +1,51 @@
+/* Cover pixels always fit inside the frame. Blank space belongs to the frame,
+   never to a cropped or stretched derivative of the publisher's artwork. */
+img.cover-artwork-image,
+.poster>img.cover-artwork-image,
+.series-card:hover .poster>img.cover-artwork-image,
+.hero-art>img.cover-artwork-image{
+  object-fit:contain;object-position:center;background:#000;transform:none;filter:none;
+}
+.cover-artwork-frame,.poster.cover-artwork-frame,.hero-art.cover-artwork-frame{background:#000;overflow:hidden;position:relative;}
+.cover-artwork-frame>.cover-artwork-image{display:block;width:100%;height:100%;}
+body .ranking-row>img,body .continue-card>img,body .studio-series-image>img,body .content-admin-row>img,body .unlock-preview>img{
+  object-fit:contain;object-position:center;background:#000;
+}
+.video-player>.player-poster{object-fit:contain;object-position:center;background:#000;filter:brightness(.32);}
+.cover-panel .cover-artwork-editor-frame{display:flex;align-items:center;justify-content:center;width:100%;border:1px solid #ffffff20;border-radius:8px;margin-top:18px;}
+.cover-artwork-editor-frame>.cover-artwork-image{position:absolute;inset:0;}
+.cover-artwork-empty{display:flex;flex-direction:column;align-items:center;gap:12px;color:var(--muted);padding:20px;font-size:12px;text-align:center;line-height:1.7;}
+.cover-panel .cover-choose-action{margin-top:12px;font-size:12px;white-space:normal;line-height:1.6;min-height:44px;}
+.cover-panel .cover-layout-field{margin-top:20px;}
+.cover-layout-field select{max-width:100%;font-size:14px;text-overflow:ellipsis;}
+.cover-layout-field small,.cover-panel .cover-whole-image-hint,.cover-panel .cover-source-dimensions{line-height:1.9;overflow-wrap:anywhere;}
+.cover-panel .cover-source-dimensions{font-size:11px;color:var(--muted);margin-top:10px;}
+.cover-panel .cover-whole-image-hint{font-size:11px;margin-top:8px;}
+/* Keep the native language selector and give its caret a readable inset. */
+.editor-page #series-language{
+  appearance:none;-webkit-appearance:none;padding-inline-end:44px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4' fill='none' stroke='%23ded4e8' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-size:16px 16px;background-position:right 16px center;
+}
+html[dir="rtl"] .editor-page #series-language{background-position:left 16px center;}
+@media(forced-colors:active){.editor-page #series-language{appearance:auto;-webkit-appearance:auto;background-image:none;}}
+/* Public uploaded artwork has its own space; copy and carousel controls do not
+   sit on top of it. Demo editorial heroes retain their existing composition. */
+.home-page .hero.hero-user-artwork{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);height:auto;min-height:400px;}
+.home-page .hero-user-artwork .hero-copy{grid-column:1;grid-row:1;max-width:none;width:100%;height:auto;padding:32px;}
+.home-page .hero-user-artwork .hero-art{position:relative;inset:auto;left:auto;grid-column:2;grid-row:1 / span 2;width:100%;height:100%;min-height:400px;mask-image:none;aspect-ratio:auto;}
+.home-page .hero-user-artwork .hero-pagination{position:relative;inset:auto;grid-column:1;grid-row:2;margin:0 32px 24px;align-self:end;}
+@media(max-width:640px){
+  .editor-page .editor-grid>aside>.cover-panel{grid-column:1 / -1;}
+  .editor-page .editor-grid>aside .cover-panel h2{font-size:16px;}
+  .cover-layout-field select{font-size:16px;min-height:44px;}
+  .cover-panel .cover-choose-action{font-size:14px;}
+  .cover-panel .cover-source-dimensions,.cover-panel .cover-whole-image-hint{font-size:12px;}
+  .detail-page .series-detail-hero:has(>.detail-cover[data-cover-aspect-ratio="16:9"]){display:flex;flex-direction:column;}
+  .detail-page .detail-cover[data-cover-aspect-ratio="16:9"]{width:100%;align-self:stretch;}
+  .detail-page .series-detail-hero:has(>.detail-cover[data-cover-aspect-ratio="16:9"])>.detail-info{display:flex;flex-direction:column;gap:16px;width:100%;}
+  .home-page .hero.hero-user-artwork{grid-template-columns:minmax(0,1fr);min-height:0;}
+  .home-page .hero-user-artwork .hero-art{grid-column:1;grid-row:1;min-height:0;height:280px;}
+  .home-page .hero-user-artwork .hero-copy{grid-column:1;grid-row:2;padding:24px 20px;}
+  .home-page .hero-user-artwork .hero-pagination{grid-column:1;grid-row:3;margin:0 20px 20px;}
+}

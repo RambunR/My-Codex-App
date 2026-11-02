@@ -10,6 +10,7 @@ import {promoAdminEnglish,promoAdminMessages} from './promo-admin-locales';
 import {seriesLifecycleEnglish,seriesLifecycleMessages} from './series-lifecycle-locales';
 import {bulkRewardsEnglish,bulkRewardsMessages} from './bulk-rewards-locales';
 import {publisherProfileEnglish,publisherProfileMessages} from './publisher-profile-locales';
+import {coverArtworkEnglish,coverArtworkMessages} from './cover-artwork-locales';
 
 const en = {
   ...contentAdminEnglish,
@@ -54,7 +55,7 @@ const en = {
   overview:'Overview', mySeries:'My series', earnings:'Earnings & payouts', storage:'Storage', newSeries:'New series', totalSales:'Episode unlocks', availableEarnings:'Available earnings', lifetimeEarnings:'Lifetime earnings',
   storageUsed:'Storage used', manage:'Manage', draft:'Draft', published:'Published', archived:'Archived', noSeries:'Your first story starts here.',
   noSeriesBody:'Create a series, add a cover, and upload a folder of episodes.', seriesDetails:'Series details', seriesTitle:'Series title', description:'Synopsis',
-  spokenLanguage:'Drama language', languageHint:'Choose the language spoken in these episodes.', cover:'Cover artwork', coverHint:'JPEG, PNG or WebP · up to 5 MB · portrait recommended',
+  spokenLanguage:'Drama language', languageHint:'Choose the language spoken in these episodes.', cover:'Cover artwork',
   chooseCover:'Choose cover', episodePricing:'Episode pricing', paidPrice:'Price per paid episode (USD)', freeCount:'Number of free episodes',
   freeHint:'The first episodes are free. Everything after that uses your episode price.', saveDraft:'Save details', publish:'Publish series', unpublish:'Return to draft',
   uploadEpisodes:'Upload episodes', uploadFolder:'Choose a folder', chooseFiles:'Choose video files', uploadHint:'Drop episodes here, or choose a folder. Files are ordered by filename.',
@@ -89,6 +90,7 @@ const en = {
   ...seriesLifecycleEnglish,
   ...bulkRewardsEnglish,
   ...publisherProfileEnglish,
+  ...coverArtworkEnglish,
 } as const;
 export type Key = keyof typeof en;
 type Dictionary = Partial<Record<Key,string>>;
@@ -168,6 +170,7 @@ for(const language of LANGUAGES){if(!promoAdminMessages[language.code])throw new
 for(const language of LANGUAGES){if(!seriesLifecycleMessages[language.code])throw new Error(`Series lifecycle translations missing: ${language.code}`);Object.assign(dictionaries[language.code],seriesLifecycleMessages[language.code]);}
 for(const language of LANGUAGES){if(!bulkRewardsMessages[language.code])throw new Error(`Bulk and reward translations missing: ${language.code}`);Object.assign(dictionaries[language.code],bulkRewardsMessages[language.code]);}
 for(const language of LANGUAGES){if(!publisherProfileMessages[language.code])throw new Error(`Publisher profile translations missing: ${language.code}`);Object.assign(dictionaries[language.code],publisherProfileMessages[language.code]);}
+for(const language of LANGUAGES){if(!coverArtworkMessages[language.code])throw new Error(`Cover artwork translations missing: ${language.code}`);Object.assign(dictionaries[language.code],coverArtworkMessages[language.code]);}
 const uploadConfirmationMessages:Record<Locale,string>={
   en:'Upload confirmation was interrupted. Refresh this series before retrying the file.',
   'zh-TW':'上傳確認中斷。請重新整理此系列，再重試上傳檔案。',

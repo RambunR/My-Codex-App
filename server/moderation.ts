@@ -3,6 +3,7 @@ import {one,all,run,transaction} from './db.js';
 import {assert} from './errors.js';
 import {config} from './config.js';
 import {publisherNameSql} from './publisher-profile-sql.js';
+import {coverAspectRatioSql} from './cover-layout.js';
 
 type Row=Record<string,any>;
 export interface ModerationState {taken_down:boolean;reason:string|null;updated_at:string|null}
@@ -82,7 +83,7 @@ export function listAdminSeries(actorId:string,filters:AdminSeriesFilters={}){
   const where=conditions.length?' WHERE '+conditions.join(' AND '):'';
   const source=" FROM series s JOIN users u ON u.id=s.creator_id LEFT JOIN series_moderation m ON m.series_id=s.id";
   const total=Number(one('SELECT COUNT(*) AS n'+source+where,...params)!.n);
-  const series=all(`SELECT s.*,${publisherNameSql()} AS creator_name,COALESCE(m.taken_down,0) AS taken_down,m.reason AS moderation_reason,m.updated_at AS moderated_at,
+  const series=all(`SELECT s.*,${publisherNameSql()} AS creator_name,${coverAspectRatioSql()} AS cover_aspect_ratio,COALESCE(m.taken_down,0) AS taken_down,m.reason AS moderation_reason,m.updated_at AS moderated_at,
     (SELECT COUNT(*) FROM episodes e WHERE e.series_id=s.id) AS episode_count,
     (SELECT COUNT(*) FROM purchases p JOIN episodes e ON e.id=p.episode_id WHERE e.series_id=s.id) AS paid_unlocks,
     (SELECT COUNT(*) FROM test_purchases p JOIN episodes e ON e.id=p.episode_id WHERE e.series_id=s.id) AS test_unlocks`+source+where+' ORDER BY s.updated_at DESC,s.rowid DESC LIMIT ? OFFSET ?',...params,limit,(page-1)*limit);

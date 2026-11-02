@@ -1,0 +1,271 @@
+import type {Locale} from '../shared/config';
+
+export const coverArtworkEnglish={
+  "coverHint": "JPEG, PNG or WebP · up to 5 MiB · vertical, square or landscape",
+  "coverLayout": "Cover layout",
+  "coverLayoutVertical": "Vertical · 1080 × 1920 (9:16)",
+  "coverLayoutSquare": "Square · 1080 × 1080 (1:1)",
+  "coverLayoutLandscape": "Landscape · 1920 × 1080 (16:9)",
+  "coverLayoutLegacy": "Existing layout · 2:3",
+  "coverLayoutHint": "Recommended sizes only. Other image dimensions are welcome; the full image is shown with black space when needed.",
+  "coverSourceDimensions": "Source image: {width} × {height} pixels",
+  "coverWholeImageHint": "Your entire image stays visible. It will not be cropped or stretched.",
+  "coverPreview": "Cover preview"
+} as const;
+export type CoverArtworkKey=keyof typeof coverArtworkEnglish;
+type CoverArtworkCopy=Record<CoverArtworkKey,string>;
+
+export const coverArtworkMessages:Record<Locale,CoverArtworkCopy>={
+  "en": {
+    "coverHint": "JPEG, PNG or WebP · up to 5 MiB · vertical, square or landscape",
+    "coverLayout": "Cover layout",
+    "coverLayoutVertical": "Vertical · 1080 × 1920 (9:16)",
+    "coverLayoutSquare": "Square · 1080 × 1080 (1:1)",
+    "coverLayoutLandscape": "Landscape · 1920 × 1080 (16:9)",
+    "coverLayoutLegacy": "Existing layout · 2:3",
+    "coverLayoutHint": "Recommended sizes only. Other image dimensions are welcome; the full image is shown with black space when needed.",
+    "coverSourceDimensions": "Source image: {width} × {height} pixels",
+    "coverWholeImageHint": "Your entire image stays visible. It will not be cropped or stretched.",
+    "coverPreview": "Cover preview"
+  },
+  "zh-TW": {
+    "coverHint": "JPEG、PNG 或 WebP · 最大 5 MiB · 支援直式、正方形及橫式",
+    "coverLayout": "封面版型",
+    "coverLayoutVertical": "直式 · 1080 × 1920（9:16）",
+    "coverLayoutSquare": "正方形 · 1080 × 1080（1:1）",
+    "coverLayoutLandscape": "橫式 · 1920 × 1080（16:9）",
+    "coverLayoutLegacy": "現有版型 · 2:3",
+    "coverLayoutHint": "以上僅為建議尺寸，也接受其他圖片尺寸。完整圖片會顯示於版型中，必要時以黑色空間補齊。",
+    "coverSourceDimensions": "原始圖片：{width} × {height} 像素",
+    "coverWholeImageHint": "整張圖片都會保留顯示，不會裁切或拉伸。",
+    "coverPreview": "封面預覽"
+  },
+  "zh-CN": {
+    "coverHint": "JPEG、PNG 或 WebP · 最大 5 MiB · 支持竖版、正方形及横版",
+    "coverLayout": "封面布局",
+    "coverLayoutVertical": "竖版 · 1080 × 1920（9:16）",
+    "coverLayoutSquare": "正方形 · 1080 × 1080（1:1）",
+    "coverLayoutLandscape": "横版 · 1920 × 1080（16:9）",
+    "coverLayoutLegacy": "现有布局 · 2:3",
+    "coverLayoutHint": "以上仅为建议尺寸，也接受其他图片尺寸。完整图片会显示在布局中，必要时以黑色空间补齐。",
+    "coverSourceDimensions": "原始图片：{width} × {height} 像素",
+    "coverWholeImageHint": "整张图片都会保留显示，不会裁剪或拉伸。",
+    "coverPreview": "封面预览"
+  },
+  "ja": {
+    "coverHint": "JPEG・PNG・WebP · 最大 5 MiB · 縦長・正方形・横長に対応",
+    "coverLayout": "カバーのレイアウト",
+    "coverLayoutVertical": "縦長 · 1080 × 1920（9:16）",
+    "coverLayoutSquare": "正方形 · 1080 × 1080（1:1）",
+    "coverLayoutLandscape": "横長 · 1920 × 1080（16:9）",
+    "coverLayoutLegacy": "既存のレイアウト · 2:3",
+    "coverLayoutHint": "推奨サイズです。他の画像サイズも使えます。画像全体を表示し、必要に応じて黒い余白を加えます。",
+    "coverSourceDimensions": "元の画像：{width} × {height} ピクセル",
+    "coverWholeImageHint": "画像全体が表示されます。切り抜きや引き伸ばしは行いません。",
+    "coverPreview": "カバーのプレビュー"
+  },
+  "ko": {
+    "coverHint": "JPEG, PNG 또는 WebP · 최대 5 MiB · 세로·정사각형·가로 지원",
+    "coverLayout": "표지 레이아웃",
+    "coverLayoutVertical": "세로 · 1080 × 1920 (9:16)",
+    "coverLayoutSquare": "정사각형 · 1080 × 1080 (1:1)",
+    "coverLayoutLandscape": "가로 · 1920 × 1080 (16:9)",
+    "coverLayoutLegacy": "기존 레이아웃 · 2:3",
+    "coverLayoutHint": "권장 크기이며 다른 이미지 크기도 사용할 수 있습니다. 전체 이미지를 표시하고 필요하면 검은 여백을 추가합니다.",
+    "coverSourceDimensions": "원본 이미지: {width} × {height} 픽셀",
+    "coverWholeImageHint": "이미지 전체를 표시합니다. 자르거나 늘리지 않습니다.",
+    "coverPreview": "표지 미리보기"
+  },
+  "hi": {
+    "coverHint": "JPEG, PNG या WebP · अधिकतम 5 MiB · खड़ी, वर्गाकार या आड़ी तस्वीर",
+    "coverLayout": "कवर का लेआउट",
+    "coverLayoutVertical": "खड़ा · 1080 × 1920 (9:16)",
+    "coverLayoutSquare": "वर्गाकार · 1080 × 1080 (1:1)",
+    "coverLayoutLandscape": "आड़ा · 1920 × 1080 (16:9)",
+    "coverLayoutLegacy": "मौजूदा लेआउट · 2:3",
+    "coverLayoutHint": "ये केवल सुझाए गए आकार हैं। अन्य आकार की तस्वीरें भी स्वीकार हैं; पूरी तस्वीर दिखेगी और ज़रूरत पर काली खाली जगह जोड़ी जाएगी।",
+    "coverSourceDimensions": "मूल तस्वीर: {width} × {height} पिक्सेल",
+    "coverWholeImageHint": "आपकी पूरी तस्वीर दिखाई देगी। उसे काटा या खींचा नहीं जाएगा।",
+    "coverPreview": "कवर का पूर्वावलोकन"
+  },
+  "id": {
+    "coverHint": "JPEG, PNG atau WebP · hingga 5 MiB · vertikal, persegi atau horizontal",
+    "coverLayout": "Tata letak sampul",
+    "coverLayoutVertical": "Vertikal · 1080 × 1920 (9:16)",
+    "coverLayoutSquare": "Persegi · 1080 × 1080 (1:1)",
+    "coverLayoutLandscape": "Horizontal · 1920 × 1080 (16:9)",
+    "coverLayoutLegacy": "Tata letak saat ini · 2:3",
+    "coverLayoutHint": "Ukuran ini hanya rekomendasi. Dimensi gambar lain juga diterima; seluruh gambar ditampilkan dengan ruang hitam bila diperlukan.",
+    "coverSourceDimensions": "Gambar asli: {width} × {height} piksel",
+    "coverWholeImageHint": "Seluruh gambar tetap terlihat. Gambar tidak akan dipotong atau diregangkan.",
+    "coverPreview": "Pratinjau sampul"
+  },
+  "pt-BR": {
+    "coverHint": "JPEG, PNG ou WebP · até 5 MiB · vertical, quadrado ou horizontal",
+    "coverLayout": "Formato da capa",
+    "coverLayoutVertical": "Vertical · 1080 × 1920 (9:16)",
+    "coverLayoutSquare": "Quadrado · 1080 × 1080 (1:1)",
+    "coverLayoutLandscape": "Horizontal · 1920 × 1080 (16:9)",
+    "coverLayoutLegacy": "Formato atual · 2:3",
+    "coverLayoutHint": "Os tamanhos são apenas recomendações. Outras dimensões são aceitas; a imagem inteira é exibida com espaço preto quando necessário.",
+    "coverSourceDimensions": "Imagem original: {width} × {height} pixels",
+    "coverWholeImageHint": "Sua imagem inteira permanece visível. Ela não será cortada nem esticada.",
+    "coverPreview": "Prévia da capa"
+  },
+  "es": {
+    "coverHint": "JPEG, PNG o WebP · hasta 5 MiB · vertical, cuadrada u horizontal",
+    "coverLayout": "Formato de portada",
+    "coverLayoutVertical": "Vertical · 1080 × 1920 (9:16)",
+    "coverLayoutSquare": "Cuadrada · 1080 × 1080 (1:1)",
+    "coverLayoutLandscape": "Horizontal · 1920 × 1080 (16:9)",
+    "coverLayoutLegacy": "Formato actual · 2:3",
+    "coverLayoutHint": "Los tamaños son solo recomendaciones. Se aceptan otras dimensiones; la imagen completa se muestra con espacio negro cuando sea necesario.",
+    "coverSourceDimensions": "Imagen original: {width} × {height} píxeles",
+    "coverWholeImageHint": "Toda la imagen permanece visible. No se recortará ni se estirará.",
+    "coverPreview": "Vista previa de portada"
+  },
+  "ar": {
+    "coverHint": "JPEG أو PNG أو WebP · حتى 5 MiB · عمودي أو مربع أو أفقي",
+    "coverLayout": "تخطيط الغلاف",
+    "coverLayoutVertical": "عمودي · 1080 × 1920 (9:16)",
+    "coverLayoutSquare": "مربع · 1080 × 1080 (1:1)",
+    "coverLayoutLandscape": "أفقي · 1920 × 1080 (16:9)",
+    "coverLayoutLegacy": "التخطيط الحالي · 2:3",
+    "coverLayoutHint": "هذه أحجام مقترحة فقط. يمكن استخدام أبعاد أخرى؛ تظهر الصورة كاملة مع مساحة سوداء عند الحاجة.",
+    "coverSourceDimensions": "الصورة الأصلية: {width} × {height} بكسل",
+    "coverWholeImageHint": "تبقى صورتك كاملة ظاهرة، دون قص أو تمديد.",
+    "coverPreview": "معاينة الغلاف"
+  },
+  "bn": {
+    "coverHint": "JPEG, PNG বা WebP · সর্বোচ্চ 5 MiB · উল্লম্ব, বর্গাকার বা আড়াআড়ি",
+    "coverLayout": "কভারের বিন্যাস",
+    "coverLayoutVertical": "উল্লম্ব · 1080 × 1920 (9:16)",
+    "coverLayoutSquare": "বর্গাকার · 1080 × 1080 (1:1)",
+    "coverLayoutLandscape": "আড়াআড়ি · 1920 × 1080 (16:9)",
+    "coverLayoutLegacy": "বর্তমান বিন্যাস · 2:3",
+    "coverLayoutHint": "আকারগুলো শুধু সুপারিশ। অন্য মাপের ছবিও গ্রহণযোগ্য; পুরো ছবি দেখানো হয় এবং প্রয়োজনে কালো ফাঁকা জায়গা যোগ হয়।",
+    "coverSourceDimensions": "মূল ছবি: {width} × {height} পিক্সেল",
+    "coverWholeImageHint": "আপনার পুরো ছবি দেখা যাবে। ছবি কাটা বা টেনে বড় করা হবে না।",
+    "coverPreview": "কভারের প্রিভিউ"
+  },
+  "ur": {
+    "coverHint": "JPEG، PNG یا WebP · زیادہ سے زیادہ 5 MiB · عمودی، مربع یا افقی",
+    "coverLayout": "سرورق کی ترتیب",
+    "coverLayoutVertical": "عمودی · 1080 × 1920 (9:16)",
+    "coverLayoutSquare": "مربع · 1080 × 1080 (1:1)",
+    "coverLayoutLandscape": "افقی · 1920 × 1080 (16:9)",
+    "coverLayoutLegacy": "موجودہ ترتیب · 2:3",
+    "coverLayoutHint": "یہ صرف تجویز کردہ سائز ہیں۔ دوسری پیمائش کی تصاویر بھی قبول ہیں؛ پوری تصویر دکھائی جاتی ہے اور ضرورت پر سیاہ خالی جگہ شامل ہوتی ہے۔",
+    "coverSourceDimensions": "اصل تصویر: {width} × {height} پکسل",
+    "coverWholeImageHint": "آپ کی پوری تصویر نظر آتی رہے گی۔ اسے کاٹا یا کھینچا نہیں جائے گا۔",
+    "coverPreview": "سرورق کا پیش منظر"
+  },
+  "vi": {
+    "coverHint": "JPEG, PNG hoặc WebP · tối đa 5 MiB · dọc, vuông hoặc ngang",
+    "coverLayout": "Bố cục ảnh bìa",
+    "coverLayoutVertical": "Dọc · 1080 × 1920 (9:16)",
+    "coverLayoutSquare": "Vuông · 1080 × 1080 (1:1)",
+    "coverLayoutLandscape": "Ngang · 1920 × 1080 (16:9)",
+    "coverLayoutLegacy": "Bố cục hiện tại · 2:3",
+    "coverLayoutHint": "Đây chỉ là kích thước đề xuất. Có thể dùng kích thước khác; toàn bộ ảnh được hiển thị và thêm khoảng đen khi cần.",
+    "coverSourceDimensions": "Ảnh gốc: {width} × {height} pixel",
+    "coverWholeImageHint": "Toàn bộ ảnh của bạn vẫn hiển thị. Ảnh không bị cắt hoặc kéo giãn.",
+    "coverPreview": "Xem trước ảnh bìa"
+  },
+  "th": {
+    "coverHint": "JPEG, PNG หรือ WebP · สูงสุด 5 MiB · แนวตั้ง จัตุรัส หรือแนวนอน",
+    "coverLayout": "รูปแบบภาพปก",
+    "coverLayoutVertical": "แนวตั้ง · 1080 × 1920 (9:16)",
+    "coverLayoutSquare": "จัตุรัส · 1080 × 1080 (1:1)",
+    "coverLayoutLandscape": "แนวนอน · 1920 × 1080 (16:9)",
+    "coverLayoutLegacy": "รูปแบบปัจจุบัน · 2:3",
+    "coverLayoutHint": "ขนาดเหล่านี้เป็นเพียงคำแนะนำ ใช้ภาพขนาดอื่นได้ โดยจะแสดงภาพทั้งหมดและเติมพื้นที่สีดำเมื่อจำเป็น",
+    "coverSourceDimensions": "ภาพต้นฉบับ: {width} × {height} พิกเซล",
+    "coverWholeImageHint": "ภาพทั้งหมดของคุณยังคงมองเห็นได้ โดยไม่ถูกครอบตัดหรือยืด",
+    "coverPreview": "ตัวอย่างภาพปก"
+  },
+  "fil": {
+    "coverHint": "JPEG, PNG o WebP · hanggang 5 MiB · patayo, parisukat o pahiga",
+    "coverLayout": "Ayos ng cover",
+    "coverLayoutVertical": "Patayo · 1080 × 1920 (9:16)",
+    "coverLayoutSquare": "Parisukat · 1080 × 1080 (1:1)",
+    "coverLayoutLandscape": "Pahiga · 1920 × 1080 (16:9)",
+    "coverLayoutLegacy": "Kasalukuyang ayos · 2:3",
+    "coverLayoutHint": "Rekomendasyon lamang ang mga sukat. Tinatanggap ang ibang laki ng larawan; buong larawan ang ipinapakita na may itim na espasyo kung kailangan.",
+    "coverSourceDimensions": "Orihinal na larawan: {width} × {height} pixel",
+    "coverWholeImageHint": "Mananatiling kita ang buong larawan mo. Hindi ito puputulin o iuunat.",
+    "coverPreview": "Preview ng cover"
+  },
+  "tr": {
+    "coverHint": "JPEG, PNG veya WebP · en fazla 5 MiB · dikey, kare veya yatay",
+    "coverLayout": "Kapak düzeni",
+    "coverLayoutVertical": "Dikey · 1080 × 1920 (9:16)",
+    "coverLayoutSquare": "Kare · 1080 × 1080 (1:1)",
+    "coverLayoutLandscape": "Yatay · 1920 × 1080 (16:9)",
+    "coverLayoutLegacy": "Mevcut düzen · 2:3",
+    "coverLayoutHint": "Boyutlar yalnızca öneridir. Diğer görüntü boyutları da kullanılabilir; gerektiğinde siyah boşluk eklenerek görüntünün tamamı gösterilir.",
+    "coverSourceDimensions": "Kaynak görüntü: {width} × {height} piksel",
+    "coverWholeImageHint": "Görüntünüzün tamamı görünür kalır. Kırpılmaz veya esnetilmez.",
+    "coverPreview": "Kapak önizlemesi"
+  },
+  "ru": {
+    "coverHint": "JPEG, PNG или WebP · до 5 MiB · вертикально, квадратом или горизонтально",
+    "coverLayout": "Формат обложки",
+    "coverLayoutVertical": "Вертикально · 1080 × 1920 (9:16)",
+    "coverLayoutSquare": "Квадрат · 1080 × 1080 (1:1)",
+    "coverLayoutLandscape": "Горизонтально · 1920 × 1080 (16:9)",
+    "coverLayoutLegacy": "Текущий формат · 2:3",
+    "coverLayoutHint": "Размеры только рекомендуемые. Можно использовать другие размеры; изображение показывается целиком с чёрными полями при необходимости.",
+    "coverSourceDimensions": "Исходное изображение: {width} × {height} пикселей",
+    "coverWholeImageHint": "Всё изображение остаётся видимым. Оно не обрезается и не растягивается.",
+    "coverPreview": "Предпросмотр обложки"
+  },
+  "fr": {
+    "coverHint": "JPEG, PNG ou WebP · 5 MiB maximum · vertical, carré ou horizontal",
+    "coverLayout": "Format de la couverture",
+    "coverLayoutVertical": "Vertical · 1080 × 1920 (9:16)",
+    "coverLayoutSquare": "Carré · 1080 × 1080 (1:1)",
+    "coverLayoutLandscape": "Horizontal · 1920 × 1080 (16:9)",
+    "coverLayoutLegacy": "Format actuel · 2:3",
+    "coverLayoutHint": "Les dimensions sont seulement recommandées. D’autres dimensions conviennent ; l’image entière est affichée avec des bandes noires si nécessaire.",
+    "coverSourceDimensions": "Image source : {width} × {height} pixels",
+    "coverWholeImageHint": "Votre image reste entièrement visible, sans recadrage ni étirement.",
+    "coverPreview": "Aperçu de la couverture"
+  },
+  "de": {
+    "coverHint": "JPEG, PNG oder WebP · bis 5 MiB · Hochformat, quadratisch oder Querformat",
+    "coverLayout": "Coverformat",
+    "coverLayoutVertical": "Hochformat · 1080 × 1920 (9:16)",
+    "coverLayoutSquare": "Quadratisch · 1080 × 1080 (1:1)",
+    "coverLayoutLandscape": "Querformat · 1920 × 1080 (16:9)",
+    "coverLayoutLegacy": "Vorhandenes Format · 2:3",
+    "coverLayoutHint": "Die Größen sind Empfehlungen. Andere Bildgrößen sind ebenfalls möglich; das ganze Bild wird bei Bedarf mit schwarzen Rändern angezeigt.",
+    "coverSourceDimensions": "Originalbild: {width} × {height} Pixel",
+    "coverWholeImageHint": "Dein ganzes Bild bleibt sichtbar. Es wird weder beschnitten noch verzerrt.",
+    "coverPreview": "Covervorschau"
+  },
+  "ms": {
+    "coverHint": "JPEG, PNG atau WebP · sehingga 5 MiB · menegak, segi empat sama atau melintang",
+    "coverLayout": "Susun atur kulit",
+    "coverLayoutVertical": "Menegak · 1080 × 1920 (9:16)",
+    "coverLayoutSquare": "Segi empat sama · 1080 × 1080 (1:1)",
+    "coverLayoutLandscape": "Melintang · 1920 × 1080 (16:9)",
+    "coverLayoutLegacy": "Susun atur sedia ada · 2:3",
+    "coverLayoutHint": "Saiz ini hanya cadangan. Dimensi imej lain turut diterima; keseluruhan imej dipaparkan dengan ruang hitam apabila perlu.",
+    "coverSourceDimensions": "Imej asal: {width} × {height} piksel",
+    "coverWholeImageHint": "Keseluruhan imej anda kekal kelihatan. Imej tidak dipotong atau diregangkan.",
+    "coverPreview": "Pratonton kulit"
+  },
+  "ta": {
+    "coverHint": "JPEG, PNG அல்லது WebP · அதிகபட்சம் 5 MiB · செங்குத்து, சதுரம் அல்லது கிடைமட்டம்",
+    "coverLayout": "அட்டைப் பட அமைப்பு",
+    "coverLayoutVertical": "செங்குத்து · 1080 × 1920 (9:16)",
+    "coverLayoutSquare": "சதுரம் · 1080 × 1080 (1:1)",
+    "coverLayoutLandscape": "கிடைமட்டம் · 1920 × 1080 (16:9)",
+    "coverLayoutLegacy": "தற்போதைய அமைப்பு · 2:3",
+    "coverLayoutHint": "இவை பரிந்துரைக்கப்பட்ட அளவுகள் மட்டுமே. பிற பட அளவுகளும் ஏற்கப்படும்; தேவையான இடத்தில் கருப்பு வெளி சேர்த்து முழுப் படமும் காட்டப்படும்.",
+    "coverSourceDimensions": "மூலப் படம்: {width} × {height} பிக்சல்கள்",
+    "coverWholeImageHint": "உங்கள் முழுப் படமும் தெரியும். படம் வெட்டப்படவோ நீட்டப்படவோ மாட்டாது.",
+    "coverPreview": "அட்டைப் பட முன்னோட்டம்"
+  }
+};

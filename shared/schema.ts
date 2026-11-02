@@ -4,6 +4,7 @@ import {FUNDING_REWARD_SCHEMA} from './funding-reward-schema.js';
 import {EPISODE_BATCH_SCHEMA} from './episode-batch-schema.js';
 import {PUBLISHER_PROFILE_SCHEMA} from './publisher-profile-schema.js';
 import {FUNDING_RISK_SCHEMA} from './funding-risk-schema.js';
+import {COVER_LAYOUT_SCHEMA} from './cover-layout-schema.js';
 
 export const DATABASE_SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -255,4 +256,5 @@ ${FUNDING_REWARD_SCHEMA}
 ${EPISODE_BATCH_SCHEMA}
 ${PUBLISHER_PROFILE_SCHEMA}
 ${FUNDING_RISK_SCHEMA}
+${COVER_LAYOUT_SCHEMA}
 `;

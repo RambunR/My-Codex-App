@@ -108,6 +108,7 @@ try{
   const series=(await request('/api/series')).data.series;assert.equal(series.length,20);
   const legacyAnimated=(await request('/api/series/tokyo-tomorrow')).data.series;
   assert.equal(legacyAnimated.format,'animation');assert.deepEqual(legacyAnimated.themes,[]);
+  assert.equal(legacyAnimated.cover_aspect_ratio,'2:3');assert.ok(series.every(item=>item.cover_aspect_ratio==='2:3'),'Existing seeded cover layouts must retain their legacy ratio.');
   assert.ok((await request('/api/series?format=animation')).data.series.some(s=>s.id==='tokyo-tomorrow'));
   assert.equal((await request('/api/series/after-midnight')).data.series.format,null);
   await request('/api/series?format=not-a-format',undefined,'',400);
@@ -206,6 +207,8 @@ try{
   const sid=(await request('/api/studio/series',body,publisher,201)).data.id;
   const privateClassification=(await request(`/api/studio/series/${sid}`,undefined,publisher)).data.series;
   assert.deepEqual(privateClassification.themes,body.themes);assert.equal(privateClassification.format,body.format);
+  assert.equal(privateClassification.cover_aspect_ratio,'9:16','New series default to a portrait layout.');
+  await request('/api/studio/series',{...body,title:'Invalid Cover Layout',cover_aspect_ratio:'2:3'},publisher,400);
   const {themes:omittedThemes,format:omittedFormat,...legacyBody}=body;
   await request(`/api/studio/series/${sid}`,legacyBody,publisher,200,'PATCH');
   assert.deepEqual((await request(`/api/studio/series/${sid}`,undefined,publisher)).data.series.themes,body.themes);
@@ -216,6 +219,7 @@ try{
   const profileSeriesPath=`/api/studio/series/${profileSeriesId}`;
   const defaultAttribution=(await request(profileSeriesPath,undefined,admin)).data.series;
   assert.equal(defaultAttribution.publisher_id,officialPublisher.id);assert.equal(defaultAttribution.creator_name,officialPublisher.display_name);assert.equal(defaultAttribution.creator_id,adminBeforeProfiles.id);
+  assert.equal(defaultAttribution.cover_aspect_ratio,'9:16');
   await request(profileSeriesPath,{...profileSeriesBody,publisher_profile_id:managedPublisher.id},admin,200,'PATCH');
   const selectedAttribution=(await request(profileSeriesPath,undefined,admin)).data.series;
   assert.equal(selectedAttribution.publisher_id,managedPublisher.id);assert.equal(selectedAttribution.publisher_profile_id,managedPublisher.id);assert.equal(selectedAttribution.creator_name,editedPublisher.display_name);assert.equal(selectedAttribution.creator_id,adminBeforeProfiles.id);
@@ -230,6 +234,23 @@ try{
   const managedPublicProfile=(await request(`/api/publishers/${managedPublisher.id}`)).data;
   assert.equal(managedPublicProfile.publisher.registered_at,editedPublisher.registered_at);assert.equal(managedPublicProfile.stats.series_count,1);assert.equal(managedPublicProfile.stats.episode_count,1);assert.equal(managedPublicProfile.stats.likes,0);assert.equal(managedPublicProfile.stats.views,0);
   assert.equal(managedPublicProfile.series[0].id,profileSeriesId);assert.equal(managedPublicProfile.pagination.total,1);
+  const layoutQuotaBefore=(await request('/api/auth/me',undefined,admin)).data.user.used_bytes;
+  for(const coverAspectRatio of ['1:1','16:9','9:16']){
+    await request(profileSeriesPath,{...profileSeriesBody,cover_aspect_ratio:coverAspectRatio},admin,200,'PATCH');
+    assert.equal((await request(profileSeriesPath,undefined,admin)).data.series.cover_aspect_ratio,coverAspectRatio);
+    assert.equal((await request(`/api/series/${profileSeriesId}`)).data.series.cover_aspect_ratio,coverAspectRatio);
+    assert.equal((await request(`/api/publishers/${managedPublisher.id}`)).data.series[0].cover_aspect_ratio,coverAspectRatio);
+    const layoutCover=await fetch(base+`/api/series/${profileSeriesId}/cover`);
+    assert.equal(layoutCover.status,200);assert.deepEqual(Buffer.from(await layoutCover.arrayBuffer()),cover,'Layout changes must not crop or rewrite the original cover.');
+  }
+  await request(profileSeriesPath,{...profileSeriesBody,cover_aspect_ratio:'16:9'},admin,200,'PATCH');
+  await request(profileSeriesPath,profileSeriesBody,admin,200,'PATCH');
+  assert.equal((await request(profileSeriesPath,undefined,admin)).data.series.cover_aspect_ratio,'16:9','An older editor omitting the field must retain the selected layout.');
+  for(const invalidCoverRatio of ['2:3','4:3',null])await request(profileSeriesPath,{...profileSeriesBody,cover_aspect_ratio:invalidCoverRatio},admin,400,'PATCH');
+  assert.equal((await request(`/api/series/${profileSeriesId}`)).data.series.cover_aspect_ratio,'16:9');
+  assert.equal((await request('/api/auth/me',undefined,admin)).data.user.used_bytes,layoutQuotaBefore);
+  const unmodifiedLayoutCover=await fetch(base+`/api/series/${profileSeriesId}/cover`);assert.deepEqual(Buffer.from(await unmodifiedLayoutCover.arrayBuffer()),cover);
+  console.log('PASS: portrait, square and landscape cover layouts persist in private/public profiles without changing original image bytes or quota.');
   assert.ok((await request('/api/series?'+new URLSearchParams({q:editedPublisher.display_name}))).data.series.some(series=>series.id===profileSeriesId));
   await request(profileSeriesPath+'/status',{status:'archived'},admin);
   const archivedPublicProfile=(await request(`/api/publishers/${managedPublisher.id}`)).data;
@@ -553,9 +574,15 @@ try{
   assert.equal((await request(`/api/studio/series/${sid}`,undefined,admin)).data.series.taken_down,false);
   const retainedClassification=(await request(`/api/studio/series/${sid}`,undefined,publisher)).data.series;
   assert.deepEqual(retainedClassification.themes,body.themes);assert.equal(retainedClassification.format,body.format);
+  assert.equal(retainedClassification.cover_aspect_ratio,'9:16');
+  assert.equal((await request('/api/series/tokyo-tomorrow')).data.series.cover_aspect_ratio,'2:3');
+  assert.equal((await request(profileSeriesPath,undefined,admin)).data.series.cover_aspect_ratio,'16:9');
+  assert.equal((await request(`/api/series/${profileSeriesId}`)).data.series.cover_aspect_ratio,'16:9');
+  const restartedLayoutCover=await fetch(base+`/api/series/${profileSeriesId}/cover`);assert.deepEqual(Buffer.from(await restartedLayoutCover.arrayBuffer()),cover);
   assert.equal(retainedClassification.publisher_id,ordinaryPublisherId);
   const restartedPublisher=(await request(`/api/publishers/${managedPublisher.id}`)).data;
   assert.equal(restartedPublisher.publisher.display_name,editedPublisher.display_name);assert.equal(restartedPublisher.publisher.registered_at,editedPublisher.registered_at);assert.equal(restartedPublisher.stats.series_count,1);assert.equal(restartedPublisher.series[0].id,profileSeriesId);
+  assert.equal(restartedPublisher.series[0].cover_aspect_ratio,'16:9');
   const restartedPublisherAdmin=(await request('/api/admin/publishers',undefined,admin)).data;
   assert.equal(restartedPublisherAdmin.default_publisher_id,officialPublisher.id);assert.equal(restartedPublisherAdmin.publishers.find(profile=>profile.id===managedPublisher.id).created_at,managedPublisher.created_at);
   const restartedOrdinaryPublisher=(await request(`/api/publishers/${ordinaryPublisherId}`)).data;

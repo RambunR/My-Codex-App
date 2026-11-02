@@ -35,13 +35,14 @@ import {registerEpisodeBatch,episodeBatchRevision,assertEpisodeBatchWritable,del
 import {WALLET_FUNDING_OPTIONS} from '../shared/funding-rewards.js';
 import {initializePublisherProfiles,registerPublisherProfiles,seriesPublisher,assignSeriesPublisher,publisherProfileIdSchema} from './publisher-profiles.js';
 import {publisherNameSql} from './publisher-profile-sql.js';
+import {coverAspectRatioSchema,seriesCoverAspectRatio,writeSeriesCoverLayout} from './cover-layout.js';
 
 const language = z.enum(LANGUAGES.map(x => x.code) as [string, ...string[]]);
 const id = (req: Request, field = 'id') => String(req.params[field] || '');
 const registration = z.object({ name: z.string().trim().min(2).max(60), email: z.email().max(254).transform(s => s.toLowerCase()), password: z.string().min(10).max(128), language: language.default('en') });
 const seriesSchema = z.object({ title: z.string().trim().min(SERIES_LIMITS.titleMin).max(SERIES_LIMITS.titleMax), description: z.string().trim().min(SERIES_LIMITS.synopsisMin).max(SERIES_LIMITS.synopsisMax), language,
   genres: z.array(z.enum(GENRES)).min(SERIES_LIMITS.genresMin).max(SERIES_LIMITS.genresMax).refine(values=>new Set(values).size===values.length,'Choose each genre only once.'), creation_type: z.enum(CREATION_TYPES).default('human'),
-  themes:themesSchema.optional(),format:formatSchema.optional(),publisher_profile_id:publisherProfileIdSchema,
+  themes:themesSchema.optional(),format:formatSchema.optional(),publisher_profile_id:publisherProfileIdSchema,cover_aspect_ratio:coverAspectRatioSchema,
   price_cents: z.number().int().min(SERIES_LIMITS.priceMin).max(SERIES_LIMITS.priceMax), free_episodes: z.number().int().min(SERIES_LIMITS.freeMin).max(SERIES_LIMITS.freeMax),
 });
 function ownSeries(req: Request, seriesId = id(req)) {
@@ -62,7 +63,7 @@ function serializeSeries(s: Record<string, any>, userId?: string, privateView=fa
   const { cover_key, cover_bytes,creator_id,...safe } = s;
   const {publisher,publisher_profile_id}=seriesPublisher(s);
   const genres=JSON.parse(s.genres);
-  return { ...safe,...(privateView?{creator_id}:{}),creator_name:publisher.display_name,publisher_id:publisher.id,publisher,publisher_profile_id,genres,...seriesClassification(s.id,genres),cover: cover_key?.startsWith('public:') ? cover_key.slice(7) : cover_key ? apiUrl(`/api/${privateView?'studio/series':'series'}/${s.id}/cover`) : '/images/placeholder.svg',
+  return { ...safe,...(privateView?{creator_id}:{}),creator_name:publisher.display_name,publisher_id:publisher.id,publisher,publisher_profile_id,genres,...seriesClassification(s.id,genres),cover_aspect_ratio:seriesCoverAspectRatio(s.id),cover: cover_key?.startsWith('public:') ? cover_key.slice(7) : cover_key ? apiUrl(`/api/${privateView?'studio/series':'series'}/${s.id}/cover`) : '/images/placeholder.svg',
     ...(privateView?{taken_down:moderationState(s.id).taken_down,moderation_reason:moderationState(s.id).reason}:{}),
     likes:Number(s.likes??one('SELECT COUNT(*) AS n FROM series_likes WHERE series_id=?',s.id)!.n),
     liked:!!(userId&&one('SELECT 1 FROM series_likes WHERE user_id=? AND series_id=?',userId,s.id)),
@@ -326,18 +327,20 @@ export function createApp() {
     transaction(()=>{run('INSERT INTO series (id,creator_id,title,description,language,genres,creation_type,price_cents,free_episodes) VALUES (?,?,?,?,?,?,?,?,?)',seriesId,req.user!.id,b.title,b.description,b.language,JSON.stringify(b.genres),b.creation_type,b.price_cents,b.free_episodes);
       writeSeriesClassification(seriesId,b.genres,b);
       assignSeriesPublisher(req.user!.id,one('SELECT * FROM series WHERE id=?',seriesId)!,b.publisher_profile_id,{creating:true});
+      writeSeriesCoverLayout(seriesId,b.cover_aspect_ratio,{creating:true});
     });
     res.status(201).json({ id:seriesId });
   });
   app.patch('/api/studio/series/:id', requirePublisher, (req,res) => {
     const b=seriesSchema.parse(req.body);
-    transaction(()=>{const before=writableSeries(req),beforeGenres=JSON.parse(before.genres),beforeClassification=seriesClassification(before.id,beforeGenres);
+    transaction(()=>{const before=writableSeries(req),beforeGenres=JSON.parse(before.genres),beforeClassification=seriesClassification(before.id,beforeGenres),beforeCoverRatio=seriesCoverAspectRatio(before.id);
       run("UPDATE series SET title=?,description=?,language=?,genres=?,creation_type=?,price_cents=?,free_episodes=?,updated_at=datetime('now') WHERE id=?",b.title,b.description,b.language,JSON.stringify(b.genres),b.creation_type,b.price_cents,b.free_episodes,id(req));
       // Preserve proven legacy format when an older editor changes only genre metadata.
       const classificationInput=b.format===undefined&&beforeClassification.format==='animation'&&!b.genres.includes('animation')?{...b,format:beforeClassification.format}:b;
       writeSeriesClassification(id(req),beforeGenres,classificationInput);
       assignSeriesPublisher(req.user!.id,before,b.publisher_profile_id);
-      if(req.user!.role==='admin')recordSeriesMetadataEdit(req.user!.id,id(req),'Administrator updated series details.',{before:{title:before.title,description:before.description,language:before.language,genres:beforeGenres,creation_type:before.creation_type,price_cents:before.price_cents,free_episodes:before.free_episodes,...beforeClassification},after:{...b,...seriesClassification(id(req),b.genres)}});
+      writeSeriesCoverLayout(id(req),b.cover_aspect_ratio);
+      if(req.user!.role==='admin')recordSeriesMetadataEdit(req.user!.id,id(req),'Administrator updated series details.',{before:{title:before.title,description:before.description,language:before.language,genres:beforeGenres,creation_type:before.creation_type,price_cents:before.price_cents,free_episodes:before.free_episodes,cover_aspect_ratio:beforeCoverRatio,...beforeClassification},after:{...b,cover_aspect_ratio:seriesCoverAspectRatio(id(req)),...seriesClassification(id(req),b.genres)}});
     });res.json({ok:true});
   });
   app.post('/api/studio/series/:id/cover', requirePublisher, (req,_res,next)=>{assert(!config.sandbox,403,'SANDBOX_UPLOAD_DISABLED','Uploads are disabled on the payment-test site. Use its sample episodes to test wallet purchases.');const s=writableSeries(req);assertPaymentAccountClear(s.creator_id);next();}, coverUpload.single('cover'), async (req,res) => {
