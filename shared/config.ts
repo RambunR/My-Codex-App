@@ -61,6 +61,8 @@ export interface Series {
   creator_name: string; creation_type: 'human' | 'ai-assisted' | 'ai-generated'; price_cents: number; free_episodes: number;
   publisher_id?:string;publisher?:PublisherProfile;publisher_profile_id?:string|null;
   cover_aspect_ratio?:CoverAspectRatio;
+  last_episode_free?:boolean;
+  free_episode_count?:number;
   access_type?:SeriesAccessType|null;
   episode_count: number; views: number; saves: number; status: string; featured: number; created_at: string; published_at?: string;
   likes: number; liked: boolean;

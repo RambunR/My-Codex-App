@@ -1,3 +1,5 @@
+import {seriesLastEpisodeFree} from './episode-access.js';
+import {episodeOrderChangesAccess} from '../shared/episode-access.js';
 import {getOwnerStorage} from './storage-quota.js';
 import crypto from 'node:crypto';
 import type {Express,Request} from 'express';
@@ -29,6 +31,7 @@ function pendingUploads(seriesId:string){return all("SELECT id,number,status,cle
  * reservations do invalidate a deletion/reorder warning. */
 export function episodeBatchRevision(seriesId:string){
   const series=one('SELECT id,title,free_episodes,status FROM series WHERE id=?',seriesId);
+  if(series)series.last_episode_free=seriesLastEpisodeFree(seriesId);
   const purchases=['purchases','test_purchases'].map(table=>one(`SELECT COUNT(*) AS n,COALESCE(MAX(p.rowid),0) AS latest FROM ${table} p JOIN episodes e ON e.id=p.episode_id WHERE e.series_id=?`,seriesId));
   return hash(JSON.stringify({series,episodes:seriesEpisodes(seriesId),purchases,pending:pendingUploads(seriesId)}));
 }
@@ -128,7 +131,7 @@ export function registerEpisodeBatch(app:Express){
       if(input.action==='rename')for(const episode of state.selected)run('UPDATE episodes SET title=? WHERE id=?',batchEpisodeTitle(input.base_name,Number(episode.number)),episode.id);
       else{
         assert(input.episode_ids.length===state.episodes.length,400,'INVALID_EPISODE_SELECTION','Include every episode exactly once when changing order.');
-        const changedAccess=state.selected.some((episode,index)=>(Number(episode.number)<=state.series.free_episodes)!==(index+1<=state.series.free_episodes));
+        const changedAccess=episodeOrderChangesAccess(state.episodes.map(episode=>({id:String(episode.id),number:Number(episode.number)})),input.episode_ids,Number(state.series.free_episodes),seriesLastEpisodeFree(state.series.id));
         assert(!changedAccess||input.acknowledge_access_change===true,409,'EPISODE_ACCESS_CONFIRM_REQUIRED','Confirm that changing this order also changes which episodes are free.');
         const temporary=Math.max(1000,...state.episodes.map(episode=>Number(episode.number)))+1;
         state.selected.forEach((episode,index)=>run('UPDATE episodes SET number=? WHERE id=?',temporary+index,episode.id));

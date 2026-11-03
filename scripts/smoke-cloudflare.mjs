@@ -318,6 +318,37 @@ try{
   await request(`/api/episodes/${second.id}/stream`,undefined,'',403);
   console.log('PASS: R2 covers and videos, quota accounting, publication, byte ranges, 241-second and over-200 MiB rejection.');
 
+  // A separate local series verifies optional finale pricing without changing
+  // the paid episodes, sales totals or engagement assertions below.
+  const finaleDetails={...profileSeriesBody,title:'Optional Free Finale Runtime',free_episodes:0,last_episode_free:true};
+  const finaleId=(await request('/api/studio/series',finaleDetails,admin,201)).data.id,finalePath=`/api/studio/series/${finaleId}`;
+  await upload(finalePath+'/cover',cover,'finale-cover.jpg',admin,{},'cover',200);
+  const finaleEpisodes=[];
+  for(const number of [1,3,9])finaleEpisodes.push(await upload(finalePath+'/episodes',video,`Finale ${number}.mp4`,admin,{title:`Finale chapter ${number}`,number}));
+  await request(finalePath+'/status',{status:'published'},admin);
+  const readFinale=async()=>(await request(`/api/series/${finaleId}`)).data;
+  const finalePublic=await readFinale();assert.equal(finalePublic.series.last_episode_free,true);assert.equal(finalePublic.series.free_episode_count,1);assert.equal(finalePublic.series.access_type,'free-then-paid');
+  assert.deepEqual(finalePublic.episodes.map(episode=>episode.free),[false,false,true]);assert.equal(finalePublic.episodes.at(-1).unlocked,true);
+  assert.equal((await request(`/api/studio/series/${sid}`,undefined,publisher)).data.series.last_episode_free,false,'Existing series remain opted out.');
+  await request(`/api/episodes/${finaleEpisodes[1].id}/stream`,undefined,'',403);
+  const finaleRange=await fetch(base+`/api/episodes/${finaleEpisodes[2].id}/stream`,{headers:{Range:'bytes=0-31'}});assert.equal(finaleRange.status,206);assert.equal((await finaleRange.arrayBuffer()).byteLength,32);
+  const finalePlayback=(await request(`/api/episodes/${finaleEpisodes[2].id}/playback`,{})).data;assert.ok(finalePlayback.sessionId);
+  const finaleWalletBefore=(await request('/api/wallet',undefined,viewer)).data;
+  const finaleUnlock=(await request(`/api/episodes/${finaleEpisodes[2].id}/unlock`,{},viewer)).data;assert.equal(finaleUnlock.alreadyUnlocked,true);
+  assert.deepEqual((await request('/api/wallet',undefined,viewer)).data,finaleWalletBefore,'A free finale must not debit a wallet or create ledger entries.');
+  await request(finalePath,{...finaleDetails,last_episode_free:false},admin,200,'PATCH');assert.equal((await readFinale()).series.access_type,'all-paid');
+  await request(`/api/episodes/${finaleEpisodes[2].id}/stream`,undefined,'',403);
+  await request(finalePath,finaleDetails,admin,200,'PATCH');
+  const{last_episode_free:omittedFinale,...olderFinaleDetails}=finaleDetails;await request(finalePath,olderFinaleDetails,admin,200,'PATCH');assert.equal((await readFinale()).series.last_episode_free,true);
+  const finaleRevision=(await request(finalePath,undefined,admin)).data.episodes_revision,finaleOrder=finaleEpisodes.map(episode=>episode.id).reverse();
+  await request(finalePath+'/episodes/batch',{action:'reorder',revision:finaleRevision,episode_ids:finaleOrder},admin,409);
+  await request(finalePath+'/episodes/batch',{action:'reorder',revision:finaleRevision,episode_ids:finaleOrder,acknowledge_access_change:true},admin);
+  assert.equal((await readFinale()).episodes.find(episode=>episode.free).id,finaleEpisodes[0].id);
+  const finaleNewRevision=(await request(finalePath,undefined,admin)).data.episodes_revision;
+  await request(finalePath+'/episodes/batch',{action:'reorder',revision:finaleNewRevision,episode_ids:finaleEpisodes.map(episode=>episode.id),acknowledge_access_change:true},admin);
+  assert.equal((await readFinale()).episodes.find(episode=>episode.free).id,finaleEpisodes[2].id);
+  console.log('PASS: optional final-episode pricing handles sparse order, guest playback, no-charge unlocks, opt-out/default/omitted metadata and acknowledged reorders.');
+
   const liked=(await request(`/api/series/${sid}/like`,{liked:true},viewer,200,'PUT')).data;assert.equal(liked.likes,1);
   const duplicateLike=(await request(`/api/series/${sid}/like`,{liked:true},viewer,200,'PUT')).data;assert.equal(duplicateLike.likes,1);
   const publicSeries=(await request(`/api/series/${sid}`,undefined,viewer)).data;
@@ -602,6 +633,7 @@ try{
 
   await stop();await start(true);
   const production=(await request('/api/config')).data;assert.equal(production.paymentsMode,'disabled');assert.equal(production.runtime,'cloudflare');assert.equal(production.auth.google,false);
+  const retainedFinale=await readFinale();assert.equal(retainedFinale.series.last_episode_free,true);assert.equal(retainedFinale.series.free_episode_count,1);assert.equal(retainedFinale.episodes.find(episode=>episode.free).id,finaleEpisodes[2].id);
   const retainedLikes=(await request(`/api/series/${sid}`,undefined,viewer)).data;assert.equal(retainedLikes.series.likes,1);assert.equal(retainedLikes.series.liked,true);
   const retainedNewest=(await request(newestPath)).data.series;assert.equal(retainedNewest[0].id,sid);assert.equal(retainedNewest[0].published_at,publishedAt);
   const resumedGuest=(await request(`/api/episodes/${first.id}/playback`,{},guestPlayback.cookie)).data;assert.equal(resumedGuest.sessionId,guestPlayback.data.sessionId);assert.equal(resumedGuest.viewCounted,true);

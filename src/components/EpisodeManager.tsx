@@ -6,9 +6,10 @@ import {useI18n} from '../i18n';
 import {Button,Loading,Modal} from '../ui';
 import {bytes,usd,type Episode,type StorageUsage} from '../../shared/config';
 import {batchEpisodeTitle,MAX_EPISODE_BATCH_BASE_NAME} from '../../shared/episode-batch';
+import {isEpisodeFree} from '../../shared/episode-access';
 import '../episode-manager.css';
 
-interface ManagedSeries {id:string;title:string;status:string;free_episodes:number;price_cents:number}
+interface ManagedSeries {id:string;title:string;status:string;free_episodes:number;price_cents:number;last_episode_free?:boolean}
 export interface EpisodeMutationResult {ok:boolean;episodes:Episode[];episodes_revision:string;cleanup_pending?:boolean;owner_storage?:StorageUsage}
 interface DeletePreview {
   series:{id:string;title:string};
@@ -32,7 +33,9 @@ export function EpisodeManager({series,episodes,revision,disabled=false,canPrevi
   const byId=new Map(episodes.map(episode=>[episode.id,episode])),shown=orderedIds.map(id=>byId.get(id)!).filter(Boolean),selectedEpisodes=episodes.filter(episode=>selected.includes(episode.id));
   const available=typeof revision==='string'&&/^[a-f0-9]{64}$/.test(revision);
   const blocked=disabled||busy||loading||!available;
-  const affected=dirty?shown.filter((episode,index)=>(episode.number<=series.free_episodes)!==(index+1<=series.free_episodes)).length:0;
+  const lastNumber=Math.max(0,...episodes.map(episode=>episode.number));
+  const free=(episodeNumber:number,last:number)=>isEpisodeFree(episodeNumber,series.free_episodes,!!series.last_episode_free,last);
+  const affected=dirty?shown.filter((episode,index)=>free(episode.number,lastNumber)!==free(index+1,shown.length)).length:0;
   const number=(value:number)=>new Intl.NumberFormat(locale).format(value);
   const validName=name.trim().length>0&&name.trim().length<=MAX_EPISODE_BATCH_BASE_NAME;
   const showError=(error:unknown)=>{
@@ -108,11 +111,11 @@ export function EpisodeManager({series,episodes,revision,disabled=false,canPrevi
     {dirty&&<div className="episode-order-actions" role="status"><p>{t('episodeOrderTitleHint')}</p><div><button className="button secondary small" type="button" disabled={blocked||!!dialog} onClick={()=>open('order')}><Check size={15}/>{t('episodeSaveOrder')}</button><button className="button ghost small" type="button" disabled={blocked||!!dialog} onClick={()=>{setOrder(null);setFailure('');}}>{t('episodeCancelOrder')}</button></div></div>}
     {!dialog&&failure&&<p className="form-error" role="alert">{failure}</p>}
     <div className="episode-editor-list">{shown.map((episode,index)=>{
-      const displayedNumber=dirty?index+1:episode.number,change=(episode.number<=series.free_episodes)!==(displayedNumber<=series.free_episodes),rowBlocked=blocked||!!dialog,actionBlocked=disabled||busy||loading||!!dialog||dirty;
+      const displayedNumber=dirty?index+1:episode.number,displayedFree=free(displayedNumber,dirty?shown.length:lastNumber),change=free(episode.number,lastNumber)!==displayedFree,rowBlocked=blocked||!!dialog,actionBlocked=disabled||busy||loading||!!dialog||dirty;
       return <div className={`episode-editor-row ${dragging===episode.id?'episode-dragging':''} ${change?'episode-access-changing':''}`} key={episode.id} data-episode-id={episode.id} onDragOver={event=>{if(dragId.current){event.preventDefault();event.dataTransfer.dropEffect='move';}}} onDrop={event=>drop(event,episode.id)}>
         <label className="episode-select"><input type="checkbox" aria-label={t('episodeSelect').replace('{number}',String(episode.number))} checked={selected.includes(episode.id)} disabled={actionBlocked} onChange={event=>setSelected(previous=>event.target.checked?[...previous,episode.id]:previous.filter(id=>id!==episode.id))}/></label>
         <button type="button" className="icon-button episode-drag-handle" aria-label={t('episodeDrag').replace('{number}',String(episode.number))} title={t('episodeDrag').replace('{number}',String(episode.number))} draggable={!rowBlocked} disabled={rowBlocked} onDragStart={event=>{dragId.current=episode.id;setDragging(episode.id);event.dataTransfer.effectAllowed='move';event.dataTransfer.setData('text/plain',episode.id);}} onDragEnd={pointerEnd} onPointerDown={event=>pointerStart(event,episode.id)} onPointerMove={pointerMove} onPointerUp={pointerEnd} onPointerCancel={pointerEnd} onKeyDown={event=>{if(event.altKey&&(event.key==='ArrowUp'||event.key==='ArrowDown')){event.preventDefault();move(episode.id,index+(event.key==='ArrowUp'?-1:1));}}}><GripVertical size={16}/></button>
-        <span className="episode-number">{String(displayedNumber).padStart(2,'0')}</span><div className="episode-editor-copy"><strong>{episode.title}</strong><small>{Math.round(episode.duration)}s · {bytes(episode.bytes)} · {displayedNumber<=series.free_episodes?t('free'):usd(series.price_cents*10000)}</small></div>
+        <span className="episode-number">{String(displayedNumber).padStart(2,'0')}</span><div className="episode-editor-copy"><strong>{episode.title}</strong><small>{Math.round(episode.duration)}s · {bytes(episode.bytes)} · {displayedFree?t('free'):usd(series.price_cents*10000)}</small></div>
         <div className="episode-row-actions"><button type="button" className="icon-button episode-move-up" disabled={rowBlocked||index===0} aria-label={t('episodeMoveUp').replace('{number}',String(episode.number))} onClick={()=>move(episode.id,index-1)}><ArrowUp size={15}/></button><button type="button" className="icon-button episode-move-down" disabled={rowBlocked||index===shown.length-1} aria-label={t('episodeMoveDown').replace('{number}',String(episode.number))} onClick={()=>move(episode.id,index+1)}><ArrowDown size={15}/></button>{canPreview&&<button type="button" className="icon-button" disabled={actionBlocked} aria-label={`${t('contentPreview')}: ${episode.title}`} onClick={()=>onPreview(episode)}><Play size={16}/></button>}<button type="button" className="icon-button" disabled={actionBlocked} aria-label={`${t('edit')} ${episode.title}`} onClick={()=>onEdit(episode)}><Pencil size={16}/></button><button type="button" className="icon-button danger-text" disabled={actionBlocked} aria-label={`${t('remove')} ${episode.title}`} onClick={()=>onRemove(episode)}><Trash2 size={16}/></button></div>
       </div>;
     })}</div>

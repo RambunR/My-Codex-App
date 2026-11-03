@@ -1,3 +1,4 @@
+import {episodeFreeSql,lastEpisodeFreeSchema,seriesLastEpisodeFree,writeSeriesLastEpisodeFree,seriesFreeEpisodeCount} from './episode-access.js';
 import {getOwnerStorage,withinStorageQuota} from './storage-quota.js';
 import { upload, coverUpload } from './uploads.js';
 import express, { type Request, type Response, type NextFunction } from 'express';
@@ -47,7 +48,7 @@ const registration = z.object({ name: z.string().trim().min(2).max(60), email: z
 const seriesSchema = z.object({ title: z.string().trim().min(SERIES_LIMITS.titleMin).max(SERIES_LIMITS.titleMax), description: z.string().trim().min(SERIES_LIMITS.synopsisMin).max(SERIES_LIMITS.synopsisMax), language,
   genres: z.array(z.enum(GENRES)).min(SERIES_LIMITS.genresMin).max(SERIES_LIMITS.genresMax).refine(values=>new Set(values).size===values.length,'Choose each genre only once.'), creation_type: z.enum(CREATION_TYPES).default('human'),
   themes:themesSchema.optional(),format:formatSchema.optional(),publisher_profile_id:publisherProfileIdSchema,cover_aspect_ratio:coverAspectRatioSchema,subtitle_languages:subtitleLanguagesSchema,
-  price_cents: z.number().int().min(SERIES_LIMITS.priceMin).max(SERIES_LIMITS.priceMax), free_episodes: z.number().int().min(SERIES_LIMITS.freeMin).max(SERIES_LIMITS.freeMax),
+  price_cents: z.number().int().min(SERIES_LIMITS.priceMin).max(SERIES_LIMITS.priceMax), free_episodes: z.number().int().min(SERIES_LIMITS.freeMin).max(SERIES_LIMITS.freeMax),last_episode_free:lastEpisodeFreeSchema,
 });
 function ownSeries(req: Request, seriesId = id(req)) {
   const s = one('SELECT * FROM series WHERE id=?', seriesId);
@@ -68,14 +69,14 @@ function serializeSeries(s: Record<string, any>, userId?: string, privateView=fa
   const { cover_key, cover_bytes,creator_id,...safe } = s;
   const {publisher,publisher_profile_id}=seriesPublisher(s);
   const genres=JSON.parse(s.genres);
-  return { ...safe,...(privateView?{creator_id}:{}),creator_name:publisher.display_name,publisher_id:publisher.id,publisher,publisher_profile_id,access_type:s.access_type===undefined?readSeriesAccessType(s.id):s.access_type,genres,...seriesClassification(s.id,genres),cover_aspect_ratio:seriesCoverAspectRatio(s.id),subtitle_languages:seriesSubtitleLanguages(s.id),cover: cover_key?.startsWith('public:') ? cover_key.slice(7) : cover_key ? apiUrl(`/api/${privateView?'studio/series':'series'}/${s.id}/cover`) : '/images/placeholder.svg',
+  return { ...safe,...(privateView?{creator_id}:{}),creator_name:publisher.display_name,publisher_id:publisher.id,publisher,publisher_profile_id,access_type:s.access_type===undefined?readSeriesAccessType(s.id):s.access_type,genres,...seriesClassification(s.id,genres),cover_aspect_ratio:seriesCoverAspectRatio(s.id),last_episode_free:seriesLastEpisodeFree(s.id),free_episode_count:seriesFreeEpisodeCount(s.id),subtitle_languages:seriesSubtitleLanguages(s.id),cover: cover_key?.startsWith('public:') ? cover_key.slice(7) : cover_key ? apiUrl(`/api/${privateView?'studio/series':'series'}/${s.id}/cover`) : '/images/placeholder.svg',
     ...(privateView?{taken_down:moderationState(s.id).taken_down,moderation_reason:moderationState(s.id).reason}:{}),
     likes:Number(s.likes??one('SELECT COUNT(*) AS n FROM series_likes WHERE series_id=?',s.id)!.n),
     liked:!!(userId&&one('SELECT 1 FROM series_likes WHERE user_id=? AND series_id=?',userId,s.id)),
     saved: !!(userId && one('SELECT 1 FROM saves WHERE user_id=? AND series_id=?', userId, s.id)) };
 }
-function canWatch(userId: string | undefined, e: any) { return e.number <= e.free_episodes || e.creator_id === userId || !!(userId && hasEpisodePurchase(userId,e.id)); }
-function episodeRow(episodeId: string) { return one(`SELECT e.*,${episodeDurationSql('e')} AS duration,s.free_episodes,s.creator_id,s.status FROM episodes e JOIN series s ON s.id=e.series_id WHERE e.id=?`, episodeId); }
+function canWatch(userId: string | undefined, e: any) { return !!e.free || e.creator_id === userId || !!(userId && hasEpisodePurchase(userId,e.id)); }
+function episodeRow(episodeId: string) { return one(`SELECT e.*,${episodeDurationSql('e')} AS duration,${episodeFreeSql()} AS free,s.free_episodes,s.creator_id,s.status FROM episodes e JOIN series s ON s.id=e.series_id WHERE e.id=?`, episodeId); }
 function playbackViewer(req:Request,res:Response,create=false):string|undefined {
   if(req.user)return crypto.createHash('sha256').update('user:'+req.user.id).digest('hex');
   let token=(req.headers.cookie||'').split(';').map(value=>value.trim()).find(value=>value.startsWith('drama_viewer='))?.slice('drama_viewer='.length);
@@ -209,7 +210,7 @@ export function createApp() {
   app.get('/api/series/:id', (req,res) => {
     assertSeriesAvailable(id(req),{viewerId:req.user?.id,allowOwnerPreview:true});
     const s = one(`${catalogSelect} WHERE s.id=?`,id(req))!;
-    const episodes = all(`SELECT e.id,e.series_id,e.title,e.number,${episodeDurationSql('e')} AS duration,e.bytes,(SELECT COUNT(*) FROM playback_sessions p WHERE p.episode_id=e.id AND p.counted_view=1) AS views FROM episodes e WHERE e.series_id=? ORDER BY e.number`,id(req)).map(e => ({...e,free:e.number <= s.free_episodes,unlocked:canWatch(req.user?.id,{...e,...{free_episodes:s.free_episodes,creator_id:s.creator_id}})}));
+    const episodes = all(`SELECT e.id,e.series_id,e.title,e.number,${episodeDurationSql('e')} AS duration,e.bytes,(SELECT COUNT(*) FROM playback_sessions p WHERE p.episode_id=e.id AND p.counted_view=1) AS views,${episodeFreeSql()} AS free FROM episodes e JOIN series s ON s.id=e.series_id WHERE e.series_id=? ORDER BY e.number`,id(req)).map(e => ({...e,free:!!e.free,unlocked:canWatch(req.user?.id,{...e,creator_id:s.creator_id})}));
     res.json({ series: serializeSeries(s,req.user?.id), episodes });
   });
   app.get('/api/series/:id/cover', async (req,res) => {
@@ -335,12 +336,13 @@ export function createApp() {
       assignSeriesPublisher(req.user!.id,one('SELECT * FROM series WHERE id=?',seriesId)!,b.publisher_profile_id,{creating:true});
       writeSeriesCoverLayout(seriesId,b.cover_aspect_ratio,{creating:true});
       writeSeriesSubtitleLanguages(seriesId,b.subtitle_languages);
+      writeSeriesLastEpisodeFree(seriesId,b.last_episode_free);
     });
     res.status(201).json({ id:seriesId });
   });
   app.patch('/api/studio/series/:id', requirePublisher, (req,res) => {
     const b=seriesSchema.parse(req.body);
-    transaction(()=>{const before=writableSeries(req),beforeGenres=JSON.parse(before.genres),beforeClassification=seriesClassification(before.id,beforeGenres),beforeCoverRatio=seriesCoverAspectRatio(before.id),beforeSubtitles=seriesSubtitleLanguages(before.id);
+    transaction(()=>{const before=writableSeries(req),beforeGenres=JSON.parse(before.genres),beforeClassification=seriesClassification(before.id,beforeGenres),beforeCoverRatio=seriesCoverAspectRatio(before.id),beforeSubtitles=seriesSubtitleLanguages(before.id),beforeLastEpisodeFree=seriesLastEpisodeFree(before.id);
       run("UPDATE series SET title=?,description=?,language=?,genres=?,creation_type=?,price_cents=?,free_episodes=?,updated_at=datetime('now') WHERE id=?",b.title,b.description,b.language,JSON.stringify(b.genres),b.creation_type,b.price_cents,b.free_episodes,id(req));
       // Preserve proven legacy format when an older editor changes only genre metadata.
       const classificationInput=b.format===undefined&&beforeClassification.format==='animation'&&!b.genres.includes('animation')?{...b,format:beforeClassification.format}:b;
@@ -348,7 +350,8 @@ export function createApp() {
       assignSeriesPublisher(req.user!.id,before,b.publisher_profile_id);
       writeSeriesCoverLayout(id(req),b.cover_aspect_ratio);
       writeSeriesSubtitleLanguages(id(req),b.subtitle_languages);
-      if(req.user!.role==='admin')recordSeriesMetadataEdit(req.user!.id,id(req),'Administrator updated series details.',{before:{title:before.title,description:before.description,language:before.language,genres:beforeGenres,creation_type:before.creation_type,price_cents:before.price_cents,free_episodes:before.free_episodes,cover_aspect_ratio:beforeCoverRatio,subtitle_languages:beforeSubtitles,...beforeClassification},after:{...b,cover_aspect_ratio:seriesCoverAspectRatio(id(req)),subtitle_languages:seriesSubtitleLanguages(id(req)),...seriesClassification(id(req),b.genres)}});
+      writeSeriesLastEpisodeFree(id(req),b.last_episode_free);
+      if(req.user!.role==='admin')recordSeriesMetadataEdit(req.user!.id,id(req),'Administrator updated series details.',{before:{title:before.title,description:before.description,language:before.language,genres:beforeGenres,creation_type:before.creation_type,price_cents:before.price_cents,free_episodes:before.free_episodes,cover_aspect_ratio:beforeCoverRatio,subtitle_languages:beforeSubtitles,last_episode_free:beforeLastEpisodeFree,...beforeClassification},after:{...b,cover_aspect_ratio:seriesCoverAspectRatio(id(req)),subtitle_languages:seriesSubtitleLanguages(id(req)),last_episode_free:seriesLastEpisodeFree(id(req)),...seriesClassification(id(req),b.genres)}});
     });res.json({ok:true});
   });
   app.post('/api/studio/series/:id/cover', requirePublisher, (req,_res,next)=>{assert(!config.sandbox,403,'SANDBOX_UPLOAD_DISABLED','Uploads are disabled on the payment-test site. Use its sample episodes to test wallet purchases.');const s=writableSeries(req);assertPaymentAccountClear(s.creator_id);next();}, coverUpload.single('cover'), async (req,res) => {

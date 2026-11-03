@@ -79,6 +79,8 @@ Existing databases retain the original 180-second episode and 180,000-ms playbac
 
 ## Creator series visibility and permanent deletion
 
+The optional `last_episode_free` pricing flag defaults off. It adds the highest-numbered persisted episode to the first-N free allowance, including numbering gaps. Keep the additive settings table and omitted-field PATCH compatibility. Public episode labels, stream/playback/progress authorization, no-charge unlocks, catalogue access classification, editor badges and reorder access warnings must use the same rule. Preserve existing purchases and financial partitions; never automatically enable the option based on duration or refund historical unlocks. Changing the last episode by upload, deletion or ordering changes which video receives the benefit.
+
 Episode batch changes use revision checks and audited owner/admin mutations. Preserve actor/selection-bound deletion confirmations, both-mode purchase protection, financial/moderation/pending-upload guards, atomic numbering and explicit free-boundary acknowledgement. Batch rename appends the current persisted number padded to three digits; reorder preserves IDs, purchases and titles. Both legacy individual and batch removal must defer quota release until media removal is acknowledged. See [episode batch tools](docs/EPISODE_BATCH_TOOLS.md).
 
 Creators can archive a published series to hide it and republish it while retaining its first-publication date, analytics and paid entitlements. Hidden content must be unavailable through public routes even to its owner or paid viewers; owner-only Studio preview is separate and does not count views. Administrative takedowns continue to prevent creator bypasses.

@@ -1,3 +1,4 @@
+import {episodeFreeSql} from './episode-access.js';
 import crypto from 'node:crypto';
 import Stripe from 'stripe';
 import { config } from './config.js';
@@ -71,10 +72,10 @@ export function settlePayment(paymentId: string, expected?: { amount: number; cu
 export function unlockEpisode(userId: string, episodeId: string) {
   assertPaymentAccountClear(userId);
   return transaction(() => {
-    const episode = one(`SELECT e.*,s.creator_id,s.title AS series_title,s.free_episodes,s.price_cents,s.status FROM episodes e JOIN series s ON s.id=e.series_id WHERE e.id=?`, episodeId);
+    const episode = one(`SELECT e.*,${episodeFreeSql()} AS free,s.creator_id,s.title AS series_title,s.free_episodes,s.price_cents,s.status FROM episodes e JOIN series s ON s.id=e.series_id WHERE e.id=?`, episodeId);
     assert(episode && episode.status === 'published', 404, 'NOT_FOUND', 'Episode not found.');
     assertSeriesAvailable(episode.series_id);
-    if (episode.number <= episode.free_episodes || episode.creator_id === userId) return { alreadyUnlocked: true };
+    if (episode.free || episode.creator_id === userId) return { alreadyUnlocked: true };
     if (hasEpisodePurchase(userId,episodeId)) return { alreadyUnlocked: true };
     const user = financeAccount(userId);
     const price = episode.price_cents * 10000;
