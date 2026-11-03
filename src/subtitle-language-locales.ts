@@ -6,6 +6,7 @@ export const subtitleLanguageEnglish={
   "subtitleLanguagesChoose": "Choose subtitle languages",
   "subtitleLanguagesSelected": "{count} selected",
   "subtitleLanguagesNone": "No subtitle languages selected",
+  "subtitleLanguagesUnspecified": "Not specified",
   "subtitleLanguagesClear": "Clear subtitle languages",
   "subtitleDeclaredHint": "Languages declared by the publisher. Subtitles may be part of the video; playback controls depend on the uploaded video."
 } as const;
@@ -19,6 +20,7 @@ export const subtitleLanguageMessages:Record<Locale,SubtitleLanguageCopy>={
     "subtitleLanguagesChoose": "Choose subtitle languages",
     "subtitleLanguagesSelected": "{count} selected",
     "subtitleLanguagesNone": "No subtitle languages selected",
+    "subtitleLanguagesUnspecified": "Not specified",
     "subtitleLanguagesClear": "Clear subtitle languages",
     "subtitleDeclaredHint": "Languages declared by the publisher. Subtitles may be part of the video; playback controls depend on the uploaded video."
   },
@@ -28,6 +30,7 @@ export const subtitleLanguageMessages:Record<Locale,SubtitleLanguageCopy>={
     "subtitleLanguagesChoose": "選擇字幕語言",
     "subtitleLanguagesSelected": "已選取 {count} 種",
     "subtitleLanguagesNone": "未選取字幕語言",
+    "subtitleLanguagesUnspecified": "未註明",
     "subtitleLanguagesClear": "清除字幕語言",
     "subtitleDeclaredHint": "此語言資訊由發布者提供。字幕可能已包含在影片中，播放控制選項取決於上傳的影片。"
   },
@@ -37,6 +40,7 @@ export const subtitleLanguageMessages:Record<Locale,SubtitleLanguageCopy>={
     "subtitleLanguagesChoose": "选择字幕语言",
     "subtitleLanguagesSelected": "已选择 {count} 种",
     "subtitleLanguagesNone": "未选择字幕语言",
+    "subtitleLanguagesUnspecified": "未注明",
     "subtitleLanguagesClear": "清除字幕语言",
     "subtitleDeclaredHint": "此语言信息由发布者提供。字幕可能已包含在视频中，播放控制选项取决于上传的视频。"
   },
@@ -46,6 +50,7 @@ export const subtitleLanguageMessages:Record<Locale,SubtitleLanguageCopy>={
     "subtitleLanguagesChoose": "字幕の言語を選択",
     "subtitleLanguagesSelected": "{count} 言語を選択中",
     "subtitleLanguagesNone": "字幕の言語は未選択です",
+    "subtitleLanguagesUnspecified": "未指定",
     "subtitleLanguagesClear": "字幕の言語選択を解除",
     "subtitleDeclaredHint": "配信者が申告した言語です。字幕は動画に含まれている場合があり、再生時の操作はアップロードされた動画によって異なります。"
   },
@@ -55,6 +60,7 @@ export const subtitleLanguageMessages:Record<Locale,SubtitleLanguageCopy>={
     "subtitleLanguagesChoose": "자막 언어 선택",
     "subtitleLanguagesSelected": "{count}개 선택됨",
     "subtitleLanguagesNone": "선택한 자막 언어가 없습니다",
+    "subtitleLanguagesUnspecified": "명시되지 않음",
     "subtitleLanguagesClear": "자막 언어 선택 해제",
     "subtitleDeclaredHint": "게시자가 등록한 언어 정보입니다. 자막은 영상에 포함되어 있을 수 있으며 재생 제어 기능은 업로드한 영상에 따라 달라집니다."
   },
@@ -64,6 +70,7 @@ export const subtitleLanguageMessages:Record<Locale,SubtitleLanguageCopy>={
     "subtitleLanguagesChoose": "सबटाइटल की भाषाएँ चुनें",
     "subtitleLanguagesSelected": "{count} चुनी गईं",
     "subtitleLanguagesNone": "सबटाइटल की कोई भाषा नहीं चुनी गई",
+    "subtitleLanguagesUnspecified": "निर्दिष्ट नहीं",
     "subtitleLanguagesClear": "सबटाइटल की भाषाओं का चयन हटाएँ",
     "subtitleDeclaredHint": "भाषाओं की जानकारी प्रकाशक ने दी है। सबटाइटल वीडियो का हिस्सा हो सकते हैं; प्लेबैक नियंत्रण अपलोड किए गए वीडियो पर निर्भर करते हैं।"
   },
@@ -73,6 +80,7 @@ export const subtitleLanguageMessages:Record<Locale,SubtitleLanguageCopy>={
     "subtitleLanguagesChoose": "Pilih bahasa subtitle",
     "subtitleLanguagesSelected": "{count} dipilih",
     "subtitleLanguagesNone": "Belum ada bahasa subtitle yang dipilih",
+    "subtitleLanguagesUnspecified": "Tidak ditentukan",
     "subtitleLanguagesClear": "Hapus pilihan bahasa subtitle",
     "subtitleDeclaredHint": "Bahasa yang dinyatakan penerbit. Subtitle mungkin menjadi bagian dari video; kontrol pemutaran bergantung pada video yang diunggah."
   },
@@ -82,6 +90,7 @@ export const subtitleLanguageMessages:Record<Locale,SubtitleLanguageCopy>={
     "subtitleLanguagesChoose": "Escolher idiomas das legendas",
     "subtitleLanguagesSelected": "{count} selecionados",
     "subtitleLanguagesNone": "Nenhum idioma de legenda selecionado",
+    "subtitleLanguagesUnspecified": "Não especificado",
     "subtitleLanguagesClear": "Limpar idiomas das legendas",
     "subtitleDeclaredHint": "Idiomas informados pelo publicador. As legendas podem fazer parte do vídeo; os controles de reprodução dependem do vídeo enviado."
   },
@@ -91,6 +100,7 @@ export const subtitleLanguageMessages:Record<Locale,SubtitleLanguageCopy>={
     "subtitleLanguagesChoose": "Elegir idiomas de subtítulos",
     "subtitleLanguagesSelected": "{count} seleccionados",
     "subtitleLanguagesNone": "No se han seleccionado idiomas de subtítulos",
+    "subtitleLanguagesUnspecified": "Sin especificar",
     "subtitleLanguagesClear": "Borrar selección de idiomas de subtítulos",
     "subtitleDeclaredHint": "Idiomas declarados por el editor. Los subtítulos pueden formar parte del vídeo; los controles de reproducción dependen del vídeo subido."
   },
@@ -100,6 +110,7 @@ export const subtitleLanguageMessages:Record<Locale,SubtitleLanguageCopy>={
     "subtitleLanguagesChoose": "اختيار لغات الترجمة النصية",
     "subtitleLanguagesSelected": "تم تحديد {count}",
     "subtitleLanguagesNone": "لم تُحدّد لغات للترجمة النصية",
+    "subtitleLanguagesUnspecified": "غير محدد",
     "subtitleLanguagesClear": "مسح لغات الترجمة النصية",
     "subtitleDeclaredHint": "اللغات بحسب تصريح الناشر. قد تكون الترجمة جزءًا من الفيديو؛ وتعتمد عناصر التحكم في التشغيل على الفيديو المرفوع."
   },
@@ -109,6 +120,7 @@ export const subtitleLanguageMessages:Record<Locale,SubtitleLanguageCopy>={
     "subtitleLanguagesChoose": "সাবটাইটেলের ভাষা বেছে নিন",
     "subtitleLanguagesSelected": "{count}টি নির্বাচিত",
     "subtitleLanguagesNone": "সাবটাইটেলের কোনো ভাষা নির্বাচিত হয়নি",
+    "subtitleLanguagesUnspecified": "উল্লেখ করা হয়নি",
     "subtitleLanguagesClear": "সাবটাইটেলের ভাষার নির্বাচন মুছুন",
     "subtitleDeclaredHint": "প্রকাশকের দেওয়া ভাষার তথ্য। সাবটাইটেল ভিডিওর অংশ হতে পারে; প্লেব্যাকের নিয়ন্ত্রণ আপলোড করা ভিডিওর ওপর নির্ভর করে।"
   },
@@ -118,6 +130,7 @@ export const subtitleLanguageMessages:Record<Locale,SubtitleLanguageCopy>={
     "subtitleLanguagesChoose": "سب ٹائٹلز کی زبانیں منتخب کریں",
     "subtitleLanguagesSelected": "{count} منتخب",
     "subtitleLanguagesNone": "سب ٹائٹلز کی کوئی زبان منتخب نہیں",
+    "subtitleLanguagesUnspecified": "متعین نہیں",
     "subtitleLanguagesClear": "سب ٹائٹلز کی زبانوں کا انتخاب ختم کریں",
     "subtitleDeclaredHint": "زبانوں کی معلومات ناشر نے دی ہیں۔ سب ٹائٹلز ویڈیو کا حصہ ہو سکتے ہیں؛ پلے بیک کے کنٹرول اپ لوڈ کردہ ویڈیو پر منحصر ہیں۔"
   },
@@ -127,6 +140,7 @@ export const subtitleLanguageMessages:Record<Locale,SubtitleLanguageCopy>={
     "subtitleLanguagesChoose": "Chọn ngôn ngữ phụ đề",
     "subtitleLanguagesSelected": "Đã chọn {count}",
     "subtitleLanguagesNone": "Chưa chọn ngôn ngữ phụ đề",
+    "subtitleLanguagesUnspecified": "Chưa xác định",
     "subtitleLanguagesClear": "Xóa lựa chọn ngôn ngữ phụ đề",
     "subtitleDeclaredHint": "Ngôn ngữ do nhà phát hành khai báo. Phụ đề có thể là một phần của video; các điều khiển phát phụ thuộc vào video được tải lên."
   },
@@ -136,6 +150,7 @@ export const subtitleLanguageMessages:Record<Locale,SubtitleLanguageCopy>={
     "subtitleLanguagesChoose": "เลือกภาษาคำบรรยาย",
     "subtitleLanguagesSelected": "เลือกแล้ว {count} ภาษา",
     "subtitleLanguagesNone": "ยังไม่ได้เลือกภาษาคำบรรยาย",
+    "subtitleLanguagesUnspecified": "ไม่ระบุ",
     "subtitleLanguagesClear": "ล้างการเลือกภาษาคำบรรยาย",
     "subtitleDeclaredHint": "ข้อมูลภาษาระบุโดยผู้เผยแพร่ คำบรรยายอาจเป็นส่วนหนึ่งของวิดีโอ ส่วนการควบคุมการเล่นขึ้นอยู่กับวิดีโอที่อัปโหลด"
   },
@@ -145,6 +160,7 @@ export const subtitleLanguageMessages:Record<Locale,SubtitleLanguageCopy>={
     "subtitleLanguagesChoose": "Pumili ng mga wika ng subtitle",
     "subtitleLanguagesSelected": "{count} ang napili",
     "subtitleLanguagesNone": "Walang napiling wika ng subtitle",
+    "subtitleLanguagesUnspecified": "Hindi tinukoy",
     "subtitleLanguagesClear": "Alisin ang mga napiling wika ng subtitle",
     "subtitleDeclaredHint": "Mga wikang ipinahayag ng publisher. Maaaring bahagi ng video ang mga subtitle; nakadepende sa na-upload na video ang mga kontrol sa pag-play."
   },
@@ -154,6 +170,7 @@ export const subtitleLanguageMessages:Record<Locale,SubtitleLanguageCopy>={
     "subtitleLanguagesChoose": "Altyazı dillerini seçin",
     "subtitleLanguagesSelected": "{count} seçildi",
     "subtitleLanguagesNone": "Altyazı dili seçilmedi",
+    "subtitleLanguagesUnspecified": "Belirtilmemiş",
     "subtitleLanguagesClear": "Altyazı dili seçimini temizle",
     "subtitleDeclaredHint": "Yayıncının bildirdiği dillerdir. Altyazılar videonun bir parçası olabilir; oynatma kontrolleri yüklenen videoya bağlıdır."
   },
@@ -163,6 +180,7 @@ export const subtitleLanguageMessages:Record<Locale,SubtitleLanguageCopy>={
     "subtitleLanguagesChoose": "Выбрать языки субтитров",
     "subtitleLanguagesSelected": "Выбрано: {count}",
     "subtitleLanguagesNone": "Языки субтитров не выбраны",
+    "subtitleLanguagesUnspecified": "Не указано",
     "subtitleLanguagesClear": "Очистить выбор языков субтитров",
     "subtitleDeclaredHint": "Языки указаны издателем. Субтитры могут быть частью видео; возможности управления воспроизведением зависят от загруженного видео."
   },
@@ -172,6 +190,7 @@ export const subtitleLanguageMessages:Record<Locale,SubtitleLanguageCopy>={
     "subtitleLanguagesChoose": "Choisir les langues des sous-titres",
     "subtitleLanguagesSelected": "{count} sélectionnées",
     "subtitleLanguagesNone": "Aucune langue de sous-titres sélectionnée",
+    "subtitleLanguagesUnspecified": "Non précisé",
     "subtitleLanguagesClear": "Effacer les langues des sous-titres",
     "subtitleDeclaredHint": "Langues déclarées par l’éditeur. Les sous-titres peuvent faire partie de la vidéo ; les commandes de lecture dépendent de la vidéo envoyée."
   },
@@ -181,6 +200,7 @@ export const subtitleLanguageMessages:Record<Locale,SubtitleLanguageCopy>={
     "subtitleLanguagesChoose": "Untertitelsprachen auswählen",
     "subtitleLanguagesSelected": "{count} ausgewählt",
     "subtitleLanguagesNone": "Keine Untertitelsprachen ausgewählt",
+    "subtitleLanguagesUnspecified": "Nicht angegeben",
     "subtitleLanguagesClear": "Auswahl der Untertitelsprachen aufheben",
     "subtitleDeclaredHint": "Vom Publisher angegebene Sprachen. Untertitel können Teil des Videos sein; die Wiedergabesteuerung hängt vom hochgeladenen Video ab."
   },
@@ -190,6 +210,7 @@ export const subtitleLanguageMessages:Record<Locale,SubtitleLanguageCopy>={
     "subtitleLanguagesChoose": "Pilih bahasa sari kata",
     "subtitleLanguagesSelected": "{count} dipilih",
     "subtitleLanguagesNone": "Tiada bahasa sari kata dipilih",
+    "subtitleLanguagesUnspecified": "Tidak dinyatakan",
     "subtitleLanguagesClear": "Kosongkan pilihan bahasa sari kata",
     "subtitleDeclaredHint": "Bahasa yang dinyatakan oleh penerbit. Sari kata mungkin sebahagian daripada video; kawalan main balik bergantung pada video yang dimuat naik."
   },
@@ -199,6 +220,7 @@ export const subtitleLanguageMessages:Record<Locale,SubtitleLanguageCopy>={
     "subtitleLanguagesChoose": "வசன மொழிகளைத் தேர்ந்தெடுக்கவும்",
     "subtitleLanguagesSelected": "{count} தேர்ந்தெடுக்கப்பட்டன",
     "subtitleLanguagesNone": "வசன மொழிகள் தேர்ந்தெடுக்கப்படவில்லை",
+    "subtitleLanguagesUnspecified": "குறிப்பிடப்படவில்லை",
     "subtitleLanguagesClear": "வசன மொழித் தேர்வை நீக்கு",
     "subtitleDeclaredHint": "வெளியீட்டாளர் குறிப்பிட்ட மொழிகள். வசனங்கள் காணொளியின் பகுதியாக இருக்கலாம்; இயக்கக் கட்டுப்பாடுகள் பதிவேற்றிய காணொளியைச் சார்ந்திருக்கும்."
   }
