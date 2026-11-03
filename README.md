@@ -54,6 +54,8 @@ Creator payouts are independently paused with **`PAYOUTS_ENABLED=false`**. Refun
 
 Phone viewing uses readable two-column story cards, touch-sized controls, header search, fixed bottom navigation, native sharing when available, and portrait/landscape episode controls. Phone form inputs use 16px text. Creator/admin code downloads when those routes are opened. See [phone usability checks](docs/MOBILE_UX.md), including the rapid-filter and long-title regressions. The public operator is **HK NovaXR Production**, with contact **contactus@hknovaxrproduction.com** in the footer and Help, Terms and Privacy pages.
 
+Viewer playback and Studio private previews display the existing LingYing phoenix icon at the top right with **40% transparency (60% opacity)**. This is a player overlay: existing and future videos use their original files, with no duplicate videos, transcoding or additional media storage. The player's fullscreen button includes the overlay where container fullscreen is supported. Browser-native video fullscreen, picture-in-picture and casting may use a separate video surface that cannot include website overlays.
+
 Screenshots: [viewer on desktop](docs/screenshots/viewer.png) · [phone discovery](docs/screenshots/mobile-home.png) · [phone series details](docs/screenshots/mobile-series.png) · [publisher on mobile](docs/screenshots/publisher-mobile.png).
 
 ## Deploy to Cloudflare

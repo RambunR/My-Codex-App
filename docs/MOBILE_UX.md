@@ -11,6 +11,7 @@ Reviewed on 30 October 2026, Hong Kong time. The phone layout serves the existin
 - Player navigation uses targets of at least 44px. Small phones use five episode columns; short screens can reach the complete unlock overlay. Long uploaded titles and descriptions wrap within the page, and current-episode navigation has an accessible label.
 - Form text is at least 16px, with appropriate search keyboard hints. The viewport opts into Android's supported content-resize behavior for the keyboard. Dialogs scroll within the available height.
 - Studio/editor/admin code loads on demand, keeping the creator bundle out of initial viewer navigation. Video retains native controls, inline playback and metadata-only preload.
+- Every viewer video and Studio private preview uses the existing LingYing phoenix icon as a decorative top-right player overlay at 60% opacity (40% transparency). It does not intercept playback controls or require another stored video. Container fullscreen includes the icon on supported browsers; native video fullscreen, picture-in-picture and casting can omit website overlays.
 - The footer and Help, Terms and Privacy pages identify **HK NovaXR Production** and link to **contactus@hknovaxrproduction.com** with `mailto:`. This is the public business contact; account-email delivery configuration is managed separately.
 
 ## Verification

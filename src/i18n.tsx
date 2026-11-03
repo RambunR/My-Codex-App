@@ -15,10 +15,12 @@ import {subtitleLanguageEnglish,subtitleLanguageMessages} from './subtitle-langu
 import {seriesAccessEnglish,seriesAccessMessages} from './series-access-locales';
 import {storageUnlimitedEnglish,storageUnlimitedMessages} from './storage-unlimited-locales';
 import {lastEpisodeFreeEnglish,lastEpisodeFreeMessages} from './last-episode-free-locales';
+import {videoBrandEnglish,videoBrandMessages} from './video-brand-locales';
 
 const en = {
   ...storageUnlimitedEnglish,
   ...lastEpisodeFreeEnglish,
+  ...videoBrandEnglish,
   ...contentAdminEnglish,
   ...googleAuthEnglish,
   ...walletFundingEnglish,
@@ -159,7 +161,7 @@ const extra:Record<string,Dictionary>={
  'zh-TW':{creatorTitle:'你的故事。\n下一部人氣好劇。',creatorSubtitle:'用你的語言創作，找到你的觀眾。',startCreating:'開始創作',heroEyebrow:'全球故事，幾分鐘就能相遇。',featured:'本期精選',heroTagline:'兩個陌生人，一班錯過的列車，一個改變一切的夜晚。',worldTitle:'故事無國界',worldBody:'21 種介面語言，無數精彩視角。',authSubtitle:'收藏喜愛的劇集，解鎖新篇章，支持你喜愛的創作者。',welcomeBack:'下一段故事正等著你。',joinTitle:'一點戲劇。\n無限驚喜。',noAccount:'第一次來？',haveAccount:'已有帳戶？',agreeTerms:'我同意使用條款及私隱政策。',guestTitle:'讓故事成為你的日常。',walletBody:'少量儲值，無限故事。只為你想看的集數付款。',noTransactions:'第一次交易後，你的紀錄會顯示在這裡。',unlockBody:'一次解鎖，隨時重溫。',locked:'本集尚未解鎖',insufficientFunds:'儲值後繼續觀看',creatorShare:'70% 收入歸創作者',platformShare:'30% 用於支持平台',purchaseSuccess:'已解鎖，享受精彩故事！',testPayment:'示範付款',confirmTest:'確認示範付款',paymentUnavailable:'付款功能暫未開放。',paymentSuccess:'付款完成，帳戶已更新。',paymentCancelled:'付款已取消，餘額不變。',activate:'成為創作者',storageIncluded:'包含 5 GB 儲存空間',keepSeventy:'你獲得每次解鎖收入的 70%',setYourPrice:'你的劇集，由你定價。',totalSales:'付費解鎖次數',lifetimeEarnings:'累計收益',noSeries:'你的第一個故事從這裡開始。',noSeriesBody:'建立劇集、加入封面，再上傳影片資料夾。',seriesDetails:'劇集資料',languageHint:'選擇劇集中使用的口語。',coverHint:'JPEG、PNG 或 WebP · 最大 5 MB · 建議使用直式圖片',episodePricing:'單集定價',freeHint:'前幾集免費，其後按單集售價收費。',unpublish:'改為草稿',uploadHint:'拖放影片或選擇資料夾，按檔名排序上傳。',stopUpload:'停止上傳',saveFirst:'儲存劇集資料後即可上傳影片。',duration:'時長',size:'大小',deleteConfirm:'確定移除此集？此操作無法還原。',publishedSuccess:'你的劇集已上線！',savedSuccess:'已儲存變更。',requestedStorage:'申請總空間（GB）',storageBody:'先享 5 GB，隨片庫增長申請額外空間，審核及報價另行處理。',requestSent:'申請已送出。',payoutBody:'最低提款為等值 HK$20，經審核後付款。',estimatedHkd:'預計港幣金額',exchangeNote:'匯率僅供參考，最終兌換及費用由付款服務商決定。',payoutHistory:'提款申請',noPayouts:'尚未有提款申請。',preferences:'偏好設定',installHint:'在瀏覽器選單選擇「加入主畫面」。',users:'會員',storageRequests:'空間申請',payoutRequests:'提款申請',noRequests:'目前沒有待審核申請。',grossSales:'單集銷售額',platformRevenue:'平台收入',activationRevenue:'啟用收入（港幣）',footer:'獨立創作，真實連結。',rights:'保留所有權利。',copied:'已複製連結。',emptyList:'下一部最愛就在這裡。',emptyHistory:'選一個故事，我們會記住你的進度。',freeAccess:'免費開始，無須登入。',complete:'已完成',notifications:'通知',noNotifications:'你已查看所有通知。',welcome:'歡迎',editorIntro:'創作一段令人難忘的小故事。',pricingMin:'最低 US$0.10，每次解鎖你可獲得 70%。',noEpisodes:'尚未上傳影片。',saveToContinue:'儲存並繼續',paymentProcessing:'正在確認付款…',fieldRequired:'請填寫所有必填欄位。',termsRequired:'請先同意條款。',invalidVideo:'影片須可讀取，且不超過 4 分鐘。',fileTooLarge:'本集超過 200 MiB 上限。',uploadComplete:'上傳佇列已完成。',membersOnly:'登入後繼續'},
 };
 Object.assign(dictionaries['zh-TW'],extra['zh-TW']);
-for(const language of LANGUAGES)Object.assign(dictionaries[language.code],storageUnlimitedMessages[language.code],lastEpisodeFreeMessages[language.code]);
+for(const language of LANGUAGES)Object.assign(dictionaries[language.code],storageUnlimitedMessages[language.code],lastEpisodeFreeMessages[language.code],videoBrandMessages[language.code]);
 for(const [locale,messages] of Object.entries(additionalMessages))Object.assign(dictionaries[locale],messages);
 for(const language of LANGUAGES){if(!googleAuthMessages[language.code])throw new Error(`Google translations missing: ${language.code}`);Object.assign(dictionaries[language.code],googleAuthMessages[language.code]);}
 for(const language of LANGUAGES){if(!walletFundingMessages[language.code])throw new Error(`Wallet translations missing: ${language.code}`);Object.assign(dictionaries[language.code],walletFundingMessages[language.code]);}

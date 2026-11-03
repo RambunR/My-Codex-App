@@ -97,6 +97,8 @@ Subtitle language declarations are metadata for languages already included in vi
 
 ## Cover artwork
 
+All actual video players, including viewer playback and administrator/creator private previews, display the current LingYing icon at the top right as a decorative, non-interactive overlay with `opacity: 0.6` (40% transparency). Reuse the existing icon asset and original stream URLs; do not burn the mark into media, transcode uploads, or store watermarked video copies. Preserve the actual video element's ref, analytics, progress, native controls, inline playback and full-image containment. Keep the wrapper stable across episode changes for container fullscreen. Browser-owned video fullscreen, picture-in-picture and casting cannot guarantee DOM overlays.
+
 Cover artwork must fit the whole image with black padding, without cropping, stretching, hover zoom or fake title overlays on uploaded art. Preserve the optional `cover_aspect_ratio` metadata: new series default to 9:16, explicit choices are 9:16/1:1/16:9, and existing unassigned records retain their legacy 2:3 frame without backfilling. Omitted PATCH fields must not reset the saved layout. Exact pixel dimensions are recommendations, not admission requirements. Keep the 5 MiB limit and existing image validation/optimization; changing a layout must not rewrite image files, duplicate storage, alter quota or touch ownership/finances. See [cover artwork](docs/COVER_ARTWORK.md).
 
 ## Administrator identity and upload display
