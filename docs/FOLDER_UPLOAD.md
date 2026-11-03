@@ -16,6 +16,12 @@ On browsers supporting directory drag-and-drop, the upload area recursively read
 
 If directory drop is unavailable, use **Choose a folder**. Manual **Choose video files** and loose-file drops retain the formats supported by the current deployment; the MP4-only rule applies specifically to folder batches. Currently the Cloudflare uploader accepts browser-ready H.264/AAC MP4/MOV files; the standalone Node server can also process supported WebM input.
 
+## Leaving during an upload
+
+Keep the Studio editor open while files are being read, uploaded or processed. In-site navigation, including Back and Forward, shows a LingYing-styled confirmation during an active batch. **Keep uploading**, Close, Escape or dismissing the backdrop leaves the upload running. **Leave and stop upload** cancels the current transfer and skips the remaining files, while completed episodes stay saved. If the batch finishes while the warning is open, the obsolete warning closes and the editor remains visible; navigation then works normally.
+
+Refreshing, closing the tab/browser or following an external link uses the browser's native leave-page confirmation where supported. Browsers control its wording and appearance, and some mobile/forced-close paths may not show it. There is no warning for an idle, completed or stopped batch, or simply switching to another browser tab. Uploads do not continue after the editor is closed, and reopening does not automatically resume the batch. Check the saved episode list and reselect only missing files after an interruption.
+
 ## Video checks during a batch
 
 The browser checks the file-size limit before sending each episode. It does not require the browser's local video decoder to read every file first. The former twelve-second metadata probe could stop a valid file with “Unable to read video” before any upload request was sent; browser codec support, media errors or probe timeouts did not establish that the server would reject the file.

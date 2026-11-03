@@ -1,4 +1,4 @@
-import { useEffect,useRef,useState,type ReactNode,type ButtonHTMLAttributes } from 'react';
+import { useEffect,useRef,useState,type ReactNode,type RefObject,type ButtonHTMLAttributes } from 'react';
 import { createPortal } from 'react-dom';
 import { Link,useNavigate,useLocation } from 'react-router-dom';
 import { X,Play,Plus,Check,Globe2,Film,Sparkles,ArrowUpRight,Clapperboard,LoaderCircle,ArrowLeft,Search,Eye,Heart } from 'lucide-react';
@@ -12,14 +12,14 @@ import './social.css';
 import './series-card-access.css';
 
 export function Brand({small=false}:{small?:boolean}){const{locale,t}=useI18n();const name=brandName(locale);const split=locale.startsWith('zh')?1:4;return <Link to="/" className={`brand ${small?'brand-small':''}`} aria-label={`${name} · ${t('discover')}`}><img className="brand-image" src="/brand-mark.png?v=lingying-phoenix-05-v1" alt="" width="36" height="36"/><span lang={locale.startsWith('zh')?locale:'en'} dir="ltr"><b>{name.slice(0,split)}</b>{name.slice(split)}<span className="brand-dot">.</span></span></Link>;}
-export function Modal({open,onClose,title,children,wide=false}:{open:boolean;onClose:()=>void;title:string;children:ReactNode;wide?:boolean}){
+export function Modal({open,onClose,title,children,wide=false,initialFocusRef}:{open:boolean;onClose:()=>void;title:string;children:ReactNode;wide?:boolean;initialFocusRef?:RefObject<HTMLElement|null>}){
   const{t}=useI18n();
   const ref=useRef<HTMLDivElement>(null);const onCloseRef=useRef(onClose);onCloseRef.current=onClose;
   useEffect(()=>{if(!open)return;const before=document.activeElement as HTMLElement;const overflow=document.body.style.overflow;document.body.style.overflow='hidden';
-    requestAnimationFrame(()=>ref.current?.querySelector<HTMLElement>('button,input,select,a')?.focus());
+    const focusFrame=requestAnimationFrame(()=>(initialFocusRef?.current||ref.current?.querySelector<HTMLElement>('button,input,select,a'))?.focus());
     const handle=(e:KeyboardEvent)=>{if(e.key==='Escape')onCloseRef.current();if(e.key==='Tab'){const els=ref.current?.querySelectorAll<HTMLElement>('button:not(:disabled),input,select,a[href],textarea');if(!els?.length)return;const first=els[0],last=els[els.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}};
-    document.addEventListener('keydown',handle);return()=>{document.body.style.overflow=overflow;document.removeEventListener('keydown',handle);before?.focus?.();};
-  },[open]);
+    document.addEventListener('keydown',handle);return()=>{cancelAnimationFrame(focusFrame);document.body.style.overflow=overflow;document.removeEventListener('keydown',handle);before?.focus?.();};
+  },[open,initialFocusRef]);
   if(!open)return null;return createPortal(<div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose();}}><div ref={ref} className={`modal ${wide?'modal-wide':''}`} role="dialog" aria-modal="true" aria-label={title}><div className="modal-heading"><h2>{title}</h2><button className="icon-button" onClick={onClose} aria-label={t('close')}><X size={20}/></button></div>{children}</div></div>,document.body);
 }
 export function LanguagePicker({open,onClose}:{open:boolean;onClose:()=>void}){

@@ -42,6 +42,8 @@ Creators can **hide a published series** and show it again from Studio, preservi
 
 Studio also supports episode selection, batch rename with numeric suffixes, confirmed batch deletion, and drag or arrow reordering with an explicit save. See [episode batch tools](docs/EPISODE_BATCH_TOOLS.md).
 
+Studio warns before leaving an active upload batch: in-site navigation uses a branded **Keep uploading / Leave and stop upload** dialog, while closing or refreshing uses the browser's native confirmation where supported. Completed episodes remain saved; there is no background transfer or automatic resume after closing the editor. See [upload navigation protection](docs/FOLDER_UPLOAD.md#leaving-during-an-upload).
+
 Administrators can manage multiple public publisher profiles in **Admin → Publishers**, set their display names and public registration dates, and select a profile for their own series. Click a series' **By** credit to browse that publisher's public releases and engagement totals. Profiles share the administrator's existing login; ownership and earnings remain with the original account. See [publisher profiles](docs/PUBLISHER_PROFILES.md).
 
 Cover artwork supports **vertical 1080 × 1920**, **square 1080 × 1080** and **landscape 1920 × 1080** display layouts. Images fit in full with black padding, and uploaded covers keep their original artwork without added title overlays. Choose **Cover layout** in the series editor and save details. See [cover artwork](docs/COVER_ARTWORK.md).

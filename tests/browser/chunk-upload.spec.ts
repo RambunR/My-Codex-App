@@ -74,7 +74,7 @@ for(const navigation of [false,true])test(`${navigation?'leaving the editor':'st
   });
   try{
     await chooseFile(page,fixture.file);await partEntered.promise;
-    if(navigation){await page.locator('.editor-page').getByRole('button',{name:'My series',exact:true}).click();await expect(page).toHaveURL(/\/studio$/);}
+    if(navigation){await page.locator('.editor-page').getByRole('button',{name:'My series',exact:true}).click();await expect(page.getByRole('dialog',{name:'Leave while uploads are in progress?',exact:true})).toBeVisible();await page.getByRole('button',{name:'Leave and stop upload',exact:true}).click();await expect(page).toHaveURL(/\/studio$/);}
     else{await page.getByRole('button',{name:'Stop upload',exact:true}).click();await expect(page.getByRole('button',{name:'Choose video files',exact:true})).toBeEnabled();}
     await expect.poll(()=>cancellations).toBe(1);allowPart.resolve();
     expect(parts).toBe(1);expect(completions).toBe(0);expect(errors).toEqual([]);
