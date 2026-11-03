@@ -4,3 +4,12 @@
 .content-admin-editor-fields{border:0;padding:0;margin:0;min-width:0}.content-admin-editor-fields[disabled]{opacity:.7}.content-admin-editor-notice p{overflow-wrap:anywhere;margin-top:8px}
 
 .content-admin-preview{display:block;width:100%;max-height:65vh;aspect-ratio:9/16;background:#000;margin-top:18px;border-radius:8px}
+
+.status.content-admin-suggested{display:inline-flex;align-items:center;gap:5px;color:#e4caff;background:#c7a5ff1a;white-space:normal;overflow-wrap:anywhere}
+.content-admin-suggested>svg,.content-admin-suggestion>svg{flex-shrink:0}
+.content-admin-actions>.content-admin-suggestion{min-height:44px;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
+.content-admin-actions>.content-admin-suggestion.is-suggested{border-color:#a487cb;color:#e4caff;background:#c7a5ff16}
+.content-admin-suggestion-hint,.content-admin-suggestion-error{margin:0;font-size:12px;line-height:1.7;overflow-wrap:anywhere;max-width:280px}
+.content-admin-suggestion-hint{color:var(--muted)}
+.content-admin-suggestion-error{color:#f4a8bf}
+@media(max-width:700px){.content-admin-suggestion-hint,.content-admin-suggestion-error{flex:1 1 100%;max-width:none}}

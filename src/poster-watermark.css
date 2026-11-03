@@ -1,0 +1,69 @@
+/* The icon is a shared cached asset, never a second or modified cover file. */
+.cover-watermark {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: clamp(22px, 12%, 42px);
+  aspect-ratio: 1;
+  display: block;
+  background: url('/brand-mark.png?v=lingying-phoenix-05-v1') center / contain no-repeat;
+  opacity: .6;
+  pointer-events: none;
+  user-select: none;
+  filter: drop-shadow(0 1px 2px #0008);
+  z-index: 4;
+}
+.cover-thumbnail {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  overflow: hidden;
+  width: 64px;
+  height: 96px;
+  border-radius: 5px;
+  background: #000;
+  line-height: 0;
+}
+.cover-thumbnail > .cover-artwork-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  transform: none;
+}
+.studio-series-image { position: relative; }
+.cover-thumbnail > .cover-watermark,
+.studio-series-image > .cover-watermark {
+  top: 3px;
+  right: 3px;
+  width: clamp(12px, 24%, 20px);
+}
+.ranking-row > .cover-thumbnail { width: 90px; height: 120px; border-radius: 7px; }
+.continue-card > .cover-thumbnail { width: 49px; height: 65px; }
+.content-admin-row > .cover-thumbnail { width: 64px; height: 92px; border-radius: 10px; }
+.unlock-preview > .cover-thumbnail { width: 52px; height: 73px; }
+
+/* Reserve the top-right corner for the mark, with a separate 44px save target. */
+:root body .series-card > .poster-save {
+  top: 58px;
+  width: 44px;
+  height: 44px;
+  inset-inline-end: 6px;
+}
+:root body .series-card .poster-badge {
+  inset-inline-start: auto;
+  left: 8px;
+  right: auto;
+  max-width: calc(100% - 66px);
+}
+@media (max-width: 700px) {
+  .content-admin-row > .cover-thumbnail { width: 52px; height: 76px; }
+}
+@media (max-width: 640px) {
+  .ranking-row > .cover-thumbnail { width: 62px; height: 93px; }
+  .continue-card > .cover-thumbnail { width: 46px; height: 61px; }
+}
+@media (hover: none) {
+  .series-card > .poster-save { opacity: 1; }
+}

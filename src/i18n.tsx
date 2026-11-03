@@ -17,6 +17,7 @@ import {storageUnlimitedEnglish,storageUnlimitedMessages} from './storage-unlimi
 import {lastEpisodeFreeEnglish,lastEpisodeFreeMessages} from './last-episode-free-locales';
 import {videoBrandEnglish,videoBrandMessages} from './video-brand-locales';
 import {uploadLeaveEnglish,uploadLeaveMessages} from './upload-leave-locales';
+import {suggestionsEnglish,suggestionsMessages} from './suggestions-locales';
 
 const en = {
   ...storageUnlimitedEnglish,
@@ -103,6 +104,7 @@ const en = {
   ...coverArtworkEnglish,
   ...subtitleLanguageEnglish,
   ...seriesAccessEnglish,
+  ...suggestionsEnglish,
 } as const;
 export type Key = keyof typeof en;
 type Dictionary = Partial<Record<Key,string>>;
@@ -186,6 +188,7 @@ for(const language of LANGUAGES){if(!publisherProfileMessages[language.code])thr
 for(const language of LANGUAGES){if(!coverArtworkMessages[language.code])throw new Error(`Cover artwork translations missing: ${language.code}`);Object.assign(dictionaries[language.code],coverArtworkMessages[language.code]);}
 for(const language of LANGUAGES){if(!subtitleLanguageMessages[language.code])throw new Error(`Subtitle language translations missing: ${language.code}`);Object.assign(dictionaries[language.code],subtitleLanguageMessages[language.code]);}
 for(const language of LANGUAGES){if(!seriesAccessMessages[language.code])throw new Error(`Series access translations missing: ${language.code}`);Object.assign(dictionaries[language.code],seriesAccessMessages[language.code]);}
+for(const language of LANGUAGES){if(!suggestionsMessages[language.code])throw new Error(`Suggestion translations missing: ${language.code}`);Object.assign(dictionaries[language.code],suggestionsMessages[language.code]);}
 const uploadConfirmationMessages:Record<Locale,string>={
   en:'Upload confirmation was interrupted. Refresh this series before retrying the file.',
   'zh-TW':'上傳確認中斷。請重新整理此系列，再重試上傳檔案。',

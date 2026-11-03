@@ -20,7 +20,7 @@ async function publicCatalogue(page:Page){
 async function wholeImagePixels(image:Locator){
   await expect.poll(()=>image.evaluate((element:HTMLImageElement)=>element.complete&&element.naturalWidth>0)).toBe(true);
   const natural=await image.evaluate((element:HTMLImageElement)=>({width:element.naturalWidth,height:element.naturalHeight}));
-  const{data,info}=await sharp(await image.screenshot({animations:'disabled'})).removeAlpha().raw().toBuffer({resolveWithObject:true});
+  const{data,info}=await sharp(await image.screenshot({animations:'disabled',style:'.cover-watermark{visibility:hidden!important}'})).removeAlpha().raw().toBuffer({resolveWithObject:true});
   const scale=Math.min(info.width/natural.width,info.height/natural.height),width=natural.width*scale,height=natural.height*scale;
   const left=(info.width-width)/2,top=(info.height-height)/2;
   const rgb=(x:number,y:number)=>{const offset=(Math.min(info.height-1,Math.max(0,Math.floor(y)))*info.width+Math.min(info.width-1,Math.max(0,Math.floor(x))))*info.channels;return [...data.subarray(offset,offset+3)];};

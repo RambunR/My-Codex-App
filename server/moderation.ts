@@ -64,6 +64,20 @@ export function recordSeriesMetadataEdit(actorId:string,seriesId:string,reasonVa
   const id=randomUUID();run('INSERT INTO series_moderation_events (id,series_id,actor_id,action,reason,snapshot_json) VALUES (?,?,?,?,?,?)',id,seriesId,actorId,'metadata',reason,json);return id;
 }
 
+/** Homepage suggestions are public attribution, never a publishing or payment action. */
+export function setSeriesFeatured(actorId:string,seriesId:string,featured:boolean){
+  return transaction(()=>{
+    requireAdministrator(actorId);const series=requireSeries(seriesId);
+    assert(typeof featured==='boolean',400,'INVALID_FEATURED','Choose whether the series is suggested.');
+    if(featured)assert(series.status==='published'&&!seriesIsTakenDown(seriesId)&&one('SELECT 1 FROM episodes WHERE series_id=? LIMIT 1',seriesId),409,'SERIES_NOT_SUGGESTIBLE','Only published, available series with episodes can be suggested.');
+    const value=featured?1:0;
+    if(series.featured===value)return{featured:value,alreadyApplied:true};
+    run('UPDATE series SET featured=? WHERE id=?',value,seriesId);
+    recordSeriesMetadataEdit(actorId,seriesId,featured?'Homepage suggestion enabled by an administrator.':'Homepage suggestion removed by an administrator.',{operation:'homepage_suggestion',title:series.title,creator_id:series.creator_id,before:{featured:series.featured},after:{featured:value}});
+    return{featured:value,alreadyApplied:false};
+  });
+}
+
 export function adminModerationEvents(actorId:string,seriesId:string){
   requireAdministrator(actorId);requireSeries(seriesId);
   return all<ModerationEventRecord>('SELECT e.id,e.series_id,e.actor_id,u.name AS actor_name,e.action,e.reason,e.snapshot_json,e.created_at FROM series_moderation_events e JOIN users u ON u.id=e.actor_id WHERE e.series_id=? ORDER BY e.created_at DESC,e.rowid DESC LIMIT 100',seriesId).map(row=>{const{snapshot_json,...safe}=row;return{...safe,snapshot:JSON.parse(snapshot_json)};});

@@ -18,7 +18,8 @@ test.afterAll(async()=>{if(directory)await rm(directory,{recursive:true,force:tr
 async function fullImage(frame:Locator,width:number,height:number){
   const image=frame.locator('img');await expect(image).toHaveCSS('object-fit','contain');await expect(image).toHaveCSS('object-position','50% 50%');await expect(image).toHaveCSS('transform','none');await expect(frame).toHaveCSS('background-color','rgb(0, 0, 0)');
   await expect.poll(()=>image.evaluate(element=>{const img=element as HTMLImageElement;return[img.naturalWidth,img.naturalHeight];})).toEqual([width,height]);
-  const{data,info}=await sharp(await frame.screenshot()).removeAlpha().raw().toBuffer({resolveWithObject:true}),scale=Math.min(info.width/width,info.height/height),artWidth=width*scale,artHeight=height*scale,offsetX=(info.width-artWidth)/2,offsetY=(info.height-artHeight)/2;
+  // Test original cover pixels separately from the intentionally overlaid brand icon.
+  const{data,info}=await sharp(await frame.screenshot({style:'.cover-watermark{visibility:hidden!important}'})).removeAlpha().raw().toBuffer({resolveWithObject:true}),scale=Math.min(info.width/width,info.height/height),artWidth=width*scale,artHeight=height*scale,offsetX=(info.width-artWidth)/2,offsetY=(info.height-artHeight)/2;
   const pixel=(x:number,y:number)=>{const start=(Math.floor(y)*info.width+Math.floor(x))*info.channels;return Array.from(data.subarray(start,start+3));};
   for(const[x,y,color]of [[.12,.12,[255,0,0]],[.88,.12,[0,255,0]],[.12,.88,[0,0,255]],[.88,.88,[255,255,0]]] as const){const actual=pixel(offsetX+artWidth*x,offsetY+artHeight*y);for(let channel=0;channel<3;channel++)expect(Math.abs(actual[channel]-color[channel])).toBeLessThanOrEqual(35);}
   if(offsetX>5)expect(pixel(offsetX/2,info.height/2).every(channel=>channel<8)).toBe(true);

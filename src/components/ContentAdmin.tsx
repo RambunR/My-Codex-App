@@ -1,16 +1,17 @@
 import {useState,type FormEvent} from 'react';
 import {Link} from 'react-router-dom';
-import {Search,Upload,FilePenLine,ShieldAlert,RotateCcw,History,ChevronLeft,ChevronRight} from 'lucide-react';
-import {apiCrossOrigin,post,useApi} from '../api';
+import {Search,Upload,FilePenLine,ShieldAlert,RotateCcw,History,ChevronLeft,ChevronRight,Star} from 'lucide-react';
+import {api,apiCrossOrigin,post,useApi} from '../api';
 import {useApp} from '../context';
 import {useI18n,languageName,type Key} from '../i18n';
 import {Button,Empty,ErrorState,Loading,Modal} from '../ui';
+import {CoverThumbnail} from './CoverArtwork';
 import '../content-admin.css';
 
 interface ContentSeries {
   id:string;title:string;cover:string;language:string;
   creator_id:string;creator_name:string;status:'draft'|'published'|'archived';
-  episode_count:number;taken_down:boolean;moderation_reason?:string;
+  episode_count:number;taken_down:boolean;moderation_reason?:string;featured?:0|1;
 }
 interface ContentList {series:ContentSeries[];page:number;limit:number;total:number}
 interface ModerationEvent {id:string;action:'takedown'|'restore'|'metadata';reason:string;actor_name?:string;actor_id:string;created_at:string}
@@ -24,6 +25,8 @@ export function ContentAdmin(){
   const [selected,setSelected]=useState<{series:ContentSeries;action:Action}|null>(null);
   const [reason,setReason]=useState('');const [confirmed,setConfirmed]=useState(false);
   const [busy,setBusy]=useState(false);const [failure,setFailure]=useState('');
+  const [suggestionBusy,setSuggestionBusy]=useState<string|null>(null);
+  const [suggestionError,setSuggestionError]=useState<{id:string;message:string}|null>(null);
   const params=new URLSearchParams({q:query,status:state,page:String(page),limit:'20'});
   const list=useApi<ContentList>(user?.role==='admin'?`/api/admin/series?${params}`:undefined);
   const pages=Math.max(1,Math.ceil((list.data?.total??0)/(list.data?.limit||20)));
@@ -38,6 +41,19 @@ export function ContentAdmin(){
     setBusy(true);setFailure('');
     try{await post(`/api/admin/series/${encodeURIComponent(selected.series.id)}/moderation`,{action:selected.action,reason:reason.trim()});toast(t('contentSaved'));setSelected(null);list.refresh();}
     catch(error){setFailure((error as Error).message);}finally{setBusy(false);}
+  };
+  const suggest=async(series:ContentSeries)=>{
+    if(suggestionBusy||busy||list.loading)return;
+    const featured=series.featured!==1;
+    if(featured&&(series.status!=='published'||series.taken_down||!(series.episode_count>0)))return;
+    setSuggestionBusy(series.id);setSuggestionError(null);
+    try{
+      const result=await api<{featured:0|1;alreadyApplied:boolean}>(`/api/admin/series/${encodeURIComponent(series.id)}/featured`,{method:'PUT',body:JSON.stringify({featured})});
+      if(result.featured!==(featured?1:0))throw new Error(t('suggestionSaveFailed'));
+      list.setData(current=>current?{...current,series:current.series.map(row=>row.id===series.id?{...row,featured:result.featured}:row)}:current);
+      toast(t('suggestionSaved'));list.refresh();
+    }catch(error){const message=(error as Error).message||t('suggestionSaveFailed');setSuggestionError({id:series.id,message});toast(message,true);}
+    finally{setSuggestionBusy(null);}
   };
   const timestamp=(value:string)=>{
     const raw=value.replace(' ','T');const parsed=new Date(/(?:Z|[+-]\d{2}:\d{2})$/.test(raw)?raw:raw+'Z');
@@ -55,11 +71,21 @@ export function ContentAdmin(){
       <button className="button secondary" type="submit"><Search size={16}/>{t('contentSearchAction')}</button>
     </form>
     {list.loading&&!list.data?<Loading/>:list.error?<ErrorState error={list.error} retry={list.refresh}/>:<>
-      {list.data?.series.length?<div className="content-admin-list">{list.data.series.map(series=><article className="content-admin-row" key={series.id}>
-        <img src={series.cover||'/images/placeholder.svg'} crossOrigin={apiCrossOrigin(series.cover)} alt="" loading="lazy"/>
-        <div className="content-admin-series"><h3>{series.title}</h3><p>{t('contentCreator')}: {series.creator_name}</p><small>{languageName(series.language)} · {series.episode_count} {t('episodes')}</small><div className="content-admin-statuses"><span className={`status ${series.status}`}>{t(series.status as Key)}</span>{series.taken_down&&<span className="status content-admin-offline">{t('contentTakenDown')}</span>}</div>{series.taken_down&&series.moderation_reason&&<p className="content-admin-reason">{series.moderation_reason}</p>}</div>
-        <div className="content-admin-actions"><Link className="button secondary small" to={`/studio/series/${encodeURIComponent(series.id)}?from=admin`}><FilePenLine size={15}/>{t('contentEdit')}</Link><button className="button secondary small" onClick={()=>choose(series,'history')}><History size={15}/>{t('contentHistory')}</button><button className={`button small ${series.taken_down?'secondary':'content-admin-danger'}`} onClick={()=>choose(series,series.taken_down?'restore':'takedown')}>{series.taken_down?<RotateCcw size={15}/>:<ShieldAlert size={15}/>} {t(series.taken_down?'contentRestore':'contentTakeDown')}</button></div>
-      </article>)}</div>:<Empty title={t('contentNoSeries')}/>}
+      {list.data?.series.length?<div className="content-admin-list">{list.data.series.map(series=>{
+        const suggested=series.featured===1;
+        const eligible=series.status==='published'&&!series.taken_down&&series.episode_count>0;
+        const hintId=`suggestion-help-${series.id}`;
+        return <article className="content-admin-row" key={series.id}>
+          <CoverThumbnail src={series.cover||'/images/placeholder.svg'} crossOrigin={apiCrossOrigin(series.cover)} alt="" loading="lazy"/>
+          <div className="content-admin-series"><h3>{series.title}</h3><p>{t('contentCreator')}: {series.creator_name}</p><small>{languageName(series.language)} · {series.episode_count} {t('episodes')}</small><div className="content-admin-statuses"><span className={`status ${series.status}`}>{t(series.status as Key)}</span>{series.taken_down&&<span className="status content-admin-offline">{t('contentTakenDown')}</span>}{suggested&&<span className="status content-admin-suggested"><Star size={12} fill="currentColor" aria-hidden="true"/>{t('suggestedByLingYing')}</span>}</div>{series.taken_down&&series.moderation_reason&&<p className="content-admin-reason">{series.moderation_reason}</p>}</div>
+          <div className="content-admin-actions">
+            <Button className={`button secondary small content-admin-suggestion ${suggested?'is-suggested':''}`} type="button" busy={suggestionBusy===series.id} disabled={busy||suggestionBusy!==null||list.loading||(!suggested&&!eligible)} aria-pressed={suggested} aria-busy={suggestionBusy===series.id} aria-label={`${t(suggested?'removeSuggestion':'suggestOnHome')}: ${series.title}`} aria-describedby={!suggested&&!eligible?hintId:undefined} onClick={()=>suggest(series)}>{suggestionBusy!==series.id&&<Star size={15} fill={suggested?'currentColor':'none'} aria-hidden="true"/>}{t(suggested?'removeSuggestion':'suggestOnHome')}</Button>
+            <Link className="button secondary small" to={`/studio/series/${encodeURIComponent(series.id)}?from=admin`}><FilePenLine size={15}/>{t('contentEdit')}</Link><button className="button secondary small" onClick={()=>choose(series,'history')}><History size={15}/>{t('contentHistory')}</button><button className={`button small ${series.taken_down?'secondary':'content-admin-danger'}`} disabled={suggestionBusy!==null} onClick={()=>choose(series,series.taken_down?'restore':'takedown')}>{series.taken_down?<RotateCcw size={15}/>:<ShieldAlert size={15}/>} {t(series.taken_down?'contentRestore':'contentTakeDown')}</button>
+            {!suggested&&!eligible&&<p className="content-admin-suggestion-hint" id={hintId}>{t('suggestionUnavailable')}</p>}
+            {suggestionError?.id===series.id&&<p className="content-admin-suggestion-error" role="alert">{suggestionError.message}</p>}
+          </div>
+        </article>;
+      })}</div>:<Empty title={t('contentNoSeries')}/>}
       {list.data&&pages>1&&<nav className="content-admin-pagination" aria-label={t('contentPage')}><button className="button secondary small" disabled={page<=1||list.loading} onClick={()=>setPage(value=>Math.max(1,value-1))}><ChevronLeft size={16}/>{t('contentPrevious')}</button><span>{t('contentPage')} {list.data.page} / {pages}</span><button className="button secondary small" disabled={page>=pages||list.loading} onClick={()=>setPage(value=>value+1)}>{t('contentNext')}<ChevronRight size={16}/></button></nav>}
     </>}
     <Modal open={!!selected} onClose={close} title={t(selected?.action==='restore'?'contentRestore':selected?.action==='history'?'contentHistory':'contentTakeDown')}>

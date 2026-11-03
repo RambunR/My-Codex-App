@@ -1,0 +1,11 @@
+# Homepage suggestions and cover branding
+
+Administrators choose suggestions at **Admin → Content**, using **Suggest on homepage** on a published series. A suggested series displays **Suggested by LingYing** and a **Remove suggestion** control. Drafts, hidden or taken-down series and series without episodes cannot be newly suggested. A previous selection can be cleared while the series is hidden or taken down.
+
+With two or more available suggestions, the homepage changes series every eight seconds, fading the artwork and story details together. It pauses for hover, keyboard focus, touch interaction, a hidden browser tab, or the pause control. Explicit Resume starts rotation again; reduced-motion users retain instant manual previous/next controls without automatic rotation. The section remains within 70% of the viewport height, and its full synopsis remains available in the scrollable description.
+
+One suggestion stays static. Without suggestions, the homepage shows a single public release with an ordinary release label. Deployment does not select content; select at least two series in Admin and refresh an already-open homepage to see automatic rotation.
+
+Selection uses the existing `series.featured` flag. `PUT /api/admin/series/:id/featured` accepts exactly `{ "featured": true }` or `{ "featured": false }`. It checks the administrator's current role and series availability inside a transaction, records an ordinary metadata audit event, and does not duplicate that event on an identical retry. The public `featured=true` catalogue filter composes with existing filters and excludes unpublished, unavailable, retired, deleted and empty series. Other series settings and financial records remain unchanged.
+
+Poster covers use the existing LingYing icon at the top right, at 60% opacity. It is a decorative, non-interactive display layer; source images, their aspect ratios and stored bytes remain intact. Small thumbnails reuse the same icon in their own frame, and poster save controls keep a separate 44px target. Video playback retains its existing branded player overlay.

@@ -441,6 +441,26 @@ try{
   assert.deepEqual(await moderationFinance(),beforeModerationFinance);
   console.log('PASS: Cloudflare SQL moderation hides purchased content, preserves private admin review and audit history, blocks publisher republication, and restores access without changing money.');
 
+  const suggestionPath=`/api/admin/series/${sid}/featured`;
+  const suggestionFinance=await moderationFinance();
+  const suggestionAuditBefore=(await request(moderationPath,undefined,admin)).data.events.length;
+  await request(suggestionPath,{featured:true},publisher,403,'PUT');
+  await request(suggestionPath,{featured:true},viewer,403,'PUT');
+  await request(suggestionPath,{featured:1},admin,400,'PUT');
+  assert.deepEqual((await request(suggestionPath,{featured:true},admin,200,'PUT')).data,{featured:1,alreadyApplied:false});
+  assert.deepEqual((await request(suggestionPath,{featured:true},admin,200,'PUT')).data,{featured:1,alreadyApplied:true});
+  const suggested=(await request('/api/series?featured=true')).data.series;
+  assert.ok(suggested.some(series=>series.id===sid));
+  assert.ok(suggested.every(series=>series.featured===1&&series.status==='published'&&series.episode_count>0));
+  assert.equal((await request(adminSeriesPath,undefined,admin)).data.series[0].featured,1);
+  assert.equal((await request(moderationPath,undefined,admin)).data.events.length,suggestionAuditBefore+1);
+  assert.deepEqual((await request(suggestionPath,{featured:false},admin,200,'PUT')).data,{featured:0,alreadyApplied:false});
+  assert.equal((await request('/api/series?featured=true')).data.series.some(series=>series.id===sid),false);
+  const suggestionAudit=(await request(moderationPath,undefined,admin)).data.events;
+  assert.equal(suggestionAudit.length,suggestionAuditBefore+2);
+  assert.deepEqual(await moderationFinance(),suggestionFinance);
+  console.log('PASS: Cloudflare homepage suggestions enforce administrator access, strict booleans, selected-only discovery, replay-safe audit and unchanged financial state.');
+
   const beforeHideFinance=await moderationFinance();
   const beforeHideAnalytics=(await request(`/api/studio/series/${sid}/analytics?period=7d`,undefined,publisher)).data;
   await request(`/api/studio/series/${sid}/status`,{status:'archived'},publisher);
@@ -639,7 +659,7 @@ try{
   const resumedGuest=(await request(`/api/episodes/${first.id}/playback`,{},guestPlayback.cookie)).data;assert.equal(resumedGuest.sessionId,guestPlayback.data.sessionId);assert.equal(resumedGuest.viewCounted,true);
   const retainedAnalytics=(await request(`/api/studio/series/${sid}/analytics?period=7d`,undefined,publisher)).data;assert.equal(retainedAnalytics.totals.views,1);assert.equal(retainedAnalytics.totals.avgWatchSeconds,3.2);assert.equal(retainedAnalytics.totals.paidViewers,1);assert.equal(retainedAnalytics.episodes.find(episode=>episode.id===second.id).paidViewers,1);
   const retainedModerationAudit=(await request(moderationPath,undefined,admin)).data.events;
-  assert.deepEqual(retainedModerationAudit,moderationAudit);
+  assert.deepEqual(retainedModerationAudit,suggestionAudit);
   assert.equal((await request(`/api/studio/series/${sid}`,undefined,admin)).data.series.taken_down,false);
   const retainedClassification=(await request(`/api/studio/series/${sid}`,undefined,publisher)).data.series;
   assert.deepEqual(retainedClassification.themes,body.themes);assert.equal(retainedClassification.format,body.format);

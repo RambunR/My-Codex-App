@@ -18,7 +18,7 @@ import { prepareVideo, prepareCover, putObject, serveObject, removeTempFile } fr
 import { createCheckout, cancelCheckout, settlePayment, unlockEpisode, requestWithdrawal,returnWithdrawalFunds, addLedger, stripe,paymentsReady,stripeConfigured,stripeModeMatches,stripeTestPayments,assertPayoutsEnabled } from './finance.js';
 import {processRiskEvent,recordPaymentLink,adminPaymentReviews,resolvePaymentReview,assertPaymentAccountClear} from './payment-risk.js';
 import {ensurePlatformOwnerAccess,creatorDisplayName} from './owner.js';
-import {publicSeriesAllowedSql,assertSeriesAvailable,assertSeriesWritable,moderationState,setSeriesModeration,recordSeriesMetadataEdit,adminModerationEvents,listAdminSeries} from './moderation.js';
+import {publicSeriesAllowedSql,assertSeriesAvailable,assertSeriesWritable,moderationState,setSeriesModeration,setSeriesFeatured,recordSeriesMetadataEdit,adminModerationEvents,listAdminSeries} from './moderation.js';
 import {ensureStripeWebhookReady,stripeWebhookReadiness} from './stripe-readiness.js';
 import {runWithVerifiedStripeEventContext,type VerifiedStripeEventContext} from './stripe-event-context.js';
 import { paymentTable,purchaseTable,ledgerTable,hasEpisodePurchase,usingTestPaymentState } from './payment-state.js';
@@ -193,7 +193,7 @@ export function createApp() {
     run('UPDATE users SET name=?,language=? WHERE id=?', body.name, body.language, req.user!.id); res.json({ user: getUser(req.user!.id) });
   });
   app.get('/api/series', (req,res) => {
-    const query = z.object({ q: z.string().max(120).optional(), language: language.optional(), genre: z.enum(GENRES).optional(),theme:z.enum(STORY_THEMES).optional(),format:z.enum(SERIES_FORMATS).optional(),access:z.enum(SERIES_ACCESS_FILTERS).optional(), sort: z.enum(['popular','new','saved']).optional(), saved: z.enum(['true']).optional(), creation: z.enum(CREATION_TYPES).optional() }).parse(req.query);
+    const query = z.object({ q: z.string().max(120).optional(), language: language.optional(), genre: z.enum(GENRES).optional(),theme:z.enum(STORY_THEMES).optional(),format:z.enum(SERIES_FORMATS).optional(),access:z.enum(SERIES_ACCESS_FILTERS).optional(),featured:z.enum(['true']).optional(), sort: z.enum(['popular','new','saved']).optional(), saved: z.enum(['true']).optional(), creation: z.enum(CREATION_TYPES).optional() }).parse(req.query);
     const conditions = ["s.status='published'",publicSeriesAllowedSql('s')]; const params: any[] = [];
     if (query.q) { conditions.push(`(s.title LIKE ? OR s.description LIKE ? OR (${publisherNameSql()}) LIKE ?)`); params.push(`%${query.q}%`,`%${query.q}%`,`%${query.q}%`); }
     if (query.language) { conditions.push('s.language=?'); params.push(query.language); }
@@ -203,6 +203,7 @@ export function createApp() {
     if(query.format){conditions.push(`(${SERIES_FORMAT_SQL})=?`);params.push(query.format);}
     if (query.creation) { conditions.push('s.creation_type=?'); params.push(query.creation); }
     if(query.access){conditions.push(`(${seriesAccessTypeSql()})=?`);params.push(query.access);}
+    if(query.featured)conditions.push('s.featured=1 AND EXISTS (SELECT 1 FROM episodes suggested_episode WHERE suggested_episode.series_id=s.id)');
     if (query.saved) { assert(req.user,401,'AUTH_REQUIRED','Sign in to view your list.'); conditions.push('EXISTS(SELECT 1 FROM saves sv WHERE sv.series_id=s.id AND sv.user_id=?)'); params.push(req.user.id); }
     const order = query.sort === 'new' ? 'julianday(COALESCE(sp.published_at,s.created_at)) DESC,s.rowid DESC' : query.sort === 'saved' ? 'saves DESC,s.views DESC' : 's.views DESC';
     res.json({ series: all(`${catalogSelect} WHERE ${conditions.join(' AND ')} ORDER BY ${order} LIMIT 150`, ...params).map(s => serializeSeries(s,req.user?.id)) });
@@ -429,6 +430,10 @@ export function createApp() {
   });
   app.get('/api/admin/series/:id/moderation',requireAdmin,(req,res)=>{
     res.setHeader('Cache-Control','private, no-store');res.json({events:adminModerationEvents(req.user!.id,id(req))});
+  });
+  app.put('/api/admin/series/:id/featured',requireAdmin,(req,res)=>{
+    const body=z.object({featured:z.boolean()}).strict().parse(req.body);
+    res.setHeader('Cache-Control','private, no-store');res.json(setSeriesFeatured(req.user!.id,id(req),body.featured));
   });
   app.post('/api/admin/series/:id/moderation',requireAdmin,(req,res)=>{
     const body=z.object({action:z.enum(['takedown','restore']),reason:z.string().trim().min(10).max(2000)}).parse(req.body);

@@ -55,3 +55,10 @@
   .home-page .hero-bounded .hero-pills{font-size:11px}
   .home-page .hero-bounded .hero-synopsis-wrap{flex-basis:45px;min-height:32px}
 }
+/* Fade the active artwork and copy together while the stable controls retain
+   focus. Interaction cancels any pending swap before its links can change. */
+.home-page .hero-bounded>.hero-art,.home-page .hero-bounded>.hero-copy{opacity:1;transition:opacity 280ms ease-in-out}
+.home-page .hero-bounded[data-carousel-phase="out"]>.hero-art,.home-page .hero-bounded[data-carousel-phase="out"]>.hero-copy,
+.home-page .hero-bounded[data-carousel-phase="in"]>.hero-art,.home-page .hero-bounded[data-carousel-phase="in"]>.hero-copy{opacity:0}
+.home-page .hero-bounded .hero-rotation-toggle>svg{width:16px;height:16px}
+@media(prefers-reduced-motion:reduce){.home-page .hero-bounded>.hero-art,.home-page .hero-bounded>.hero-copy{transition:none}}
