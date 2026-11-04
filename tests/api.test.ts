@@ -161,15 +161,15 @@ test('Newest preserves legacy releases and orders ISO and SQLite timestamps chro
   }
 });
 test('payout minimum, reservation, rejection refund and duplicate processing are enforced',async()=>{
-  run('UPDATE users SET earnings_micros=? WHERE id=?',5_000_000,publisherId);
-  assert.equal((await request('/api/studio/withdrawals',{amount_cents:200},publisher)).status,400);
-  const withdrawal=await request('/api/studio/withdrawals',{amount_cents:300},publisher);assert.equal(withdrawal.status,201);assert.equal(withdrawal.data.user.earnings_micros,2_000_000);
+  run('UPDATE users SET earnings_micros=? WHERE id=?',15_000_000,publisherId);
+  assert.equal((await request('/api/studio/withdrawals',{amount_cents:999},publisher)).status,400);
+  const withdrawal=await request('/api/studio/withdrawals',{amount_cents:1000},publisher);assert.equal(withdrawal.status,201);assert.equal(withdrawal.data.user.earnings_micros,5_000_000);
   assert.equal((await request(`/api/admin/withdrawals/${withdrawal.data.id}`,{approve:true},viewer)).status,403);
   assert.equal((await request(`/api/admin/withdrawals/${withdrawal.data.id}`,{approve:false},admin)).status,200);
   assert.equal((await request(`/api/admin/withdrawals/${withdrawal.data.id}`,{approve:false},admin)).status,409);
+  assert.equal(one('SELECT earnings_micros FROM users WHERE id=?',publisherId)!.earnings_micros,15_000_000);
+  const paid=await request('/api/studio/withdrawals',{amount_cents:1000},publisher);assert.equal((await request(`/api/admin/withdrawals/${paid.data.id}`,{approve:true},admin)).status,200);assert.equal((await request(`/api/admin/withdrawals/${paid.data.id}`,{approve:true},admin)).status,409);
   assert.equal(one('SELECT earnings_micros FROM users WHERE id=?',publisherId)!.earnings_micros,5_000_000);
-  const paid=await request('/api/studio/withdrawals',{amount_cents:300},publisher);assert.equal((await request(`/api/admin/withdrawals/${paid.data.id}`,{approve:true},admin)).status,200);assert.equal((await request(`/api/admin/withdrawals/${paid.data.id}`,{approve:true},admin)).status,409);
-  assert.equal(one('SELECT earnings_micros FROM users WHERE id=?',publisherId)!.earnings_micros,2_000_000);
 });
 test('storage expansion requires administrator approval and preserves the original allowance until approved',async()=>{
   const r=await request('/api/studio/storage-requests',{requested_gb:10,reason:'A larger catalogue of original short dramas.'},publisher);assert.equal(r.status,201);

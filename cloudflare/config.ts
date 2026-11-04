@@ -1,7 +1,10 @@
 import type {Env} from './runtime';
 import {selectStripeSettings} from '../shared/stripe-settings';
-export const config={port:8080,production:true,sandbox:false,stripeTestMode:false,payoutsEnabled:false,stripeAutoConfigureWebhook:false,passPromotionEnabled:false,publicUrl:'',stripeSiteOrigin:'',platformOwnerUserId:'',platformAdminEmailHash:'',officialCreatorName:'LingYingDrama Offical',appUrl:'https://aidramio.example',dataDir:'/tmp',payments:'disabled',usdToHkd:7.8,...selectStripeSettings({},false),googleClientId:'',googleClientSecret:'',appleClientId:'',appleTeamId:'',appleKeyId:'',applePrivateKey:'',resendApiKey:'',mailFrom:'',mailProvider:'auto',cloudflareEmailAccountId:'',cloudflareEmailApiToken:'',seed:false,ffmpeg:'',ffprobe:'',runtime:'cloudflare',videoFormats:['mp4','mov','m4v']};
+export const config={testPayoutsEnabled:false,testPayoutAccount:'',testConnectWebhook:'',port:8080,production:true,sandbox:false,stripeTestMode:false,payoutsEnabled:false,stripeAutoConfigureWebhook:false,passPromotionEnabled:false,publicUrl:'',stripeSiteOrigin:'',platformOwnerUserId:'',platformAdminEmailHash:'',officialCreatorName:'LingYingDrama Offical',appUrl:'https://aidramio.example',dataDir:'/tmp',payments:'disabled',usdToHkd:7.8,...selectStripeSettings({},false),googleClientId:'',googleClientSecret:'',appleClientId:'',appleTeamId:'',appleKeyId:'',applePrivateKey:'',resendApiKey:'',mailFrom:'',mailProvider:'auto',cloudflareEmailAccountId:'',cloudflareEmailApiToken:'',seed:false,ffmpeg:'',ffprobe:'',runtime:'cloudflare',videoFormats:['mp4','mov','m4v']};
 export function configure(env:Env){
+  config.testPayoutsEnabled=env.STRIPE_TEST_PAYOUTS_ENABLED==='true';
+  config.testPayoutAccount=env.STRIPE_TEST_PAYOUT_ACCOUNT_ID||'';
+  config.testConnectWebhook=env.STRIPE_TEST_CONNECT_WEBHOOK_SECRET||'';
   config.production=env.ENVIRONMENT!=='development';config.payments=env.PAYMENTS_MODE||'disabled';
   config.sandbox=env.ENVIRONMENT==='sandbox';
   config.platformOwnerUserId=env.PLATFORM_OWNER_USER_ID||'';config.officialCreatorName=env.OFFICIAL_CREATOR_NAME||'LingYingDrama Offical';

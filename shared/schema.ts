@@ -8,6 +8,7 @@ import {EPISODE_ACCESS_SCHEMA} from './episode-access-schema.js';
 import {COVER_LAYOUT_SCHEMA} from './cover-layout-schema.js';
 import {SUBTITLE_LANGUAGE_SCHEMA} from './subtitle-language-schema.js';
 import {CATALOG_RETIREMENT_SCHEMA} from './catalog-retirement-schema.js';
+import {TEST_PAYOUT_SCHEMA} from './test-payout-schema.js';
 
 export const DATABASE_SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -183,6 +184,15 @@ CREATE TABLE IF NOT EXISTS withdrawals (
  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','processing','paid','rejected')),
  transfer_id TEXT, note TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS withdrawal_terms (
+ withdrawal_id TEXT PRIMARY KEY REFERENCES withdrawals(id), policy_version TEXT NOT NULL,
+ gross_micros INTEGER NOT NULL CHECK(gross_micros > 0),
+ fee_micros INTEGER NOT NULL CHECK(fee_micros >= 0),
+ payout_micros INTEGER NOT NULL CHECK(payout_micros > 0),
+ processing_min_days INTEGER NOT NULL CHECK(processing_min_days > 0),
+ processing_max_days INTEGER NOT NULL CHECK(processing_max_days >= processing_min_days),
+ CHECK(gross_micros = fee_micros + payout_micros)
+);
 CREATE TABLE IF NOT EXISTS payment_provider_links (
  table_group TEXT NOT NULL CHECK(table_group IN ('default','test')), livemode INTEGER NOT NULL CHECK(livemode IN (0,1)),
  payment_id TEXT NOT NULL, user_id TEXT NOT NULL REFERENCES users(id), provider_session TEXT NOT NULL,
@@ -263,4 +273,5 @@ ${COVER_LAYOUT_SCHEMA}
 ${EPISODE_ACCESS_SCHEMA}
 ${SUBTITLE_LANGUAGE_SCHEMA}
 ${CATALOG_RETIREMENT_SCHEMA}
+${TEST_PAYOUT_SCHEMA}
 `;

@@ -18,8 +18,12 @@ import {lastEpisodeFreeEnglish,lastEpisodeFreeMessages} from './last-episode-fre
 import {videoBrandEnglish,videoBrandMessages} from './video-brand-locales';
 import {uploadLeaveEnglish,uploadLeaveMessages} from './upload-leave-locales';
 import {suggestionsEnglish,suggestionsMessages} from './suggestions-locales';
+import {withdrawalEnglish,withdrawalMessages} from './withdrawal-locales';
+import {testPayoutEnglish,testPayoutMessages} from './test-payout-locales';
 
 const en = {
+  ...testPayoutEnglish,
+  ...withdrawalEnglish,
   ...storageUnlimitedEnglish,
   ...lastEpisodeFreeEnglish,
   ...videoBrandEnglish,
@@ -77,7 +81,7 @@ const en = {
   requestStorage:'Request more storage', requestedStorage:'Requested total storage (GB)', reason:'Tell us what you need',
   storageBody:'Start with 5 GB. Request a larger allowance as your catalogue grows. Additional storage is reviewed and quoted separately.',
   pending:'Pending', approved:'Approved', rejected:'Declined', paid:'Paid', requestSent:'Your request has been sent.',
-  requestPayout:'Request payout', payoutBody:'Withdraw available earnings from HK$20 equivalent. Requests are reviewed before payout.', payoutAmount:'Amount to withdraw (USD)',
+  requestPayout:'Request payout', payoutAmount:'Amount to withdraw (USD)',
   estimatedHkd:'Estimated HKD value', exchangeNote:'Indicative exchange rate. Your payout provider determines the final conversion and fees.',
   connectPayout:'Set up payout account', payoutHistory:'Payout requests', noPayouts:'No payout requests yet.',
   profile:'Profile', preferences:'Preferences', saveProfile:'Save profile', installApp:'Add to home screen', installHint:'Use your browser menu and choose “Add to Home Screen”.',
@@ -189,6 +193,8 @@ for(const language of LANGUAGES){if(!coverArtworkMessages[language.code])throw n
 for(const language of LANGUAGES){if(!subtitleLanguageMessages[language.code])throw new Error(`Subtitle language translations missing: ${language.code}`);Object.assign(dictionaries[language.code],subtitleLanguageMessages[language.code]);}
 for(const language of LANGUAGES){if(!seriesAccessMessages[language.code])throw new Error(`Series access translations missing: ${language.code}`);Object.assign(dictionaries[language.code],seriesAccessMessages[language.code]);}
 for(const language of LANGUAGES){if(!suggestionsMessages[language.code])throw new Error(`Suggestion translations missing: ${language.code}`);Object.assign(dictionaries[language.code],suggestionsMessages[language.code]);}
+for(const language of LANGUAGES)Object.assign(dictionaries[language.code],withdrawalMessages[language.code]);
+for(const language of LANGUAGES)Object.assign(dictionaries[language.code],testPayoutMessages[language.code]);
 const uploadConfirmationMessages:Record<Locale,string>={
   en:'Upload confirmation was interrupted. Refresh this series before retrying the file.',
   'zh-TW':'上傳確認中斷。請重新整理此系列，再重試上傳檔案。',

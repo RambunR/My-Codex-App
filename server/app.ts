@@ -37,6 +37,9 @@ import {episodeDurationSql,legacyEpisodeDuration,writeEpisodeDuration} from './e
 import {responseSecurityHeaders} from '../shared/security-headers.js';
 import {registerEpisodeBatch,episodeBatchRevision,assertEpisodeBatchWritable,deleteSingleEpisode} from './episode-batch.js';
 import {WALLET_FUNDING_OPTIONS} from '../shared/funding-rewards.js';
+import {WITHDRAWAL_POLICY} from '../shared/withdrawals.js';
+import {withdrawalTerms,WITHDRAWAL_TERMS_SQL} from './withdrawal-terms.js';
+import {registerTestPayoutRoutes,registerTestPayoutWebhook} from './test-payouts.js';
 import {initializePublisherProfiles,registerPublisherProfiles,seriesPublisher,assignSeriesPublisher,publisherProfileIdSchema} from './publisher-profiles.js';
 import {publisherNameSql} from './publisher-profile-sql.js';
 import {coverAspectRatioSchema,seriesCoverAspectRatio,writeSeriesCoverLayout} from './cover-layout.js';
@@ -97,6 +100,7 @@ export function createApp() {
   if (process.env.TRUST_PROXY === 'true') app.set('trust proxy', 1);
   app.use((req, res, next) => { for(const[name,value]of Object.entries(responseSecurityHeaders(req.path)))res.setHeader(name,value); if(req.path==='/auth')res.setHeader('Cache-Control','no-store'); next(); });
   app.use('/api',credentialedCors);
+  registerTestPayoutWebhook(app);
   app.post('/api/payments/webhook', express.raw({ type: 'application/json', limit: '1mb' }), async (req, res) => {
     // Check both saved pairs. The UI switch selects new Checkout, not which
     // already-issued payments or later refund/dispute events remain payable.
@@ -164,12 +168,13 @@ export function createApp() {
     next();
   }, readSession, rateLimit('api', 1500, 60_000));
   registerGoogleAuth(app);
+  registerTestPayoutRoutes(app);
   registerAppleAuth(app);
   registerEmailAuth(app);
   registerPublisherProfiles(app,{catalogSelect,serializeSeries});
   app.get('/api/health', (_req,res) => res.json({ ok: true, database: !!one('SELECT 1 AS ready') }));
   app.get('/api/config', async (_req,res) => {initializePromotions();if(config.payments==='stripe'&&stripeConfigured())await ensureStripeWebhookReady(stripe);return res.json({ brand: 'LingYing', languages: LANGUAGES, genres: GENRES,standardGenres:STANDARD_GENRES,storyThemes:STORY_THEMES,formats:SERIES_FORMATS,creationTypes:CREATION_TYPES, passPromotion:{enabled:true},paymentsMode: config.payments,paymentsReady:paymentsReady(),paymentsConfigured:stripeConfigured(),paymentSetup:stripeWebhookReadiness(),sandbox:config.sandbox,paymentsTestMode:stripeTestPayments()||config.payments==='demo',payoutsEnabled:config.payoutsEnabled&&!stripeTestPayments(),uploadsEnabled:!config.sandbox,usdToHkd: config.usdToHkd,
-    limits: { maxEpisodeSeconds: MAX_EPISODE_SECONDS, maxEpisodeBytes: MAX_EPISODE_BYTES, quotaBytes: DEFAULT_QUOTA_BYTES, activationHkd: 88, minimumPriceUsd: 0.1, creatorShare: 0.7, minimumPayoutHkd: 20,minWalletFundingUsd:MIN_WALLET_FUNDING_CENTS/100,maxWalletFundingUsd:MAX_WALLET_FUNDING_CENTS/100 },walletFunding:WALLET_FUNDING_OPTIONS, demo: config.seed,episodeUpload:{mode:chunkedEpisodeUploadsEnabled()?'chunked':'multipart',chunkBytes:EPISODE_UPLOAD_CHUNK_BYTES}, runtime: (config as any).runtime || 'node', videoFormats: (config as any).videoFormats || ['mp4','mov','webm','m4v'], auth:{google:googleEnabled(),apple:appleEnabled(),email:emailAuthEnabled()} });});
+    limits: { maxEpisodeSeconds: MAX_EPISODE_SECONDS, maxEpisodeBytes: MAX_EPISODE_BYTES, quotaBytes: DEFAULT_QUOTA_BYTES, activationHkd: 88, minimumPriceUsd: 0.1, creatorShare: 0.7, minimumPayoutUsd: WITHDRAWAL_POLICY.minimumCents/100,minWalletFundingUsd:MIN_WALLET_FUNDING_CENTS/100,maxWalletFundingUsd:MAX_WALLET_FUNDING_CENTS/100 },withdrawalPolicy:WITHDRAWAL_POLICY,walletFunding:WALLET_FUNDING_OPTIONS, demo: config.seed,episodeUpload:{mode:chunkedEpisodeUploadsEnabled()?'chunked':'multipart',chunkBytes:EPISODE_UPLOAD_CHUNK_BYTES}, runtime: (config as any).runtime || 'node', videoFormats: (config as any).videoFormats || ['mp4','mov','webm','m4v'], auth:{google:googleEnabled(),apple:appleEnabled(),email:emailAuthEnabled()} });});
   app.get('/api/auth/me', (req,res) => res.json({ user: req.user || null }));
   app.post('/api/auth/register', rateLimit('register', 12, 15 * 60_000), async (req,res) => {
     const body = registration.parse(req.body);
@@ -302,7 +307,7 @@ export function createApp() {
   app.get('/api/studio', requireAuth, (req,res) => {
     const user=req.user!;void finishInBackground(cleanupSeriesMedia(undefined,20)).catch(()=>{});void finishInBackground(cleanupExpiredEpisodeUploads(5)).catch(()=>{});res.json({ user:getUser(user.id),series:all(`${catalogSelect} WHERE s.creator_id=? AND NOT EXISTS (SELECT 1 FROM series_deletions d WHERE d.series_id=s.id) AND NOT EXISTS (SELECT 1 FROM retired_catalog_series r WHERE r.series_id=s.id) ORDER BY s.created_at DESC`,user.id).map(s=>serializeSeries(s,user.id,true)),
       stats:one(`SELECT COUNT(*) AS sales,COALESCE(SUM(p.creator_micros),0) AS lifetime_micros FROM ${purchaseTable()} p JOIN episodes e ON e.id=p.episode_id JOIN series s ON s.id=e.series_id WHERE s.creator_id=?`,user.id),
-      withdrawals:stripeTestPayments()?[]:all('SELECT * FROM withdrawals WHERE user_id=? ORDER BY created_at DESC',user.id), storageRequests:all('SELECT * FROM storage_requests WHERE user_id=? ORDER BY created_at DESC',user.id) });
+      withdrawals:stripeTestPayments()?[]:all(`SELECT w.*,${WITHDRAWAL_TERMS_SQL} FROM withdrawals w LEFT JOIN withdrawal_terms wt ON wt.withdrawal_id=w.id WHERE w.user_id=? ORDER BY w.created_at DESC`,user.id), storageRequests:all('SELECT * FROM storage_requests WHERE user_id=? ORDER BY created_at DESC',user.id) });
   });
   app.get('/api/studio/series/:id/lifecycle',requireAuth,rateLimit('series-delete-preview',30,60_000),(req,res)=>{
     ownSeries(req);res.setHeader('Cache-Control','private, no-store');res.json(previewSeriesDeletion(req.user!.id,id(req)));
@@ -458,7 +463,7 @@ export function createApp() {
     stats:{users:one('SELECT COUNT(*) AS n FROM users')!.n,publishers:one(`SELECT COUNT(*) AS n FROM users WHERE publisher_active=1${usingTestPaymentState()?' OR EXISTS(SELECT 1 FROM test_accounts t WHERE t.user_id=users.id AND t.publisher_active=1)':''}`)!.n,
       sales:one(`SELECT COUNT(*) AS n,COALESCE(SUM(price_micros),0) AS gross_micros,COALESCE(SUM(platform_micros),0) AS platform_micros FROM ${purchaseTable()}`),activation_hkd:one(`SELECT COALESCE(SUM(amount_cents),0)/100.0 AS n FROM ${paymentTable()} WHERE kind='activation' AND status='paid'`)!.n},
     storageRequests:all('SELECT r.*,u.name,u.email,u.quota_bytes,u.used_bytes FROM storage_requests r JOIN users u ON u.id=r.user_id ORDER BY r.created_at DESC'),
-    withdrawals:stripeTestPayments()?[]:all('SELECT w.*,u.name,u.email,u.stripe_account_id FROM withdrawals w JOIN users u ON u.id=w.user_id ORDER BY w.created_at DESC'),
+    withdrawals:stripeTestPayments()?[]:all(`SELECT w.*,u.name,u.email,u.stripe_account_id,${WITHDRAWAL_TERMS_SQL} FROM withdrawals w JOIN users u ON u.id=w.user_id LEFT JOIN withdrawal_terms wt ON wt.withdrawal_id=w.id ORDER BY w.created_at DESC`),
     users:all('SELECT id,name,email,role,publisher_active,quota_bytes,used_bytes FROM users ORDER BY created_at DESC LIMIT 200').map(user=>{const current=usingTestPaymentState()?{...user,role:getUser(user.id)!.role,publisher_active:getUser(user.id)!.publisher_active}:user;return{...current,storage_unlimited:current.role==='admin'};}),
   }));
   app.post('/api/admin/storage-requests/:id', requireAdmin, (req,res) => {
@@ -475,7 +480,8 @@ export function createApp() {
     run("UPDATE withdrawals SET status='processing' WHERE id=? AND status='pending'",w.id);
     if(config.payments==='stripe'){
       assert(stripe && w.stripe_account_id,400,'CONNECT_REQUIRED','Publisher payout account is missing.');
-      const transfer=await stripe.transfers.create({amount:Math.floor(w.amount_micros/10000),currency:'usd',destination:w.stripe_account_id,metadata:{withdrawalId:w.id}},{idempotencyKey:`withdrawal:${w.id}`});
+      const terms=withdrawalTerms(w.id,w.amount_micros);
+      const transfer=await stripe.transfers.create({amount:Math.floor(terms.payout_micros/10000),currency:'usd',destination:w.stripe_account_id,metadata:{withdrawalId:w.id}},{idempotencyKey:`withdrawal:${w.id}`});
       run("UPDATE withdrawals SET status='paid',transfer_id=? WHERE id=?",transfer.id,w.id);
     }else{assert(config.payments==='demo'&&!config.production,503,'PAYMENTS_UNAVAILABLE','Payouts unavailable.');run("UPDATE withdrawals SET status='paid',transfer_id=? WHERE id=?",`demo_${w.id}`,w.id);}
     res.json({ok:true});

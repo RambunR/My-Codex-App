@@ -44,6 +44,46 @@ test('live Checkout can be available while creator payout controls remain paused
   expect(writes).toEqual([]);
 });
 
+test('earnings show the USD10 minimum, USD1 fee and processing time before a gross withdrawal is submitted',async({page})=>{
+  await configureLive(page);
+  await page.route('**/api/config',async route=>{const response=await route.fetch();const config=await response.json();await route.fulfill({response,json:{...config,paymentsMode:'stripe',paymentsReady:true,paymentsTestMode:false,payoutsEnabled:true}});});
+  const submitted:unknown[]=[];
+  await page.route('**/api/studio/withdrawals',async route=>{submitted.push(route.request().postDataJSON());await route.fulfill({status:201,json:{id:'withdrawal-browser-fixture'}});});
+  await page.goto('/studio');
+  await page.getByRole('button',{name:'Earnings & payouts',exact:true}).click();
+  const callout=page.locator('.earnings-callout');
+  await expect(callout).toContainText('Minimum withdrawal: US$10.00.');
+  await expect(callout).toContainText('A US$1.00 fee is deducted');
+  await expect(callout).toContainText('within 3–5 days of submission');
+  await callout.getByRole('button',{name:'Request payout',exact:true}).click();
+  const dialog=page.getByRole('dialog');
+  const amount=dialog.getByLabel('Amount to withdraw (USD)');
+  await expect(amount).toHaveAttribute('min','10.00');await expect(amount).toHaveValue('10.00');
+  await expect(dialog.locator('.balance-row').filter({hasText:'Withdrawal fee'})).toContainText('$1.00');
+  await expect(dialog.locator('.balance-row').filter({hasText:'Net withdrawal'})).toContainText('$9.00');
+  await amount.fill('9.99');await expect(dialog.getByRole('button',{name:'Request payout',exact:true})).toBeDisabled();
+  expect(submitted).toEqual([]);
+  await amount.fill('10.001');await expect(dialog.getByRole('button',{name:'Request payout',exact:true})).toBeDisabled();
+  await amount.fill('10.00');
+  await page.setViewportSize({width:390,height:844});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await dialog.getByRole('button',{name:'Request payout',exact:true}).click();
+  await expect(dialog).toHaveCount(0);expect(submitted).toEqual([{amount_cents:1000}]);
+});
+
+test('Traditional Chinese earnings disclose the same policy while real withdrawals remain paused',async({page})=>{
+  await configureLive(page);
+  await page.addInitScript(()=>localStorage.setItem('drama-language','zh-TW'));
+  await page.goto('/studio');
+  await page.getByRole('button',{name:'收益與提款',exact:true}).click();
+  const callout=page.locator('.earnings-callout');
+  await expect(callout).toContainText('最低提領金額為 US$10.00');
+  await expect(callout).toContainText('扣除 US$1.00 手續費');
+  await expect(callout).toContainText('送出後 3–5 天內處理');
+  await page.setViewportSize({width:390,height:844});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+
 test('admin payment review requires mapped evidence, notes and explicit accounting confirmation',async({page})=>{
   await configureLive(page);
   await page.route('**/api/auth/me',route=>route.fulfill({json:{user:{...user,role:'admin'}}}));

@@ -16,6 +16,7 @@ import {ensureStripeWebhookReady,stripeWebhookReadiness,resetStripeReadiness} fr
 import {assertSeriesAvailable} from './moderation.js';
 import {fundingRewardQuote} from '../shared/funding-rewards.js';
 import {storeFundingQuote,fundingCreditForPayment} from './funding-rewards.js';
+import {WITHDRAWAL_POLICY} from '../shared/withdrawals.js';
 
 export let stripe = config.stripeKey ? new Stripe(config.stripeKey, {httpClient:Stripe.createFetchHttpClient()}) : null;
 const stripeLocales:Record<string,Stripe.Checkout.SessionCreateParams.Locale>={en:'en','zh-TW':'zh-TW','zh-CN':'zh',ja:'ja',ko:'ko',id:'id','pt-BR':'pt-BR',es:'es-419',vi:'vi',th:'th',fil:'fil',tr:'tr',ru:'ru',fr:'fr',de:'de',ms:'ms'};
@@ -101,13 +102,15 @@ export function requestWithdrawal(userId: string, amountCents: number, note = ''
   assertPayoutsEnabled();
   assertPaymentAccountClear(userId);
   assert(Number.isSafeInteger(amountCents) && amountCents > 0, 400, 'INVALID_AMOUNT', 'Enter a valid withdrawal amount.');
-  assert(amountCents * config.usdToHkd / 100 >= 20, 400, 'MIN_WITHDRAWAL', 'The minimum payout is HK$20 equivalent.');
+  assert(amountCents >= WITHDRAWAL_POLICY.minimumCents, 400, 'MIN_WITHDRAWAL', 'The minimum withdrawal is US$10.00.');
   return transaction(() => {
     const user = one('SELECT earnings_micros FROM users WHERE id=?', userId); const amount = amountCents * 10000;
     assert(user && user.earnings_micros >= amount, 400, 'INSUFFICIENT_EARNINGS', 'Your available earnings are too low.');
     const id = crypto.randomUUID();
     run('UPDATE users SET earnings_micros=earnings_micros-? WHERE id=?', amount, userId);
     run('INSERT INTO withdrawals (id,user_id,amount_micros,note) VALUES (?,?,?,?)', id, userId, amount, note);
+    const fee=WITHDRAWAL_POLICY.feeCents*10000;
+    run('INSERT INTO withdrawal_terms (withdrawal_id,policy_version,gross_micros,fee_micros,payout_micros,processing_min_days,processing_max_days) VALUES (?,?,?,?,?,?,?)',id,WITHDRAWAL_POLICY.version,amount,fee,amount-fee,WITHDRAWAL_POLICY.processingMinDays,WITHDRAWAL_POLICY.processingMaxDays);
     addLedger(userId, 'withdrawal', -amount, id, 'Payout requested · funds reserved');
     return id;
   });

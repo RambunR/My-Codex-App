@@ -51,6 +51,7 @@ export interface User extends StorageUsage {
   id: string; name: string; email: string; role: 'viewer' | 'publisher' | 'admin'; publisher_active: number;
   wallet_micros: number; earnings_micros: number; language: string;
   stripe_account_id?: string; connected?: boolean;
+  test_withdrawal_unlimited?:boolean;
   creator_display_name?: string;
   email_verified?: boolean;
   payment_review?: boolean;

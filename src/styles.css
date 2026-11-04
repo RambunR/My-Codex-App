@@ -36,3 +36,5 @@
 .home-heading h1,.page-heading h1,.publisher-intro>h1,.auth-form-panel>h1,.detail-info>h1,.watch-series-intro>h1{color:#ead8ff}
 @supports(background-clip:text){.brand>span{background:var(--brand-gradient);background-clip:text;-webkit-background-clip:text;color:transparent}}
 @media(forced-colors:active){.brand>span{background:none;color:LinkText}.button.primary{background:ButtonFace;color:ButtonText;border-color:ButtonText}}
+
+.withdrawal-breakdown{display:grid;gap:4px;min-width:0}.withdrawal-breakdown small{font-size:11px;color:var(--muted);overflow-wrap:anywhere}

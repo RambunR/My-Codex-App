@@ -32,7 +32,8 @@ async function start(production=false,testStripe=false,publicOrigin=base,missing
   args.push('--var','PLATFORM_ADMIN_EMAIL_SHA256:'+createHash('sha256').update('viewer@example.test').digest('hex'));
   child=spawn(process.execPath,args,{env:{...process.env,XDG_CONFIG_HOME:path.join(dir,'config'),WRANGLER_SEND_METRICS:'false',WRANGLER_LOG_PATH:path.join(dir,'wrangler.log')},stdio:['ignore','pipe','pipe']});
   child.stdout.on('data',d=>{logs+=d;});child.stderr.on('data',d=>{logs+=d;});
-  for(let n=0;n<120;n++){
+  const startupDeadline=Date.now()+Number(process.env.CLOUDFLARE_TEST_STARTUP_TIMEOUT_MS||30_000);
+  while(Date.now()<startupDeadline){
     if(child.exitCode!==null)throw new Error(`Local Cloudflare server exited: ${logs}`);
     try{const r=await fetch(base+'/api/health',{signal:AbortSignal.timeout(1000)});if(r.ok&&(await r.json()).database)return;}catch{}
     await new Promise(r=>setTimeout(r,250));
@@ -378,7 +379,21 @@ try{
   const report=(await request('/api/admin',undefined,admin)).data;assert.equal(report.stats.sales.platform_micros,1_503_000);
   const paid=await fetch(base+`/api/episodes/${second.id}/stream`,{headers:{Cookie:viewer,Range:'bytes=0-15'}});assert.equal(paid.status,206);assert.equal((await paid.arrayBuffer()).byteLength,16);
   await request('/api/studio/withdrawals',{amount_cents:100},publisher,400);
-  const withdrawal=(await request('/api/studio/withdrawals',{amount_cents:300,note:'Local test only'},publisher,201)).data;
+  await request('/api/studio/withdrawals',{amount_cents:999},publisher,400);
+  await request('/api/studio/withdrawals',{amount_cents:1000},publisher,400);
+  // Earn enough through an actual, entirely local demo purchase to exercise the
+  // USD10 minimum and fee snapshot without fabricating a production balance.
+  const payoutBuyer=(await request('/api/auth/register',{name:'Payout smoke viewer',email:'payout-smoke@example.test',password},'',201)).cookie;
+  const payoutFunding=(await request('/api/payments/checkout',{kind:'funding',amount_cents:2000},payoutBuyer)).data;
+  await request(`/api/payments/${payoutFunding.paymentId}/demo-confirm`,{},payoutBuyer);
+  const payoutSeries=(await request(`/api/studio/series/${sid}`,undefined,publisher)).data.series;
+  const payoutPricing={title:payoutSeries.title,description:payoutSeries.description,language:payoutSeries.language,genres:payoutSeries.genres,free_episodes:payoutSeries.free_episodes,creation_type:payoutSeries.creation_type};
+  await request(`/api/studio/series/${sid}`,{...payoutPricing,price_cents:2000},publisher,200,'PATCH');
+  await request(`/api/episodes/${second.id}/unlock`,{},payoutBuyer);
+  await request(`/api/studio/series/${sid}`,{...payoutPricing,price_cents:payoutSeries.price_cents},publisher,200,'PATCH');
+  const withdrawal=(await request('/api/studio/withdrawals',{amount_cents:1700,note:'Local test only'},publisher,201)).data;
+  const terms=(await request('/api/studio',undefined,publisher)).data.withdrawals.find(row=>row.id===withdrawal.id);
+  assert.equal(terms.amount_micros,17_000_000);assert.equal(terms.fee_micros,1_000_000);assert.equal(terms.payout_micros,16_000_000);
   assert.equal(withdrawal.user.earnings_micros,507_000);
   await request(`/api/admin/withdrawals/${withdrawal.id}`,{approve:true},admin);
   await request(`/api/admin/withdrawals/${withdrawal.id}`,{approve:true},admin,409);
@@ -392,7 +407,7 @@ try{
   await request(adminSeriesPath,undefined,viewer,403);
   await request(adminSeriesPath,undefined,publisher,403);
   const managed=(await request(adminSeriesPath,undefined,admin)).data;
-  assert.equal(managed.total,1);assert.equal(managed.series[0].id,sid);assert.equal(managed.series[0].paid_unlocks,1);assert.equal(managed.series[0].taken_down,false);
+  assert.equal(managed.total,1);assert.equal(managed.series[0].id,sid);assert.equal(managed.series[0].paid_unlocks,2);assert.equal(managed.series[0].taken_down,false);
   const moderationFinance=async()=>{
     const [viewerWallet,publisherWallet,report]=await Promise.all([
       request('/api/wallet',undefined,viewer),request('/api/wallet',undefined,publisher),request('/api/admin',undefined,admin),
@@ -601,7 +616,7 @@ try{
   await assertDisposableDeleted();
   await request(`/api/episodes/${disposableEpisode.id}/unlock`,{},viewer,404);
   await request(disposablePath,deletionConfirmation(),publisher,404,'DELETE');
-  assert.equal((await request('/api/studio',undefined,publisher)).data.stats.sales,2,'Deletion must retain historical creator sales.');
+  assert.equal((await request('/api/studio',undefined,publisher)).data.stats.sales,3,'Deletion must retain historical creator sales.');
   console.log('PASS: exact 200 MiB / 240-second upload uses forty 5 MiB requests, survives restart, replays completion once, and preserves full-file SHA-256 and exact quota.');
   console.log('PASS: permanent paid-series deletion enforces private fresh confirmations, removes R2 media and quota exactly, denies restoration, and retains financial receipts and historical sales.');
 
@@ -657,7 +672,7 @@ try{
   const retainedLikes=(await request(`/api/series/${sid}`,undefined,viewer)).data;assert.equal(retainedLikes.series.likes,1);assert.equal(retainedLikes.series.liked,true);
   const retainedNewest=(await request(newestPath)).data.series;assert.equal(retainedNewest[0].id,sid);assert.equal(retainedNewest[0].published_at,publishedAt);
   const resumedGuest=(await request(`/api/episodes/${first.id}/playback`,{},guestPlayback.cookie)).data;assert.equal(resumedGuest.sessionId,guestPlayback.data.sessionId);assert.equal(resumedGuest.viewCounted,true);
-  const retainedAnalytics=(await request(`/api/studio/series/${sid}/analytics?period=7d`,undefined,publisher)).data;assert.equal(retainedAnalytics.totals.views,1);assert.equal(retainedAnalytics.totals.avgWatchSeconds,3.2);assert.equal(retainedAnalytics.totals.paidViewers,1);assert.equal(retainedAnalytics.episodes.find(episode=>episode.id===second.id).paidViewers,1);
+  const retainedAnalytics=(await request(`/api/studio/series/${sid}/analytics?period=7d`,undefined,publisher)).data;assert.equal(retainedAnalytics.totals.views,1);assert.equal(retainedAnalytics.totals.avgWatchSeconds,3.2);assert.equal(retainedAnalytics.totals.paidViewers,2);assert.equal(retainedAnalytics.episodes.find(episode=>episode.id===second.id).paidViewers,2);
   const retainedModerationAudit=(await request(moderationPath,undefined,admin)).data.events;
   assert.deepEqual(retainedModerationAudit,suggestionAudit);
   assert.equal((await request(`/api/studio/series/${sid}`,undefined,admin)).data.series.taken_down,false);
