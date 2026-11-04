@@ -1,6 +1,6 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {Link} from 'react-router-dom';
-import {Play,Pause,Plus,ChevronLeft,ChevronRight,ChevronDown} from 'lucide-react';
+import {Play,Pause,Plus,ChevronDown} from 'lucide-react';
 import {type Series} from '../../shared/config';
 import {languageName,useI18n,type Key} from '../i18n';
 import {CoverArtwork,CoverWatermark} from './CoverArtwork';
@@ -90,7 +90,7 @@ export function SuggestedHero({suggestions,fallback}:{suggestions:Series[];fallb
   return <section className={`hero hero-bounded hero-${hero.genres[0]} ${hero.demo===1?'':'hero-user-artwork'}`} aria-label={hero.title} data-suggested-carousel={suggestions.length>1?'true':'false'} data-carousel-phase={phase} data-autoplay={rotating?'running':'paused'}
     onPointerEnter={event=>{if(event.pointerType!=='touch'){setHoverPaused(true);settleTransition();}}}
     onPointerLeave={event=>{if(event.pointerType!=='touch')setHoverPaused(false);}}
-    onPointerDownCapture={event=>{if(event.pointerType==='touch'&&suggestions.length>1&&!(event.target instanceof Element&&event.target.closest('.hero-pagination button'))){setUserPaused(true);settleTransition();}}}
+    onPointerDownCapture={event=>{if(event.pointerType==='touch'&&suggestions.length>1&&!(event.target instanceof Element&&event.target.closest('.hero-rotation-toggle'))){setUserPaused(true);settleTransition();}}}
     onFocusCapture={()=>{setFocusPaused(true);settleTransition();}}
     onBlurCapture={event=>{if(!(event.relatedTarget instanceof Node)||!event.currentTarget.contains(event.relatedTarget))setFocusPaused(false);}}>
     <div className="hero-art cover-artwork-frame" inert={phase!=='idle'} aria-hidden={phase!=='idle'?true:undefined}><CoverArtwork key={hero.id} src={hero.cover} alt="" fetchPriority="high" decoding="async"/><CoverWatermark/></div>
@@ -100,6 +100,6 @@ export function SuggestedHero({suggestions,fallback}:{suggestions:Series[];fallb
       <div className="hero-synopsis-wrap"><div ref={synopsisRef} className="hero-synopsis" tabIndex={0} role="region" aria-label={t('description')} onScroll={measureHeroScroll}><p>{hero.description}</p></div>{heroScroll.synopsisMore&&<span className="hero-synopsis-more" aria-hidden="true"><ChevronDown size={15}/></span>}</div>
       <div className="hero-buttons"><Link className="button hero-play" to={hero.first_episode_id?`/watch/${hero.id}/${hero.first_episode_id}`:`/series/${hero.id}`}><Play size={17} fill="currentColor"/>{t('watchNow')}</Link><Link className="button hero-details" to={`/series/${hero.id}`}><Plus size={19}/>{t('aboutSeries')}</Link></div>{hero.free_episodes>0&&<span className="hero-free"><span className="free-dot"/>{t('freeAccess')}</span>}
     </div>
-    {suggestions.length>1&&<div className="hero-pagination" role="group" aria-label={t('suggestedByLingYing')}><div>{suggestions.map((series,i)=><button key={series.id} className={i===index?'active':''} aria-label={`${t('suggestedByLingYing')} ${i+1}: ${series.title}`} title={series.title} aria-current={i===index?'true':undefined} onClick={()=>goTo(i)}/>)}</div><span>{String(index+1).padStart(2,'0')} <i>/ {String(suggestions.length).padStart(2,'0')}</i></span>{!reducedMotion&&<button className="hero-rotation-toggle" aria-label={t(userPaused?'carouselResume':'carouselPause')} title={t(userPaused?'carouselResume':'carouselPause')} aria-pressed={userPaused} onClick={toggleRotation}>{userPaused?<Play size={16}/>:<Pause size={16}/>}</button>}<button aria-label={t('previous')} onClick={()=>goTo(index-1)}><ChevronLeft size={16}/></button><button aria-label={t('next')} onClick={()=>goTo(index+1)}><ChevronRight size={16}/></button></div>}
+    {suggestions.length>1&&!reducedMotion&&<button className="hero-rotation-toggle" aria-label={t(userPaused?'carouselResume':'carouselPause')} title={t(userPaused?'carouselResume':'carouselPause')} aria-pressed={userPaused} onClick={toggleRotation}>{userPaused?<Play size={16}/>:<Pause size={16}/>}</button>}
   </section>;
 }

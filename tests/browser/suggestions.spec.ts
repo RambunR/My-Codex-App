@@ -1,9 +1,10 @@
 import {test,expect,type Page,type Locator} from '@playwright/test';
+import {mkdir} from 'node:fs/promises';
 
 const art='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="900"><rect width="600" height="900" fill="#302044"/><rect width="120" height="120" fill="#ef86c0"/></svg>');
 const base={description:'An original drama with a complete publisher-provided synopsis and full artwork.',language:'en',genres:['romance'],themes:[],format:'live-action',creation_type:'human',cover:art,cover_aspect_ratio:'9:16',creator_id:'suggestion-creator',creator_name:'Suggestion Studio',price_cents:30,free_episodes:1,episode_count:2,views:0,saves:0,likes:0,liked:false,status:'published',demo:0,created_at:'2026-11-04T00:00:00Z',taken_down:false};
 const first={...base,id:'suggested-first',title:'The first suggested original',first_episode_id:'suggested-first-001',featured:1};
-const second={...base,id:'suggested-second',title:'The second suggested original',first_episode_id:'suggested-second-001',featured:1};
+const second={...base,id:'suggested-second',title:'The second suggested original',description:'A different original drama about the promise that changed a family forever.',cover:'data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600"><rect width="900" height="600" fill="#103d45"/><circle cx="600" cy="250" r="150" fill="#ffd16f"/></svg>'),first_episode_id:'suggested-second-001',featured:1};
 const popular={...base,id:'popular-unselected',title:'Popular but not selected',first_episode_id:'popular-001',featured:0,views:99999};
 const admin={id:'suggestion-admin',name:'Editorial administrator',email:'editor@browser.test',role:'admin',publisher_active:1,wallet_micros:0,earnings_micros:0,quota_bytes:5*1024**3,used_bytes:0,language:'en',payment_review:false};
 const stats={stats:{users:2,publishers:1,sales:{gross_micros:0,platform_micros:0,n:0},activation_hkd:0},storageRequests:[],withdrawals:[],users:[]};
@@ -28,41 +29,62 @@ async function settledSwitch(page:Page){await page.clock.runFor(400);await expec
 async function noOverflow(page:Page){await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth)).toBeLessThanOrEqual(1);}
 async function titleIs(hero:Locator,title:string){await expect(hero.locator('h2')).toHaveText(title);}
 
-test('only selected releases rotate with a fade and matching active artwork, description and links',async({page})=>{
-  await page.setViewportSize({width:1440,height:900});await frozenClock(page);const state=await publicFixture(page);await page.goto('/');
-  const hero=page.locator('section.hero');await titleIs(hero,first.title);await expect(hero.locator('.spotlight')).toHaveText('Suggested by LingYing');await expect(hero).toHaveAttribute('data-autoplay','running');expect(state.queries.some(query=>new URLSearchParams(query).get('featured')==='true')).toBe(true);
-  await expect(hero.locator('.hero-play')).toHaveAttribute('href',`/watch/${first.id}/${first.first_episode_id}`);
-  await page.clock.runFor(8000);await expect(hero).toHaveAttribute('data-carousel-phase','out');await titleIs(hero,first.title);await expect(hero.locator('.hero-art')).toHaveCSS('transition-property','opacity');await expect(hero.getByRole('link',{name:'Watch now',exact:true})).toHaveCount(0);
-  await settledSwitch(page);await titleIs(hero,second.title);await expect(hero.locator('.hero-details')).toHaveAttribute('href',`/series/${second.id}`);await expect(hero.locator('.hero-play')).toHaveAttribute('href',`/watch/${second.id}/${second.first_episode_id}`);await expect(hero.locator('.hero-synopsis p')).toHaveText(second.description);await expect(hero.locator('.hero-pagination [aria-current="true"]')).toHaveAttribute('title',second.title);
-  await page.clock.runFor(8400);await titleIs(hero,first.title);await expect(hero.locator('h2')).not.toHaveText(popular.title);
-  await hero.getByRole('button',{name:'Next',exact:true}).click();await settledSwitch(page);await titleIs(hero,second.title);await hero.getByRole('button',{name:'Previous',exact:true}).click();await settledSwitch(page);await titleIs(hero,first.title);
-  expect((await hero.boundingBox())!.height).toBeLessThanOrEqual(631);await noOverflow(page);state.clean();
+async function noPagination(hero:Locator){
+  await expect(hero.locator('.hero-pagination')).toHaveCount(0);
+  await expect(hero.getByRole('button',{name:'Previous',exact:true})).toHaveCount(0);await expect(hero.getByRole('button',{name:'Next',exact:true})).toHaveCount(0);
+  await expect(hero.locator('.lucide-chevron-left,.lucide-chevron-right')).toHaveCount(0);await expect(hero.getByText(/^0[12]\s*\/\s*02$/)).toHaveCount(0);
+}
+async function activeRelease(hero:Locator,release:typeof first){
+  await titleIs(hero,release.title);await expect(hero).toHaveAttribute('aria-label',release.title);await expect(hero.locator('.hero-art img')).toHaveAttribute('src',release.cover);await expect(hero.locator('.hero-synopsis p')).toHaveText(release.description);for(const selector of ['h2 a','.hero-details'])await expect(hero.locator(selector)).toHaveAttribute('href',`/series/${release.id}`);await expect(hero.locator('.hero-play')).toHaveAttribute('href',`/watch/${release.id}/${release.first_episode_id}`);
+}
+
+test('selected releases automatically fade artwork and copy together with matching title, synopsis and links and no navigation bar',async({page})=>{
+  await page.setViewportSize({width:1440,height:900});await frozenClock(page);const state=await publicFixture(page);await page.goto('/');const hero=page.locator('section.hero');
+  await activeRelease(hero,first);await expect(hero.locator('.spotlight')).toHaveText('Suggested by LingYing');await expect(hero).toHaveAttribute('data-autoplay','running');expect(state.queries.some(query=>new URLSearchParams(query).get('featured')==='true')).toBe(true);await noPagination(hero);await expect(hero.getByRole('button')).toHaveCount(1);
+  await page.clock.runFor(8000);await expect(hero).toHaveAttribute('data-carousel-phase','out');await activeRelease(hero,first);
+  for(const layer of ['.hero-art','.hero-copy']){await expect(hero.locator(layer)).toHaveCSS('transition-property','opacity');await expect(hero.locator(layer)).toHaveCSS('transition-duration','0.28s');await expect(hero.locator(layer)).toHaveAttribute('inert','');await expect(hero.locator(layer)).toHaveAttribute('aria-hidden','true');}
+  await expect(hero.getByRole('link',{name:'Watch now',exact:true})).toHaveCount(0);
+  const layers=await hero.locator('.hero-art,.hero-copy').evaluateAll(elements=>elements.map(element=>({opacity:Number(getComputedStyle(element).opacity),transition:getComputedStyle(element).transition})));
+  expect(Math.abs(layers[0].opacity-layers[1].opacity)).toBeLessThan(.02);expect(layers[0].transition).toBe(layers[1].transition);
+  await settledSwitch(page);await activeRelease(hero,second);await expect(hero.locator('.hero-copy')).not.toHaveAttribute('inert','');await noPagination(hero);
+  await page.clock.runFor(8400);await activeRelease(hero,first);await expect(hero.locator('h2')).not.toHaveText(popular.title);expect((await hero.boundingBox())!.height).toBeLessThanOrEqual(631);await noOverflow(page);state.clean();
 });
 
-test('reading, hidden tabs and the explicit pause control stop automatic changes',async({page})=>{
+test('hover, keyboard reading, hidden tabs and the compact pause control stop automatic changes',async({page})=>{
   await frozenClock(page);const state=await publicFixture(page);await page.goto('/');const hero=page.locator('section.hero');await titleIs(hero,first.title);
-  await hero.hover();await expect(hero).toHaveAttribute('data-autoplay','paused');await page.clock.runFor(20000);await titleIs(hero,first.title);await page.mouse.move(0,0);
-  await hero.locator('h2 a').focus();await expect(hero).toHaveAttribute('data-autoplay','paused');await page.clock.runFor(20000);await titleIs(hero,first.title);await page.evaluate(()=>(document.activeElement as HTMLElement)?.blur());
-  await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));});await expect(hero).toHaveAttribute('data-autoplay','paused');await page.clock.runFor(20000);await titleIs(hero,first.title);
+  await hero.hover();await expect(hero).toHaveAttribute('data-autoplay','paused');await page.clock.runFor(20000);await activeRelease(hero,first);await page.mouse.move(0,0);
+  await hero.locator('h2 a').focus();await expect(hero).toHaveAttribute('data-autoplay','paused');await page.clock.runFor(20000);await activeRelease(hero,first);await page.evaluate(()=>(document.activeElement as HTMLElement)?.blur());
+  await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));});await expect(hero).toHaveAttribute('data-autoplay','paused');await page.clock.runFor(20000);await activeRelease(hero,first);
   await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:false});document.dispatchEvent(new Event('visibilitychange'));});
-  await hero.getByRole('button',{name:'Pause slideshow',exact:true}).click();await expect(hero.getByRole('button',{name:'Resume slideshow',exact:true})).toHaveAttribute('aria-pressed','true');await page.mouse.move(0,0);await page.clock.runFor(20000);await titleIs(hero,first.title);
-  await hero.getByRole('button',{name:'Resume slideshow',exact:true}).click();await expect(hero).toHaveAttribute('data-autoplay','running');await page.mouse.move(0,0);await page.clock.runFor(8400);await titleIs(hero,second.title);state.clean();
+  await hero.getByRole('button',{name:'Pause slideshow',exact:true}).click();await expect(hero.getByRole('button',{name:'Resume slideshow',exact:true})).toHaveAttribute('aria-pressed','true');await page.mouse.move(0,0);await page.clock.runFor(20000);await activeRelease(hero,first);
+  await hero.getByRole('button',{name:'Resume slideshow',exact:true}).click();await expect(hero).toHaveAttribute('data-autoplay','running');await page.mouse.move(0,0);await page.clock.runFor(8400);await activeRelease(hero,second);await noPagination(hero);state.clean();
 });
 
-test('reduced motion keeps suggestions still and manual navigation switches instantly',async({page})=>{
-  await page.emulateMedia({reducedMotion:'reduce'});await frozenClock(page);const state=await publicFixture(page);await page.goto('/');const hero=page.locator('section.hero');await titleIs(hero,first.title);await expect(hero.locator('.hero-rotation-toggle')).toHaveCount(0);await page.clock.runFor(30000);await titleIs(hero,first.title);
-  await hero.getByRole('button',{name:'Next',exact:true}).click();await titleIs(hero,second.title);await expect(hero).toHaveAttribute('data-carousel-phase','idle');await expect(hero.locator('.hero-art')).toHaveCSS('transition-duration','0s');state.clean();
+test('interaction during fade cancels the swap before artwork or action links can change under the reader',async({page})=>{
+  await frozenClock(page);const state=await publicFixture(page);await page.goto('/');const hero=page.locator('section.hero');await activeRelease(hero,first);await page.clock.runFor(8000);await expect(hero).toHaveAttribute('data-carousel-phase','out');
+  await hero.hover();await expect(hero).toHaveAttribute('data-carousel-phase','idle');await expect(hero).toHaveAttribute('data-autoplay','paused');await page.clock.runFor(20000);await activeRelease(hero,first);await page.mouse.move(0,0);await page.clock.runFor(8400);await activeRelease(hero,second);state.clean();
 });
 
-for(const selected of [[],[first]])test(`${selected.length} selected releases remain static without unnecessary slideshow controls`,async({page})=>{
-  await frozenClock(page);const state=await publicFixture(page,selected);await page.goto('/');const hero=page.locator('section.hero');await titleIs(hero,selected.length?first.title:popular.title);await expect(hero.locator('.hero-pagination')).toHaveCount(0);await page.clock.runFor(30000);await titleIs(hero,selected.length?first.title:popular.title);if(!selected.length)await expect(hero.locator('.spotlight')).toHaveText('Fresh off the reel');state.clean();
+test('reduced motion keeps suggested releases static without slideshow controls or transitions',async({page})=>{
+  await page.emulateMedia({reducedMotion:'reduce'});await frozenClock(page);const state=await publicFixture(page);await page.goto('/');const hero=page.locator('section.hero');await activeRelease(hero,first);await expect(hero.getByRole('button')).toHaveCount(0);await noPagination(hero);await expect(hero).toHaveAttribute('data-autoplay','paused');await page.clock.runFor(30000);await activeRelease(hero,first);await expect(hero).toHaveAttribute('data-carousel-phase','idle');for(const selector of ['.hero-art','.hero-copy'])await expect(hero.locator(selector)).toHaveCSS('transition-duration','0s');state.clean();
+});
+
+for(const selected of [[],[first]])test(`${selected.length} selected releases remain static without any slideshow controls or footer bar`,async({page})=>{
+  await frozenClock(page);const state=await publicFixture(page,selected);await page.goto('/');const hero=page.locator('section.hero');await activeRelease(hero,selected.length?first:popular);await noPagination(hero);await expect(hero.getByRole('button')).toHaveCount(0);await page.clock.runFor(30000);await activeRelease(hero,selected.length?first:popular);if(!selected.length)await expect(hero.locator('.spotlight')).toHaveText('Fresh off the reel');state.clean();
+});
+
+for(const size of [{name:'desktop',width:1440,height:900,portrait:false},{name:'narrow phone',width:320,height:568,portrait:true},{name:'short landscape',width:844,height:390,portrait:false}])test(`automatic hero fills its ${size.name} grid without a blank navigation footer and stays below 70% height`,async({page})=>{
+  await page.setViewportSize({width:size.width,height:size.height});await frozenClock(page);const state=await publicFixture(page);await page.goto('/');const hero=page.locator('section.hero');await activeRelease(hero,first);await noPagination(hero);await page.evaluate(()=>document.fonts.ready);
+  const bounds=await hero.evaluate(element=>{const hero=element.getBoundingClientRect(),art=element.querySelector('.hero-art')!.getBoundingClientRect(),copy=element.querySelector('.hero-copy')!.getBoundingClientRect();return{hero:{top:hero.top,bottom:hero.bottom,height:hero.height},art:{top:art.top,bottom:art.bottom},copy:{top:copy.top,bottom:copy.bottom},rows:getComputedStyle(element).gridTemplateRows.split(' ').filter(Boolean).length};});
+  expect(bounds.hero.height).toBeLessThanOrEqual(size.height*.7+1);expect(bounds.rows).toBe(size.portrait?2:1);expect(Math.abs((size.portrait?bounds.copy.bottom:bounds.art.bottom)-bounds.hero.bottom)).toBeLessThanOrEqual(2);await expect(hero.locator('.hero-art img')).toHaveCSS('object-fit','contain');await expect(hero.locator('.hero-art img')).toHaveCSS('transform','none');await noOverflow(page);state.clean();
+  if(size.name!=='short landscape'){await page.route('**/api/series?featured=true',route=>route.fulfill({json:{series:[{...first,cover:'/images/hero.jpg'},second]}}));await page.reload();await expect(hero.locator('.hero-art img')).toHaveAttribute('src','/images/hero.jpg');await hero.locator('.hero-art img').evaluate((image:HTMLImageElement)=>image.decode());await mkdir('/workspace/exports',{recursive:true});await hero.screenshot({path:`/workspace/exports/lingying-hero-fade-${size.portrait?'mobile':'desktop'}.png`});state.clean();}
 });
 
 test.describe('Traditional Chinese touch layout',()=>{
   test.use({viewport:{width:390,height:844},hasTouch:true,isMobile:true});
-  test('touching a suggestion pauses rotation while manual controls and full artwork remain available',async({page})=>{
-    await frozenClock(page);const state=await publicFixture(page,[first,second],'zh-TW');await page.goto('/');const hero=page.locator('section.hero');await titleIs(hero,first.title);await expect(hero.locator('.spotlight')).toHaveText('靈映推薦');await hero.locator('.hero-story-meta').tap();await expect(hero).toHaveAttribute('data-autoplay','paused');await page.clock.runFor(20000);await titleIs(hero,first.title);
-    const next=hero.getByRole('button',{name:'下一集',exact:true});const fallback=hero.locator('.hero-pagination>button').last();const control=await next.count()?next:fallback;const box=(await control.boundingBox())!;expect(box.width).toBeGreaterThanOrEqual(44);expect(box.height).toBeGreaterThanOrEqual(44);await control.tap();await settledSwitch(page);await titleIs(hero,second.title);await expect(hero.locator('.hero-art img')).toHaveCSS('object-fit','contain');expect((await hero.boundingBox())!.height).toBeLessThanOrEqual(844*.7+1);await noOverflow(page);state.clean();
+  test('touch pauses suggestions and the standalone resume control restarts coordinated fades without pagination',async({page})=>{
+    await frozenClock(page);const state=await publicFixture(page,[first,second],'zh-TW');await page.goto('/');const hero=page.locator('section.hero');await activeRelease(hero,first);await expect(hero.locator('.spotlight')).toHaveText('靈映推薦');const control=hero.locator('.hero-rotation-toggle');await control.tap();await expect(control).toHaveAttribute('aria-pressed','true');await expect(hero).toHaveAttribute('data-autoplay','paused');await page.clock.runFor(20000);await activeRelease(hero,first);await control.tap();await expect(control).toHaveAttribute('aria-pressed','false');await expect(hero).toHaveAttribute('data-autoplay','running');await hero.locator('.hero-story-meta').tap();await expect(hero).toHaveAttribute('data-autoplay','paused');await page.clock.runFor(20000);await activeRelease(hero,first);
+    await noPagination(hero);await expect(control).toHaveAttribute('aria-pressed','true');const box=(await control.boundingBox())!;expect(box.width).toBeGreaterThanOrEqual(44);expect(box.height).toBeGreaterThanOrEqual(44);await control.tap();await expect(control).toHaveAttribute('aria-pressed','false');await expect(hero).toHaveAttribute('data-autoplay','running');await page.clock.runFor(8400);await activeRelease(hero,second);await expect(hero.locator('.hero-art img')).toHaveCSS('object-fit','contain');expect((await hero.boundingBox())!.height).toBeLessThanOrEqual(844*.7+1);await noOverflow(page);state.clean();
   });
 });
 

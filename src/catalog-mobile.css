@@ -66,11 +66,6 @@
   .home-page .hero-buttons .button { font-size: 14px; min-height: 48px; padding: 10px; line-height: 1.4; white-space: normal; text-align: center; }
   .home-page .hero-buttons .button svg { flex-shrink: 0; }
   .home-page .hero-free { font-size: 12px; line-height: 1.6; }
-  .home-page .hero-pagination { inset-inline: 20px; bottom: 16px; }
-  .home-page .hero-pagination > div { display: none; }
-  .home-page .hero-pagination > span { font-size: 12px; margin-inline-end: auto; }
-  .home-page .hero-pagination > button { width: 44px; height: 44px; min-width: 44px; }
-  .home-page .hero-pagination > button svg { width: 20px; height: 20px; }
   .home-page .genre-bar { scroll-padding-inline: 19px; overscroll-behavior-inline: contain; }
   .home-page .genre-bar > button,
   .home-page .genre-bar > a { min-height: 44px; font-size: 14px; padding-inline: 16px; flex-shrink: 0; }
