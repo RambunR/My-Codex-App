@@ -10,7 +10,7 @@ const rate=(quote='TWD',value=4.169)=>({base:'HKD',quote,rate:value,date:'2026-1
 
 test('Taiwan comes from trusted country metadata and rates receive no browser-supplied location or payment data',async()=>{
   let called=0;
-  const fetcher:typeof fetch=async(url,init)=>{called++;assert.equal(String(url),'https://api.frankfurter.dev/v2/rate/HKD/TWD');assert.deepEqual(init?.headers,{Accept:'application/json'});assert.equal(init?.redirect,'error');assert.ok(init?.signal);return Response.json(rate());};
+  const fetcher:typeof fetch=async(url,init)=>{called++;assert.equal(String(url),'https://api.frankfurter.dev/v2/rate/HKD/TWD');assert.deepEqual(init?.headers,{Accept:'application/json'});assert.equal(init?.redirect,'manual');assert.ok(init?.signal);return Response.json(rate());};
   const response=await displayCurrencyResponse(request('TW',{headers:{'CF-IPCountry':'JP','Accept-Language':'fr',Cookie:'private-fixture'}}),{fetcher,now});
   assert.equal(called,1);assert.equal(response.headers.get('Cache-Control'),'private, no-store');
   assert.deepEqual((await response.json()).quote,{country:'TW',currency:'TWD',ratePerHkd:4.169,asOf:'2026-11-04'});
@@ -45,6 +45,10 @@ test('provider errors, malformed/stale dates, wrong pairs and invalid rates fail
 test('the display endpoint is read-only, and HEAD has no response body',async()=>{
   const write=await displayCurrencyResponse(request('TW',{method:'POST'}));assert.equal(write.status,405);assert.equal(write.headers.get('Allow'),'GET, HEAD');
   const head=await displayCurrencyResponse(request('HK',{method:'HEAD'}));assert.equal(head.status,200);assert.equal(await head.text(),'');
+});
+test('provider redirects are rejected using the Workers-supported manual mode without following another host',async()=>{
+  let calls=0;const fetcher:typeof fetch=async(_url,init)=>{calls++;assert.equal(init?.redirect,'manual');return new Response(null,{status:302,headers:{Location:'https://unexpected.example/rate'}});};
+  const response=await displayCurrencyResponse(request('TW'),{fetcher,now});assert.equal((await response.json()).quote.currency,'HKD');assert.equal(calls,1);
 });
 test('localized labels use clear currencies, correct decimal precision and the same promotional amount without mutating billing cents',()=>{
   const tw={country:'TW',currency:'TWD',ratePerHkd:4.169,asOf:'2026-11-04'};

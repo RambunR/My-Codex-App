@@ -21,7 +21,9 @@ export async function displayCurrencyResponse(request:Request,dependencies:Depen
     const cache=dependencies.cache||(globalThis as unknown as {caches?:{default?:RateCache}}).caches?.default;
     let rate:any;try{const cached=await cache?.match(key);if(cached)rate=await cached.json();}catch{}
     if(!validRate(rate,currency,now)){
-      const response=await(dependencies.fetcher||fetch)(key.url,{signal:AbortSignal.timeout(3500),redirect:'error',headers:{Accept:'application/json'}});
+      // Workers supports manual/follow, but rejects Fetch's "error" mode.
+      // Treat redirects as unavailable rather than following another URL.
+      const response=await(dependencies.fetcher||fetch)(key.url,{signal:AbortSignal.timeout(3500),redirect:'manual',headers:{Accept:'application/json'}});
       if(!response.ok)throw new Error('Rate unavailable');
       const body=await response.text();if(body.length>16384)throw new Error('Rate response too large');
       rate=JSON.parse(body);if(!validRate(rate,currency,now))throw new Error('Invalid or stale rate');
