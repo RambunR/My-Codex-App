@@ -2,12 +2,13 @@ import type {CSSProperties,ImgHTMLAttributes} from 'react';
 import {coverAspectRatioCss} from '../../shared/cover-layout';
 import '../cover-artwork.css';
 import '../poster-watermark.css';
+import '../media-save-controls.css';
 
 type CoverArtworkProps=ImgHTMLAttributes<HTMLImageElement>&{onDimensions?:(dimensions:{width:number;height:number})=>void};
 
 export function coverFrameStyle(ratio:unknown):CSSProperties{return{aspectRatio:coverAspectRatioCss(ratio)};}
-export function CoverArtwork({className='',onLoad,onDimensions,...props}:CoverArtworkProps){
-  return <img {...props} className={`cover-artwork-image ${className}`} data-cover-artwork="whole" onLoad={event=>{const image=event.currentTarget;if(image.naturalWidth&&image.naturalHeight)onDimensions?.({width:image.naturalWidth,height:image.naturalHeight});onLoad?.(event);}}/>;
+export function CoverArtwork({className='',onLoad,onDimensions,onContextMenu,onDragStart,...props}:CoverArtworkProps){
+  return <img {...props} draggable={false} className={`cover-artwork-image ${className}`} data-cover-artwork="whole" onContextMenu={event=>{event.preventDefault();onContextMenu?.(event);}} onDragStart={event=>{event.preventDefault();onDragStart?.(event);}} onLoad={event=>{const image=event.currentTarget;if(image.naturalWidth&&image.naturalHeight)onDimensions?.({width:image.naturalWidth,height:image.naturalHeight});onLoad?.(event);}}/>;
 }
 
 /** A decorative display layer; original artwork and stored media stay intact. */

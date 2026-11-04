@@ -99,6 +99,8 @@ Subtitle language declarations are metadata for languages already included in vi
 
 ## Cover artwork
 
+Media saving deterrents apply only to `CoverArtwork` images and `BrandedVideo` media: suppress default context menus and dragging, keep `nodownload` in supported native video controls, and retain playback callbacks, seeking, fullscreen and picture-in-picture. Keep normal page text selection, form inputs, browser shortcuts and episode reordering available. These browser hints and display watermarks are not DRM and cannot prevent screenshots, recording or retrieval by authorized viewers; do not claim otherwise or weaken server access checks. See [media saving controls](docs/MEDIA_SAVING.md).
+
 Poster covers display the same decorative LingYing icon at the physical top right with `opacity: 0.6`. Keep the icon separate from image pixels, preserve whole-image containment and original storage, and reserve a distinct 44px target for the save button. Use `CoverWatermark` in existing artwork frames and `CoverThumbnail` for small covers; `CoverArtwork` retains its bare image and dimension/event contract.
 
 All actual video players, including viewer playback and administrator/creator private previews, display the current LingYing icon at the top right as a decorative, non-interactive overlay with `opacity: 0.6` (40% transparency). Reuse the existing icon asset and original stream URLs; do not burn the mark into media, transcode uploads, or store watermarked video copies. Preserve the actual video element's ref, analytics, progress, native controls, inline playback and full-image containment. Keep the wrapper stable across episode changes for container fullscreen. Browser-owned video fullscreen, picture-in-picture and casting cannot guarantee DOM overlays.

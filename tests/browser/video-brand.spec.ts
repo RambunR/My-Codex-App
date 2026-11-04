@@ -44,7 +44,7 @@ for(const admin of [false,true])test(`${admin?'administrator':'creator'} private
 });
 
 test('unsupported or rejected wrapper fullscreen retains native fallback and inline video',async({page})=>{
-  await page.addInitScript(()=>{Element.prototype.requestFullscreen=()=>Promise.reject(new Error('Fullscreen denied by browser policy'));});await fixture(page);await page.goto(`/watch/${series.id}/brand-episode-1`);await expect(page.locator('video')).toHaveAttribute('controlslist','nofullscreen');await page.getByRole('button',{name:'Enter fullscreen',exact:true}).click();await expect(page.getByRole('button',{name:'Enter fullscreen',exact:true})).toHaveCount(0);await expect(page.locator('video')).not.toHaveAttribute('controlslist',/nofullscreen/);await expect(page.locator('video')).toBeVisible();await assertIcon(page);
+  await page.addInitScript(()=>{Element.prototype.requestFullscreen=()=>Promise.reject(new Error('Fullscreen denied by browser policy'));});await fixture(page);await page.goto(`/watch/${series.id}/brand-episode-1`);await expect(page.locator('video')).toHaveAttribute('controlslist',/(?:^|\s)nofullscreen(?:\s|$)/);await expect(page.locator('video')).toHaveAttribute('controlslist',/(?:^|\s)nodownload(?:\s|$)/);await page.getByRole('button',{name:'Enter fullscreen',exact:true}).click();await expect(page.getByRole('button',{name:'Enter fullscreen',exact:true})).toHaveCount(0);await expect(page.locator('video')).not.toHaveAttribute('controlslist',/nofullscreen/);await expect(page.locator('video')).toBeVisible();await assertIcon(page);
 });
 
 test('locked episode retains sign-in flow and does not render a playable video',async({page})=>{

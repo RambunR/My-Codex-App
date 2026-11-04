@@ -20,6 +20,8 @@ Production uses the real publisher catalogue. Automatic sample seeding is disabl
 
 Administrators select **Suggested by LingYing** series in **Admin → Content**. Two or more available selections rotate in the homepage hero with coordinated artwork/text fades and a compact pause/resume control, without an arrow bar, pagination dots or slide counter. Poster covers display a translucent LingYing icon while retaining the full original artwork. See [homepage suggestions and cover branding](docs/HOMEPAGE_SUGGESTIONS.md).
 
+Media controls discourage casual image/video saving while retaining normal viewing and text interaction. These controls are not DRM; see [media saving controls and limits](docs/MEDIA_SAVING.md).
+
 Publishers can declare multiple **Subtitle languages** directly below **Drama language** in the editor, then save details. Public metadata shows the selected languages already included in the videos; selection does not generate or translate subtitles. See [subtitle declarations](docs/SUBTITLE_LANGUAGES.md).
 
 Agent shortcut: send **`/push`** in chat, optionally followed by a commit message, to check the changes, commit and push them to GitHub `main`, update the existing Cloudflare website, and verify the live site. **“Push and deploy”** is an equivalent plain-language request. This project convention is defined in [AGENTS.md](AGENTS.md); it does not add a built-in Codex slash-menu entry or a terminal command. Future agents working in this repository should follow those instructions.
