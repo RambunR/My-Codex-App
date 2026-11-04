@@ -1,4 +1,4 @@
-import {useCallback,useEffect,useRef,useState} from 'react';
+import {useCallback,useEffect,useRef,useState,type PointerEvent as ReactPointerEvent} from 'react';
 import {Link} from 'react-router-dom';
 import {Play,Plus,ChevronDown} from 'lucide-react';
 import {type Series} from '../../shared/config';
@@ -81,6 +81,17 @@ export function SuggestedHero({suggestions,fallback}:{suggestions:Series[];fallb
     const next={synopsisMore:!!synopsis&&synopsis.scrollHeight>synopsis.clientHeight+synopsis.scrollTop+2,copyOverflow:!!copy&&copy.scrollHeight>copy.clientHeight+2};
     setHeroScroll(current=>current.synopsisMore===next.synopsisMore&&current.copyOverflow===next.copyOverflow?current:next);
   };
+  const updatePointerPause=(event:ReactPointerEvent<HTMLElement>)=>{
+    if(event.pointerType==='touch')return;
+    const selector='a,button,.hero-synopsis';
+    let paused=event.target instanceof Element&&!!event.target.closest(selector);
+    // Fading layers are inert, so hit testing targets the section instead of
+    // its links. Preserve the link under an approaching pointer before a swap.
+    if(!paused&&phase!=='idle')paused=Array.from(event.currentTarget.querySelectorAll(selector)).some(element=>{
+      const box=element.getBoundingClientRect();return event.clientX>=box.left&&event.clientX<box.right&&event.clientY>=box.top&&event.clientY<box.bottom;
+    });
+    setHoverPaused(paused);if(paused)settleTransition();
+  };
   useEffect(()=>{
     const synopsis=synopsisRef.current,copy=heroCopyRef.current;if(!synopsis||!copy)return;
     synopsis.scrollTop=0;copy.scrollTop=0;measureHeroScroll();
@@ -90,7 +101,7 @@ export function SuggestedHero({suggestions,fallback}:{suggestions:Series[];fallb
   if(!hero)return null;
   const suggested=suggestions.some(series=>series.id===hero.id);
   return <section className={`hero hero-bounded hero-${hero.genres[0]} ${hero.demo===1?'':'hero-user-artwork'}`} aria-label={hero.title} data-suggested-carousel={suggestions.length>1?'true':'false'} data-carousel-phase={phase} data-autoplay={rotating?'running':'paused'}
-    onPointerEnter={event=>{if(event.pointerType!=='touch'){setHoverPaused(true);settleTransition();}}}
+    onPointerOver={updatePointerPause} onPointerMove={updatePointerPause}
     onPointerLeave={event=>{if(event.pointerType!=='touch')setHoverPaused(false);}}
     onPointerDownCapture={event=>{if(event.pointerType==='touch'&&suggestions.length>1){touchPointers.current.add(event.pointerId);setTouchPaused(true);settleTransition();}}}
     onFocusCapture={()=>{setFocusPaused(true);settleTransition();}}

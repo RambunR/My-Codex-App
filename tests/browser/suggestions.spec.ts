@@ -51,9 +51,20 @@ test('selected releases automatically fade artwork and copy together with matchi
   await page.clock.runFor(8400);await activeRelease(hero,first);await expect(hero.locator('h2')).not.toHaveText(popular.title);expect((await hero.boundingBox())!.height).toBeLessThanOrEqual(631);await noOverflow(page);state.clean();
 });
 
-test('hover, keyboard reading and hidden tabs pause automatic changes until interaction ends',async({page})=>{
+test('a pointer resting on artwork or panel background does not stop automatic fading and series changes',async({page})=>{
+  await frozenClock(page);const state=await publicFixture(page);await page.goto('/');const hero=page.locator('section.hero');await activeRelease(hero,first);
+  await hero.locator('.hero-art').hover();await expect(hero).toHaveAttribute('data-autoplay','running');
+  await page.clock.runFor(8000);await expect(hero).toHaveAttribute('data-carousel-phase','out');await settledSwitch(page);await activeRelease(hero,second);
+  await expect(hero).toHaveAttribute('data-autoplay','running');
+  await hero.locator('.hero-copy').hover({position:{x:5,y:5}});await expect(hero).toHaveAttribute('data-autoplay','running');
+  await page.clock.runFor(8400);await activeRelease(hero,first);await noPagination(hero);state.clean();
+});
+
+test('hovering actions or the synopsis, keyboard reading and hidden tabs pause changes until interaction ends',async({page})=>{
   await frozenClock(page);const state=await publicFixture(page);await page.goto('/');const hero=page.locator('section.hero');await titleIs(hero,first.title);
-  await hero.hover();await expect(hero).toHaveAttribute('data-autoplay','paused');await page.clock.runFor(20000);await activeRelease(hero,first);await page.mouse.move(0,0);
+  for(const selector of ['h2 a','.hero-play','.hero-details','.hero-synopsis']){
+    await hero.locator(selector).hover();await expect(hero).toHaveAttribute('data-autoplay','paused');await page.clock.runFor(20000);await activeRelease(hero,first);await page.mouse.move(0,0);
+  }
   await hero.locator('h2 a').focus();await expect(hero).toHaveAttribute('data-autoplay','paused');await page.clock.runFor(20000);await activeRelease(hero,first);await page.evaluate(()=>(document.activeElement as HTMLElement)?.blur());
   await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));});await expect(hero).toHaveAttribute('data-autoplay','paused');await page.clock.runFor(20000);await activeRelease(hero,first);
   await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:false});document.dispatchEvent(new Event('visibilitychange'));});
@@ -62,7 +73,8 @@ test('hover, keyboard reading and hidden tabs pause automatic changes until inte
 
 test('interaction during fade cancels the swap before artwork or action links can change under the reader',async({page})=>{
   await frozenClock(page);const state=await publicFixture(page);await page.goto('/');const hero=page.locator('section.hero');await activeRelease(hero,first);await page.clock.runFor(8000);await expect(hero).toHaveAttribute('data-carousel-phase','out');
-  await hero.hover();await expect(hero).toHaveAttribute('data-carousel-phase','idle');await expect(hero).toHaveAttribute('data-autoplay','paused');await page.clock.runFor(20000);await activeRelease(hero,first);await page.mouse.move(0,0);await page.clock.runFor(8400);await activeRelease(hero,second);state.clean();
+  const action=(await hero.locator('.hero-play').boundingBox())!;await page.mouse.move(action.x+action.width/2,action.y+action.height/2);
+  await expect(hero).toHaveAttribute('data-carousel-phase','idle');await expect(hero).toHaveAttribute('data-autoplay','paused');await page.clock.runFor(20000);await activeRelease(hero,first);await page.mouse.move(0,0);await page.clock.runFor(8400);await activeRelease(hero,second);state.clean();
 });
 
 test('reduced motion keeps suggested releases static without slideshow controls or transitions',async({page})=>{
