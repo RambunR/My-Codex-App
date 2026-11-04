@@ -65,7 +65,14 @@ Configure the restricted test key on `acct_1StBIYJ6Er233b9c` with these columns:
 
 Charges Write supports automatic simulated funding. Webhook endpoint write permission is needed only for provisioning the test destination, not for ordinary withdrawal processing. Leave live keys unchanged.
 
-On the initial remote application-flow check, Stripe accepted simulated funding but returned HTTP 403 for the transfer, requiring **Transfers Write**. This was reported to the owner with the corresponding test-key permission request. The application retained the request for a safe retry; no transfer or bank payout was sent by that failed attempt.
+The initial remote application-flow check accepted simulated funding but returned HTTP 403 for the transfer. After the owner confirmed the required test-key permissions were saved, the same retained request completed on **4 November 2026 at 08:34 UTC**:
+
+- Gross US$200; saved US$1 fee; net US$199; saved HKD test bank amount **HK$1,552.20**.
+- Test request `8a2de270-6cae-4080-9c78-fc2b058d6ef2`, transfer `tr_1UXzeCJ6Er233b9cPnC5jwC4`, bank payout `po_1UXzeEJ6ErvOVs1A7USTOZMn`.
+- The process response was `payout_pending`; a subsequent provider status retrieval returned **`paid`**, with `livemode:false`.
+- Verification used the application backend with a separate local audit database/session. A short-lived Cloudflare edge preview used the encrypted test key internally and forwarded only the saved request's bounded sandbox operations. No credential was exported, no production login was created, and no production earnings or wallet balance was changed. The preview was closed afterward; production version `e84471ed-3113-45d2-bf19-70717cc924d1` remained deployed.
+
+This establishes the transfer and simulated bank-payout path with the saved permissions. It does not establish live settlement or signed Connect delivery; the paid status was retrieved directly from Stripe. The local verification request is not a production website history entry.
 
 ### Connect notifications
 
@@ -83,7 +90,7 @@ The handler verifies the dedicated signature, requires `livemode:false`, scopes 
 
 The implementation includes ownership/mode guards, wrong-sandbox/live-key rejection, finite minimum/maximum amounts, immutable fees/conversion, no real/test earnings mutation, duplicate/lost-response retries, fee-safe rejection, funding simulation, bank status/failure reconciliation, automatic payout batch matching and late signed test events after switching the UI to live mode.
 
-Validation on 4 November 2026: 418 unit/API tests and the full 228-test browser suite passed; the Cloudflare build and full local Cloudflare integration smoke passed. The four new administrator browser journeys also passed separately after the final phone-layout adjustment. Remote verification remains blocked at the test-key transfer permission until the owner saves the required settings.
+Validation on 4 November 2026: 418 unit/API tests and the full 228-test browser suite passed; the Cloudflare build and full local Cloudflare integration smoke passed. The four new administrator browser journeys also passed separately after the final phone-layout adjustment. The retained remote sandbox request subsequently passed after the owner saved the required permissions, including a directly retrieved `paid` bank-payout status as recorded above.
 
 Run `npm test`, `npm run build:cloudflare`, the affected administrator/withdrawal browser journeys, and `npm run test:cloudflare`. On slow cold builds, `CLOUDFLARE_TEST_STARTUP_TIMEOUT_MS=180000` extends only the local smoke startup allowance.
 
