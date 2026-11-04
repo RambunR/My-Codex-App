@@ -6,6 +6,8 @@ Primary application: **[lingyingdrama.com](https://lingyingdrama.com)**; `www.li
 
 **Stripe mode switch:** save both live and dedicated test API/webhook Secret pairs, then choose testing or production with `STRIPE_TEST_MODE`. The same website and accounts remain; test balances and Passes stay separate. No credential overwriting or additional readiness-flag toggle is needed. See [the setup and switch guide](docs/STRIPE_MODE_SWITCH.md).
 
+**Local Pass prices:** Dramio Pass shows an approximate price in the visitor's detected country currency (for example, NT$ in Taiwan), alongside the actual HKD billing amount. Discounted prices and the Account card use the same display quote. See [local currency display](docs/LOCAL_CURRENCY_DISPLAY.md) for rate freshness, fallbacks and the unchanged HKD settlement boundary.
+
 **Wallet funding gifts:** quick amounts are US$10, US$25, US$50 and US$100. New US$50 payments receive US$5 gift credit, and US$100 receives US$15, after verified payment. See [funding gifts and accounting](docs/WALLET_FUNDING_GIFTS.md).
 
 **Dramio Pass promo codes:** administrators can create, edit, enable or disable fixed-HKD and percentage discounts with unlimited or capped usage in [Admin → Promo codes](https://lingyingdrama.com/admin?tab=promotions). Codes are shared externally and entered in a blank field; public pages do not advertise or prefill them. See [promotion controls](docs/CREATOR_LAUNCH_PROMOTION.md) and [registration email / Stripe receipt setup](docs/EMAIL_AUTH.md). Creator earnings depend on paid unlocks; withdrawals remain paused.
@@ -36,7 +38,7 @@ LingYing’s current icon is the operator-selected purple–pink origami phoenix
 
 Search engines can discover the same phoenix through stable `/favicon.ico` and `/icon-192.png` links. Real `robots.txt` and `sitemap.xml` files plus a homepage-only HTTPS canonical header support recrawling the preferred domain. Search results update on the search engine's schedule; see [search appearance and Search Console steps](docs/SEARCH_APPEARANCE.md).
 
-The publisher landing-page mosaic uses five operator-supplied example AI-drama posters, retaining their full artwork and title lettering. Auth pages use the separately supplied phoenix banner with its existing wording and no duplicate text overlays. See [decorative artwork](docs/EXAMPLE_DRAMA_ARTWORK.md).
+The publisher landing-page mosaic uses five operator-supplied example AI-drama posters, retaining their full artwork and title lettering. Auth pages use a regenerated phoenix background that fills the panel edge to edge, with responsive wording. See [decorative artwork](docs/EXAMPLE_DRAMA_ARTWORK.md).
 
 Upload test files: [download 10 numbered test episodes](https://lingyingdrama.com/downloads/dramio-test-episodes.zip). Unzip the archive and select its `Dramio_Test_Episodes` folder in the studio folder uploader. Each MP4 is 10 seconds, 720×1280, H.264 with silent AAC audio, and shows a white episode number on black. All ten were created with FFmpeg without an AI video model; each is approximately 21 KB.
 

@@ -1,5 +1,10 @@
 .auth-art.auth-art-phoenix{background:#21124a}
-.auth-art.auth-art-phoenix>img{object-fit:contain;filter:none;z-index:0}
+.auth-art.auth-art-phoenix>img{object-fit:cover;object-position:75% 25%;filter:none;z-index:0}
+.auth-art.auth-art-phoenix::before{content:'';position:absolute;inset:45% 0 0;background:linear-gradient(transparent,#170b42b8 75%);z-index:1;pointer-events:none}
+.auth-art.auth-art-phoenix .auth-phoenix-copy{position:absolute;inset-inline:clamp(16px,3vw,48px);bottom:clamp(30px,4vw,64px);z-index:2;text-align:center;display:flex;flex-direction:column;align-items:center;gap:clamp(16px,2.5vw,36px)}
+.auth-art.auth-art-phoenix .auth-phoenix-copy h2{font-family:inherit;font-weight:750;font-size:clamp(26px,3.4vw,52px);line-height:1.08;letter-spacing:-1px;white-space:normal;margin:0;color:#fff}
+.auth-art.auth-art-phoenix .auth-phoenix-copy p{font-size:clamp(14px,1.5vw,22px);line-height:1.45;color:#fff;max-width:28ch;margin:0;text-wrap:balance}
+.auth-phoenix-copy>span{font-size:clamp(8px,1vw,14px);color:#f3c9ff;white-space:nowrap}
 .auth-provider-options .button + .button{margin-top:12px}
 .apple-button{background:#080808;color:#fff;border:1px solid #a0a0a0;min-height:44px;font-weight:550;text-align:center;white-space:normal}
 .apple-button:hover:not(:disabled){background:#252525;border-color:#fff}

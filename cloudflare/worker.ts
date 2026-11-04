@@ -19,6 +19,7 @@ import {DEMO_CATALOG} from '../shared/catalog';
 import {DEMO_PREVIEW_BYTES} from './preview-meta';
 import {canonicalApiRedirect,canonicalPageRedirect} from './routing';
 import {responseSecurityHeaders} from '../shared/security-headers';
+import {displayCurrencyResponse} from './display-currency';
 
 let listening=false;
 export class AIDramioApp {
@@ -71,6 +72,7 @@ export default {
     const url=new URL(request.url);
     if(env.ENVIRONMENT==='sandbox'&&url.origin!==env.APP_URL)return new Response('This payment sandbox is available only on its isolated origin.',{status:403});
     const canonical=canonicalApiRedirect(request,env)||canonicalPageRedirect(request,env);if(canonical)return canonical;
+    if(url.pathname==='/api/display-currency')return displayCurrencyResponse(request);
     if(url.pathname.startsWith('/api/'))return env.APP.get(env.APP.idFromName('platform')).fetch(request as any) as unknown as Promise<Response>;
     const response=await env.ASSETS.fetch(request as any) as unknown as Response;
     const headers=new Headers(response.headers);for(const[name,value]of Object.entries(responseSecurityHeaders(url.pathname)))headers.set(name,value);

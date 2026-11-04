@@ -86,6 +86,11 @@ try{
   console.log('PASS: Cloudflare canonical redirects run before SPA and static asset serving on alias hosts.');
   await stop();
   await start();
+  const currencyResponse=await fetch(base+'/api/display-currency?country=TW',{headers:{'CF-IPCountry':'TW','Accept-Language':'zh-TW'}});
+  assert.equal(currencyResponse.status,200);assert.equal(currencyResponse.headers.get('cache-control'),'private, no-store');
+  assert.deepEqual((await currencyResponse.json()).quote,{country:null,currency:'HKD',ratePerHkd:1,asOf:null});
+  const currencyWrite=await fetch(base+'/api/display-currency',{method:'POST'});assert.equal(currencyWrite.status,405);await currencyWrite.body.cancel();
+  console.log('PASS: local display-currency fallback is private, read-only, ignores spoofed country inputs and does not call an external provider.');
   for(const route of ['/','/?search-source=fixture']){
     const home=await fetch(base+route);
     assert.equal(home.status,200);assert.equal(home.headers.get('link'),'<https://lingyingdrama.com/>; rel="canonical"');

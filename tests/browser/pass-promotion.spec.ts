@@ -1,5 +1,9 @@
 import {test,expect,type Page} from '@playwright/test';
 
+// Keep existing price/receipt journeys deterministic; country-specific display
+// and HKD fallback behavior are exercised in display-currency.spec.ts.
+test.beforeEach(async({page})=>{await page.route('**/api/display-currency',route=>route.fulfill({json:{quote:{country:'US',currency:'USD',ratePerHkd:1/7.8,asOf:'2026-11-04'}}}));});
+
 const quote={code:'LINGYING58',amountHkdCents:5800,regularAmountHkdCents:8800,currency:'hkd',revision:1};
 const viewer={id:'pass-promo-browser',name:'Promo viewer',email:'promo-viewer@browser.test',role:'viewer',publisher_active:0,wallet_micros:0,earnings_micros:0,quota_bytes:5*1024**3,used_bytes:0,language:'en',payment_review:false,dramio_pass:{active:false,test:false,purchased_at:null}};
 const activate=(page:Page)=>page.locator('.activation-card>button.primary');

@@ -3,6 +3,7 @@ import {Link} from 'react-router-dom';
 import {ArrowUpRight,Check,Clapperboard,Play,ShieldCheck,Sparkles,Ticket,Upload} from 'lucide-react';
 import {useI18n,type Key} from '../i18n';
 import {useApp} from '../context';
+import {usePassPrice} from '../usePassPrice';
 import '../pass.css';
 import '../account-access.css';
 import '../pass-promotion.css';
@@ -16,11 +17,12 @@ export function DramioPassIcon({className='',size=64}:{className?:string;size?:n
 
 export function DramioPassCard(){
   const{user,config}=useApp();const{t,locale}=useI18n();
+  const passPrice=usePassPrice();
   if(!user)return null;
   const pass=user.dramio_pass;
   const active=pass?.active??!!user.publisher_active;
-  const exchangeRate=Number.isFinite(config.usdToHkd)&&config.usdToHkd>0?config.usdToHkd:7.8;
-  const usdPrice=(cents:number)=>`US$${(cents/100/exchangeRate).toFixed(2)}`;
+  const price=passPrice((config.limits.activationHkd||88)*100);
+  const billing=t('passPromoBilling').replace('{hkd}',`HK$${(config.limits.activationHkd||88).toFixed(2)}`);
   const administrator=user.role==='admin';
   const adminAccess=administrator?<AdminUploadAccess canUpload={!user.payment_review&&config.uploadsEnabled!==false} held={!!user.payment_review}/>:null;
   if(administrator&&!active)return adminAccess;
@@ -33,7 +35,7 @@ export function DramioPassCard(){
   return <>{adminAccess}<section className={`dramio-pass-card ${active?'dramio-pass-owned':'dramio-pass-unowned'}`} aria-labelledby="dramio-pass-title">
     <div className="dramio-pass-card-art"><DramioPassIcon size={104}/></div>
     <div className="dramio-pass-card-copy"><div className="dramio-pass-card-heading"><h2 id="dramio-pass-title">{t('dramioPass')}</h2><span className={`dramio-pass-status ${active?'active':''}`}>{active&&<Check size={12} aria-hidden="true"/>}{t(active?'passActive':'passInactive')}</span>{test&&<span className="dramio-pass-test">{t('passTest')}</span>}</div><p>{t(active?'passOwnedBody':'passInactiveBody')}</p><span className="dramio-pass-benefits">{t('passBenefits')} <span className="creator-share-fee-note">{t('creatorShareFeeNote')}</span></span><small className="provider-fee-estimate-note">{t('providerFeeEstimateNote')}</small>{test&&<small className="dramio-pass-test-notice">{t('passTestBody')}</small>}{purchaseDate&&<small className="dramio-pass-purchased">{t('passPurchasedOn').replace('{date}',purchaseDate)}</small>}</div>
-    <div className="dramio-pass-card-action"><div className="dramio-pass-price">{active?<strong>{t('passActivated')}</strong>:<strong>≈ {usdPrice((config.limits.activationHkd||88)*100)}</strong>}<span>{t('passOneTime')}</span></div><Link to="/studio" className={`button ${active?'secondary':'primary'}`}>{t(active?'openStudio':'getDramioPass')}<ArrowUpRight size={16} aria-hidden="true"/></Link></div>
+    <div className="dramio-pass-card-action"><div className="dramio-pass-price">{active?<strong>{t('passActivated')}</strong>:<strong dir="ltr" data-currency={price.currency}>{price.text}</strong>}<span>{t('passOneTime')}</span>{!active&&<small className="dramio-pass-billing-note">{billing}</small>}</div><Link to="/studio" className={`button ${active?'secondary':'primary'}`}>{t(active?'openStudio':'getDramioPass')}<ArrowUpRight size={16} aria-hidden="true"/></Link></div>
   </section></>;
 }
 

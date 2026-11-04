@@ -3,3 +3,7 @@
 @media(max-width:360px){.activation-card h2.pass-usd-price>strong{font-size:49px!important}.activation-card h2.pass-usd-price>span{font-size:16px}.pass-promo-panel{padding-inline:11px}.pass-promo-input-row{gap:6px}.pass-promo-input-row>.button{padding-inline:8px;max-width:43%}}
 
 .pass-conflict-price{display:flex;flex-direction:column;gap:9px;margin:20px 0;color:#ead5fa}.pass-conflict-price>strong{font-size:25px}.pass-conflict-price>span{font-size:11px;line-height:1.8;color:#baa6c9}
+.activation-card h2.pass-local-price{flex-wrap:wrap;justify-content:center;gap:5px;max-width:100%}
+.activation-card h2.pass-local-price>strong{font-size:clamp(28px,4vw,56px)!important;letter-spacing:-1px!important;max-width:100%;overflow-wrap:anywhere}
+.dramio-pass-billing-note{display:block;max-width:32ch;font-size:11px;line-height:1.6;color:var(--muted);margin-top:10px}
+.activation-card>button.primary{white-space:normal;flex-wrap:wrap;line-height:1.5;text-align:center;min-width:0}

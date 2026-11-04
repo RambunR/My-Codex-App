@@ -69,6 +69,8 @@ The older `aidramio-sandbox` Worker and `wrangler.sandbox.jsonc` are legacy reso
 
 ## Credentials and production data
 
+Dramio Pass local-currency estimates are presentation only. Use trusted outer-Worker `request.cf.country`, validated daily Frankfurter rates and the private display endpoint; never infer Taiwan from Traditional Chinese, accept a country header/query override, cache country-specific responses publicly, or use estimated rates in money/receipt calculations. Preserve actual HKD billing, promotional quote amounts and test/live boundaries. Unknown locations and rate failures show exact HKD. Follow [local currency display](docs/LOCAL_CURRENCY_DISPLAY.md).
+
 Use the existing secure `CLOUDFLARE_API_TOKEN` binding against `api.cloudflare.com`. Check names/presence and operation results without printing values. Google and Stripe credentials belong in Worker Secrets; never request them in chat. Google setup is documented in `docs/GOOGLE_SIGN_IN.md`.
 
 Account records and financial transactions live in the SQLite-backed Durable Object; publisher media lives in private R2. Those records are not Git source and must not be deleted, reseeded, or included in a commit. Keep the existing migration history and use additive schema changes unless the user explicitly authorizes a data migration.

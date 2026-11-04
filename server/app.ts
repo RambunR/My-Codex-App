@@ -100,6 +100,10 @@ export function createApp() {
   if (process.env.TRUST_PROXY === 'true') app.set('trust proxy', 1);
   app.use((req, res, next) => { for(const[name,value]of Object.entries(responseSecurityHeaders(req.path)))res.setHeader(name,value); if(req.path==='/auth')res.setHeader('Cache-Control','no-store'); next(); });
   app.use('/api',credentialedCors);
+  // The standalone server has no trusted country metadata. Local development
+  // and unsupported locations show the exact HKD price without guessing.
+  app.get('/api/display-currency',(_req,res)=>res.setHeader('Cache-Control','private, no-store').json({quote:{country:null,currency:'HKD',ratePerHkd:1,asOf:null}}));
+  app.all('/api/display-currency',(_req,res)=>res.status(405).set({'Cache-Control':'private, no-store',Allow:'GET, HEAD'}).json({error:{code:'METHOD_NOT_ALLOWED'}}));
   registerTestPayoutWebhook(app);
   app.post('/api/payments/webhook', express.raw({ type: 'application/json', limit: '1mb' }), async (req, res) => {
     // Check both saved pairs. The UI switch selects new Checkout, not which
