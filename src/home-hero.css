@@ -1,5 +1,5 @@
 /* The spotlight never consumes more than 70% of the small viewport. Artwork
-   and narrative fill the frame; the pause control overlays the artwork. */
+   and narrative fill the frame without slideshow controls. */
 .home-page .hero.hero-bounded{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);grid-template-rows:minmax(0,1fr);height:min(480px,70vh);height:min(480px,70svh);max-height:70vh;max-height:70svh;min-height:0;padding:0;background:var(--panel)}
 .home-page .hero-bounded .hero-art{position:relative;inset:auto;left:auto;grid-column:2;grid-row:1;width:100%;height:100%;min-width:0;min-height:0;aspect-ratio:auto;mask-image:none;background:#000}
 .home-page .hero-bounded .hero-art>img{display:block;width:100%;height:100%;object-fit:contain;object-position:center;transform:none;filter:none;background:#000}
@@ -20,9 +20,6 @@
 .home-page .hero-bounded .hero-buttons .button{font-size:14px;line-height:1.4;min-height:44px;padding:10px 11px;min-width:0;white-space:normal;text-align:center;overflow-wrap:anywhere}
 .home-page .hero-bounded .hero-buttons .button>svg{flex-shrink:0}
 .home-page .hero-bounded .hero-free{font-size:11px;line-height:1.5;margin:0;flex-shrink:0}
-.home-page .hero-bounded .hero-rotation-toggle{grid-column:2;grid-row:1;align-self:end;justify-self:right;position:relative;z-index:5;display:grid;place-items:center;width:44px;height:44px;min-width:44px;margin:12px;border:1px solid #ffffff40;border-radius:50%;background:#17101de6;color:#fff;box-shadow:0 2px 8px #0004}
-.home-page .hero-bounded .hero-rotation-toggle:hover{background:#34223fe6}
-.home-page .hero-bounded .hero-rotation-toggle:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 @media(max-width:640px){
   .home-page .hero.hero-bounded{height:min(580px,70vh);height:min(580px,70svh);grid-template-columns:minmax(0,1fr);grid-template-rows:clamp(120px,22vh,190px) minmax(0,1fr);grid-template-rows:clamp(120px,22svh,190px) minmax(0,1fr)}
   .home-page .hero-bounded .hero-art{grid-column:1;grid-row:1}
@@ -32,7 +29,6 @@
   .home-page .hero-bounded .hero-synopsis-wrap{flex-basis:60px}
   .home-page .hero-bounded .hero-synopsis p{font-size:13px;line-height:1.65}
   .home-page .hero-bounded .hero-free{display:none}
-  .home-page .hero-bounded .hero-rotation-toggle{grid-column:1;grid-row:1}
 }
 @media(max-height:600px){
   .home-page .hero-bounded .hero-copy{padding:13px;gap:8px}
@@ -45,16 +41,14 @@
   .home-page .hero.hero-bounded{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
   .home-page .hero-bounded .hero-copy{grid-column:1;grid-row:1;padding:11px;gap:7px}
   .home-page .hero-bounded .hero-art{grid-column:2;grid-row:1}
-  .home-page .hero-bounded .hero-rotation-toggle{grid-column:2;grid-row:1}
   .home-page .hero-bounded .hero-copy h2{font-size:21px;line-height:1.15}
   .home-page .hero-bounded .hero-buttons .button{font-size:12px;min-height:44px;padding:8px}
   .home-page .hero-bounded .hero-pills{font-size:11px}
   .home-page .hero-bounded .hero-synopsis-wrap{flex-basis:45px;min-height:32px}
 }
-/* Fade the active artwork and copy together while the stable controls retain
-   focus. Interaction cancels any pending swap before its links can change. */
+/* Fade the active artwork and copy together. Interaction cancels any pending
+   swap before its links can change. */
 .home-page .hero-bounded>.hero-art,.home-page .hero-bounded>.hero-copy{opacity:1;transition:opacity 280ms ease-in-out}
 .home-page .hero-bounded[data-carousel-phase="out"]>.hero-art,.home-page .hero-bounded[data-carousel-phase="out"]>.hero-copy,
 .home-page .hero-bounded[data-carousel-phase="in"]>.hero-art,.home-page .hero-bounded[data-carousel-phase="in"]>.hero-copy{opacity:0}
-.home-page .hero-bounded .hero-rotation-toggle>svg{width:16px;height:16px}
 @media(prefers-reduced-motion:reduce){.home-page .hero-bounded>.hero-art,.home-page .hero-bounded>.hero-copy{transition:none}}

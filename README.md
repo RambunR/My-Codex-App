@@ -18,7 +18,7 @@ Source repository: **[RambunR/My-Codex-App](https://github.com/RambunR/My-Codex-
 
 Production uses the real publisher catalogue. Automatic sample seeding is disabled, and a guarded one-time retirement removes only source-verified fictional samples while protecting **The Godfather's Caged Bird** by **DreamShortDrama** and other genuine uploads. Media and accounting history remain intact. See [catalogue retirement](docs/REAL_CATALOGUE.md).
 
-Administrators select **Suggested by LingYing** series in **Admin → Content**. Two or more available selections rotate in the homepage hero with coordinated artwork/text fades and a compact pause/resume control, without an arrow bar, pagination dots or slide counter. Poster covers display a translucent LingYing icon while retaining the full original artwork. See [homepage suggestions and cover branding](docs/HOMEPAGE_SUGGESTIONS.md).
+Administrators select **Suggested by LingYing** series in **Admin → Content**. Two or more available selections rotate in the homepage hero with coordinated artwork/text fades and no slideshow controls, arrow bar, pagination dots or slide counter. Poster covers display a translucent LingYing icon while retaining the full original artwork. See [homepage suggestions and cover branding](docs/HOMEPAGE_SUGGESTIONS.md).
 
 Media controls discourage casual image/video saving while retaining normal viewing and text interaction. These controls are not DRM; see [media saving controls and limits](docs/MEDIA_SAVING.md).
 

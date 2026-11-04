@@ -1,6 +1,6 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {Link} from 'react-router-dom';
-import {Play,Pause,Plus,ChevronDown} from 'lucide-react';
+import {Play,Plus,ChevronDown} from 'lucide-react';
 import {type Series} from '../../shared/config';
 import {languageName,useI18n,type Key} from '../i18n';
 import {CoverArtwork,CoverWatermark} from './CoverArtwork';
@@ -13,8 +13,9 @@ type Phase='idle'|'out'|'in';
 export function SuggestedHero({suggestions,fallback}:{suggestions:Series[];fallback?:Series}){
   const{t,locale}=useI18n();
   const[activeId,setActiveId]=useState<string|null>(null),[phase,setPhase]=useState<Phase>('idle');
-  const[userPaused,setUserPaused]=useState(false),[hoverPaused,setHoverPaused]=useState(false),[focusPaused,setFocusPaused]=useState(false);
+  const[touchPaused,setTouchPaused]=useState(false),[hoverPaused,setHoverPaused]=useState(false),[focusPaused,setFocusPaused]=useState(false);
   const[hidden,setHidden]=useState(()=>document.hidden);
+  const touchPointers=useRef(new Set<number>());
   const[reducedMotion,setReducedMotion]=useState(()=>window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const hero=suggestions.find(series=>series.id===activeId)||suggestions[0]||fallback;
   const index=Math.max(0,suggestions.findIndex(series=>series.id===hero?.id));
@@ -55,10 +56,16 @@ export function SuggestedHero({suggestions,fallback}:{suggestions:Series[];fallb
     media.addEventListener('change',change);return()=>media.removeEventListener('change',change);
   },[settleTransition]);
   useEffect(()=>{
-    const visibility=()=>{setHidden(document.hidden);if(document.hidden)settleTransition();};
+    const visibility=()=>{setHidden(document.hidden);if(document.hidden){touchPointers.current.clear();setTouchPaused(false);settleTransition();}};
     document.addEventListener('visibilitychange',visibility);return()=>document.removeEventListener('visibilitychange',visibility);
   },[settleTransition]);
-  const rotating=suggestions.length>1&&!userPaused&&!hoverPaused&&!focusPaused&&!hidden&&!reducedMotion;
+  useEffect(()=>{
+    const finishTouch=(event:PointerEvent)=>{if(touchPointers.current.delete(event.pointerId))setTouchPaused(touchPointers.current.size>0);};
+    const loseFocus=()=>{touchPointers.current.clear();setTouchPaused(false);};
+    window.addEventListener('pointerup',finishTouch);window.addEventListener('pointercancel',finishTouch);window.addEventListener('blur',loseFocus);
+    return()=>{window.removeEventListener('pointerup',finishTouch);window.removeEventListener('pointercancel',finishTouch);window.removeEventListener('blur',loseFocus);};
+  },[]);
+  const rotating=suggestions.length>1&&!touchPaused&&!hoverPaused&&!focusPaused&&!hidden&&!reducedMotion;
   useEffect(()=>{
     if(!rotating||phase!=='idle')return;
     const timer=setTimeout(()=>goTo(index+1),DWELL_MS);return()=>clearTimeout(timer);
@@ -82,15 +89,10 @@ export function SuggestedHero({suggestions,fallback}:{suggestions:Series[];fallb
   },[hero?.id,hero?.title,hero?.description,locale]);
   if(!hero)return null;
   const suggested=suggestions.some(series=>series.id===hero.id);
-  const toggleRotation=()=>{
-    settleTransition();
-    if(userPaused){setUserPaused(false);setHoverPaused(false);setFocusPaused(false);}
-    else setUserPaused(true);
-  };
   return <section className={`hero hero-bounded hero-${hero.genres[0]} ${hero.demo===1?'':'hero-user-artwork'}`} aria-label={hero.title} data-suggested-carousel={suggestions.length>1?'true':'false'} data-carousel-phase={phase} data-autoplay={rotating?'running':'paused'}
     onPointerEnter={event=>{if(event.pointerType!=='touch'){setHoverPaused(true);settleTransition();}}}
     onPointerLeave={event=>{if(event.pointerType!=='touch')setHoverPaused(false);}}
-    onPointerDownCapture={event=>{if(event.pointerType==='touch'&&suggestions.length>1&&!(event.target instanceof Element&&event.target.closest('.hero-rotation-toggle'))){setUserPaused(true);settleTransition();}}}
+    onPointerDownCapture={event=>{if(event.pointerType==='touch'&&suggestions.length>1){touchPointers.current.add(event.pointerId);setTouchPaused(true);settleTransition();}}}
     onFocusCapture={()=>{setFocusPaused(true);settleTransition();}}
     onBlurCapture={event=>{if(!(event.relatedTarget instanceof Node)||!event.currentTarget.contains(event.relatedTarget))setFocusPaused(false);}}>
     <div className="hero-art cover-artwork-frame" inert={phase!=='idle'} aria-hidden={phase!=='idle'?true:undefined}><CoverArtwork key={hero.id} src={hero.cover} alt="" fetchPriority="high" decoding="async"/><CoverWatermark/></div>
@@ -100,6 +102,5 @@ export function SuggestedHero({suggestions,fallback}:{suggestions:Series[];fallb
       <div className="hero-synopsis-wrap"><div ref={synopsisRef} className="hero-synopsis" tabIndex={0} role="region" aria-label={t('description')} onScroll={measureHeroScroll}><p>{hero.description}</p></div>{heroScroll.synopsisMore&&<span className="hero-synopsis-more" aria-hidden="true"><ChevronDown size={15}/></span>}</div>
       <div className="hero-buttons"><Link className="button hero-play" to={hero.first_episode_id?`/watch/${hero.id}/${hero.first_episode_id}`:`/series/${hero.id}`}><Play size={17} fill="currentColor"/>{t('watchNow')}</Link><Link className="button hero-details" to={`/series/${hero.id}`}><Plus size={19}/>{t('aboutSeries')}</Link></div>{hero.free_episodes>0&&<span className="hero-free"><span className="free-dot"/>{t('freeAccess')}</span>}
     </div>
-    {suggestions.length>1&&!reducedMotion&&<button className="hero-rotation-toggle" aria-label={t(userPaused?'carouselResume':'carouselPause')} title={t(userPaused?'carouselResume':'carouselPause')} aria-pressed={userPaused} onClick={toggleRotation}>{userPaused?<Play size={16}/>:<Pause size={16}/>}</button>}
   </section>;
 }
