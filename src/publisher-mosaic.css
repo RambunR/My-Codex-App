@@ -1,0 +1,10 @@
+/* Keep the uploaded posters' full artwork, original colours and title lettering. */
+.publisher-mosaic.publisher-example-mosaic{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:14px;width:100%;max-width:520px;margin:28px 0 0;padding:10px 12px 20px}
+.publisher-mosaic.publisher-example-mosaic>div{grid-column:span 2;width:auto;max-height:none;min-width:0;aspect-ratio:4/5;background:#000}
+.publisher-mosaic.publisher-example-mosaic>div:nth-child(1){transform:rotate(-4deg)}
+.publisher-mosaic.publisher-example-mosaic>div:nth-child(2){transform:translateY(8px)}
+.publisher-mosaic.publisher-example-mosaic>div:nth-child(3){transform:rotate(4deg)}
+.publisher-mosaic.publisher-example-mosaic>div:nth-child(4){grid-column:2/span 2;transform:rotate(-3deg)}
+.publisher-mosaic.publisher-example-mosaic>div:nth-child(5){grid-column:4/span 2;transform:rotate(3deg)}
+.publisher-mosaic.publisher-example-mosaic img{display:block;width:100%;height:100%;object-fit:contain;filter:none}
+@media(max-width:640px){.publisher-mosaic.publisher-example-mosaic{max-width:360px;margin-inline:auto;gap:10px}}
