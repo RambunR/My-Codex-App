@@ -1,3 +1,5 @@
+.auth-art.auth-art-phoenix{background:#21124a}
+.auth-art.auth-art-phoenix>img{object-fit:contain;filter:none;z-index:0}
 .auth-provider-options .button + .button{margin-top:12px}
 .apple-button{background:#080808;color:#fff;border:1px solid #a0a0a0;min-height:44px;font-weight:550;text-align:center;white-space:normal}
 .apple-button:hover:not(:disabled){background:#252525;border-color:#fff}

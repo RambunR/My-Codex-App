@@ -31,7 +31,7 @@ export function Auth(){
 }
 type EmailActionMode='forgot'|'reset'|'verify'|'resend';
 const emailErrorKey=(error:unknown):Key=>error instanceof ApiError&&error.code==='MAIL_UNAVAILABLE'?'emailUnavailable':error instanceof ApiError&&error.code==='EMAIL_TOKEN_INVALID'?'emailTokenInvalid':error instanceof ApiError&&error.code==='RATE_LIMIT'?'emailRequestRateLimited':'emailRequestFailed';
-function AuthArtwork(){const{t}=useI18n();return <aside className="auth-art"><img src="/images/blue-hour.jpg" alt=""/><div className="auth-art-shade"/><span className="auth-art-star">✳</span><div><span className="eyebrow">LingYing ORIGINALS</span><h2>{t('heroTitle')}</h2><p>{t('heroSubtitle')}</p><span className="auth-worlds">EN · 繁 · 日本語 · 한국어 · +17</span></div><span className="auth-art-caption">{t('worldTitle')}</span></aside>;}
+function AuthArtwork(){return <aside className="auth-art auth-art-phoenix" lang="en"><img src="/images/auth-phoenix.webp" width={798} height={1971} alt="Fall into a new world. Discover extraordinary short dramas from creators everywhere." decoding="async"/></aside>;}
 function EmailAccountAction({mode}:{mode:EmailActionMode}){
   const{t,locale}=useI18n();const{user,setUser,refreshUser,config}=useApp();const[params]=useSearchParams();const location=useLocation();const navigate=useNavigate();
   const[token,setToken]=useState(()=>new URLSearchParams(location.hash.slice(1)).get('token')??params.get('token')??'');const[email,setEmail]=useState('');const[password,setPassword]=useState('');const[confirmation,setConfirmation]=useState('');

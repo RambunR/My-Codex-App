@@ -36,7 +36,7 @@ LingYing’s current icon is the operator-selected purple–pink origami phoenix
 
 Search engines can discover the same phoenix through stable `/favicon.ico` and `/icon-192.png` links. Real `robots.txt` and `sitemap.xml` files plus a homepage-only HTTPS canonical header support recrawling the preferred domain. Search results update on the search engine's schedule; see [search appearance and Search Console steps](docs/SEARCH_APPEARANCE.md).
 
-The publisher landing-page mosaic uses five operator-supplied example AI-drama posters, retaining their full artwork and title lettering. Auth artwork remains unchanged. See [example artwork](docs/EXAMPLE_DRAMA_ARTWORK.md).
+The publisher landing-page mosaic uses five operator-supplied example AI-drama posters, retaining their full artwork and title lettering. Auth pages use the separately supplied phoenix banner with its existing wording and no duplicate text overlays. See [decorative artwork](docs/EXAMPLE_DRAMA_ARTWORK.md).
 
 Upload test files: [download 10 numbered test episodes](https://lingyingdrama.com/downloads/dramio-test-episodes.zip). Unzip the archive and select its `Dramio_Test_Episodes` folder in the studio folder uploader. Each MP4 is 10 seconds, 720×1280, H.264 with silent AAC audio, and shows a white episode number on black. All ten were created with FFmpeg without an AI video model; each is approximately 21 KB.
 
