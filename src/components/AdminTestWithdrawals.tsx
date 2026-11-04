@@ -9,7 +9,7 @@ import {WITHDRAWAL_POLICY} from '../../shared/withdrawals';
 import {TEST_PAYOUT_MAX_CENTS,type TestPayoutDashboard,type TestPayoutStatus} from '../../shared/test-payouts';
 import './admin-test-withdrawals.css';
 
-const statusKey:Record<TestPayoutStatus,Key>={pending:'pending',processing:'paymentProcessing',transferred:'testWithdrawalTransferred',payout_pending:'testWithdrawalBankPending',paid:'paid',failed:'failed',rejected:'rejected'};
+const statusKey:Record<TestPayoutStatus,Key>={pending:'pending',processing:'paymentProcessing',transferred:'testWithdrawalTransferred',payout_pending:'testWithdrawalBankPending',paid:'testWithdrawalPaid',failed:'failed',rejected:'rejected'};
 function currencyName(currency:string,locale:string){
  const code=currency.toUpperCase();
  try{return new Intl.DisplayNames(locale,{type:'currency'}).of(code)||code;}catch{return code;}
@@ -50,7 +50,7 @@ export function AdminTestWithdrawals(){
    <div className="balance-row"><span>{t('withdrawalNet')}</span><strong>{usd(net*10000)}</strong></div>
    <div className="balance-row test-bank-amount"><span>{t('testWithdrawalBankAmount')}</span><output aria-live="polite"><BankAmount cents={Math.round(net*data.exchangeRate)} currency={data.currency} locale={locale}/></output></div>
    <Button className="button primary wide" busy={busy==='request'} disabled={!!busy||!valid||!data.ready} type="submit">{t('requestPayout')}</Button>
-  </form><section className="panel"><h2>{t('payoutHistory')} · {t('testPayment')}</h2>
+  </form><section className="panel"><h2>{t('payoutHistory')} · {t('testPayment')}</h2><p className="field-hint">{t('testWithdrawalStatusHint')}</p>
    {data.requests.length?<div className="test-withdrawal-history">{data.requests.map(request=><article key={request.id}>
     <div><strong>{usd(request.gross_cents*10000)}</strong><small>{t('withdrawalFee')}: {usd(request.fee_cents*10000)} · {t('withdrawalNet')}: {usd(request.net_cents*10000)}</small><small>{t('testWithdrawalBankAmount')}: <BankAmount cents={request.provider_amount} currency={request.currency} locale={locale}/></small><span className={`status ${request.status}`}>{t(statusKey[request.status])}</span>{request.error_code&&<small className="form-error">{request.error_code}</small>}</div>
     <div className="test-withdrawal-actions">{['pending','processing','transferred'].includes(request.status)&&<Button className="button primary small" busy={busy===request.id} disabled={!!busy} onClick={()=>act(request.id,'process')}>{t('testWithdrawalProcess')}</Button>}{request.status==='pending'&&<button className="button secondary small" disabled={!!busy} onClick={()=>act(request.id,'reject')}>{t('reject')}</button>}{request.transfer_id&&<button className="button secondary small" disabled={!!busy} onClick={()=>act(request.id,'sync')}>{t('testWithdrawalRefresh')}</button>}</div>

@@ -1,9 +1,9 @@
-// The requested amount is the total reserved from available earnings. The fee
-// is included in that amount, so a US$10 request transfers US$9 to the creator.
+// New requests have no platform withdrawal fee. Previously saved request terms
+// keep their original amounts and provider retry keys.
 export const WITHDRAWAL_POLICY = {
-  version: 'withdrawal-usd-v1',
+  version: 'withdrawal-usd-v2-no-fee',
   minimumCents: 1000,
-  feeCents: 100,
+  feeCents: 0,
   processingMinDays: 3,
   processingMaxDays: 5,
 } as const;

@@ -31,26 +31,27 @@ beforeEach(()=>{config.production=false;config.payments='demo';config.sandbox=fa
 afterEach(()=>mock.restoreAll());
 after(async()=>{await new Promise<void>(resolve=>server.close(()=>resolve()));db.close();await rm(dir,{recursive:true,force:true});});
 
-test('minimum is USD10 regardless of FX; new requests reserve gross and persist a USD1 fee',async()=>{
+test('minimum is USD10 regardless of FX; new requests reserve gross with no platform fee',async()=>{
   const creator=actor();
   config.usdToHkd=100;
   const invalid=await request('/api/studio/withdrawals',{amount_cents:999},creator.cookie,400);assert.equal(invalid.error.code,'MIN_WITHDRAWAL');
   assert.equal(earnings(creator.id),15_000_000);
   config.usdToHkd=0.01;
-  const result=await request('/api/studio/withdrawals',{amount_cents:1000,fee_micros:0,payout_micros:10_000_000},creator.cookie,201);
+  const result=await request('/api/studio/withdrawals',{amount_cents:1000,fee_micros:1_000_000,payout_micros:9_000_000},creator.cookie,201);
   assert.equal(earnings(creator.id),5_000_000);
   const terms=one('SELECT * FROM withdrawal_terms WHERE withdrawal_id=?',result.id)!;
-  assert.equal(terms.gross_micros,10_000_000);assert.equal(terms.fee_micros,1_000_000);assert.equal(terms.payout_micros,9_000_000);
+  assert.equal(terms.gross_micros,10_000_000);assert.equal(terms.fee_micros,0);assert.equal(terms.payout_micros,10_000_000);
+  assert.equal(terms.policy_version,'withdrawal-usd-v2-no-fee');
   assert.equal(terms.processing_min_days,3);assert.equal(terms.processing_max_days,5);
   const history=(await request('/api/studio',undefined,creator.cookie)).withdrawals[0];
-  assert.equal(history.fee_micros,1_000_000);assert.equal(history.payout_micros,9_000_000);
+  assert.equal(history.fee_micros,0);assert.equal(history.payout_micros,10_000_000);
   await request('/api/studio/withdrawals',{amount_cents:1000},creator.cookie,400);
   assert.equal(one('SELECT COUNT(*) AS n FROM withdrawals WHERE user_id=?',creator.id)!.n,1);
   const publicConfig=await request('/api/config',undefined);
-  assert.equal(publicConfig.limits.minimumPayoutUsd,10);assert.equal(publicConfig.withdrawalPolicy.feeCents,100);
+  assert.equal(publicConfig.limits.minimumPayoutUsd,10);assert.equal(publicConfig.withdrawalPolicy.feeCents,0);
 });
 
-test('rejection restores the entire reserved amount exactly once, including the fee',async()=>{
+test('rejection restores the entire reserved amount exactly once, without a fee deduction',async()=>{
   const creator=actor(),admin=actor('admin');
   const withdrawal=await request('/api/studio/withdrawals',{amount_cents:1000},creator.cookie,201);
   await request('/api/admin/withdrawals/'+withdrawal.id,{approve:false},admin.cookie);
@@ -77,10 +78,10 @@ test('Stripe retry sends the saved net amount with the same idempotency key and 
   await request('/api/admin/withdrawals/'+withdrawal.id,{approve:true},admin.cookie,500);
   await request('/api/admin/withdrawals/'+withdrawal.id,{approve:true},admin.cookie);
   await request('/api/admin/withdrawals/'+withdrawal.id,{approve:true},admin.cookie,409);
-  assert.deepEqual(calls,[{amount:900,key:'withdrawal:'+withdrawal.id},{amount:900,key:'withdrawal:'+withdrawal.id}]);
+  assert.deepEqual(calls,[{amount:1000,key:'withdrawal:'+withdrawal.id},{amount:1000,key:'withdrawal:'+withdrawal.id}]);
   assert.equal(earnings(creator.id),5_000_000);
   const history=(await request('/api/admin',undefined,admin.cookie)).withdrawals.find((row:any)=>row.id===withdrawal.id);
-  assert.equal(history.fee_micros,1_000_000);assert.equal(history.payout_micros,9_000_000);
+  assert.equal(history.fee_micros,0);assert.equal(history.payout_micros,10_000_000);
 });
 
 test('historical pending requests keep their original transfer amount with zero retroactive fee',async()=>{
@@ -91,6 +92,18 @@ test('historical pending requests keep their original transfer amount with zero 
   assert.equal(amount,300);
   const history=(await request('/api/studio',undefined,creator.cookie)).withdrawals.find((row:any)=>row.id===id);
   assert.equal(history.fee_micros,0);assert.equal(history.payout_micros,3_000_000);
+});
+
+test('a saved v1 fee and transfer amount remain unchanged after the platform fee is removed',async()=>{
+  const creator=actor('publisher',5_000_000),admin=actor('admin');stripeFixture(creator.id);
+  const id=randomUUID();run('INSERT INTO withdrawals (id,user_id,amount_micros) VALUES (?,?,?)',id,creator.id,10_000_000);
+  run('INSERT INTO withdrawal_terms (withdrawal_id,policy_version,gross_micros,fee_micros,payout_micros,processing_min_days,processing_max_days) VALUES (?,?,?,?,?,?,?)',id,'withdrawal-usd-v1',10_000_000,1_000_000,9_000_000,3,5);
+  let amount=0;mock.method(finance.stripe!.transfers,'create',async(params:any)=>{amount=params.amount;return{id:'tr_saved_v1_fixture'};});
+  await request('/api/admin/withdrawals/'+id,{approve:true},admin.cookie);
+  assert.equal(amount,900);assert.equal(earnings(creator.id),5_000_000);
+  const history=(await request('/api/studio',undefined,creator.cookie)).withdrawals.find((r:any)=>r.id===id);
+  assert.equal(history.fee_micros,1_000_000);assert.equal(history.payout_micros,9_000_000);
+  assert.equal((await request('/api/config',undefined)).withdrawalPolicy.feeCents,0);
 });
 
 test('sandbox and paused modes remain unable to reserve or release real earnings',async()=>{

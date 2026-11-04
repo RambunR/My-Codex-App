@@ -76,9 +76,10 @@ test('live keys and another sandbox are rejected before any provider write',asyn
 
 test('a finite quote reserves no real/test earnings and has an immutable gross, fee, net and HKD amount',async()=>{
  const before=balances(owner.id),key=randomUUID();
- const r=await create(1000,key);assert.equal(r.gross_cents,1000);assert.equal(r.fee_cents,100);assert.equal(r.net_cents,900);assert.equal(r.provider_amount,7020);assert.equal(r.currency,'hkd');
+ const r=await create(1000,key);assert.equal(r.gross_cents,1000);assert.equal(r.fee_cents,0);assert.equal(r.net_cents,1000);assert.equal(r.provider_amount,7800);assert.equal(r.currency,'hkd');
+ assert.equal(r.status,'pending');assert.equal(r.transfer_id,null);assert.equal(r.payout_id,null);assert.equal(calls.transfers.length,0);assert.equal(calls.payouts.length,0);
  config.usdToHkd=9;
- const replay=await create(1000,key);assert.equal(replay.id,r.id);assert.equal(replay.provider_amount,7020);
+ const replay=await create(1000,key);assert.equal(replay.id,r.id);assert.equal(replay.provider_amount,7800);
  await request('/api/studio/test-withdrawals',{amount_cents:2000,request_key:key},owner.cookie,409);
  await request('/api/studio/test-withdrawals',{amount_cents:999,request_key:randomUUID()},owner.cookie,400);
  await request('/api/studio/test-withdrawals',{amount_cents:Infinity,request_key:randomUUID()},owner.cookie,400);
@@ -92,12 +93,23 @@ test('transfer and bank payout are separate; refresh marks paid only after the p
  const before=balances(owner.id),r=await create();
  const result=(await request(`/api/studio/test-withdrawals/${r.id}/process`,{})).request;
  assert.equal(result.status,'payout_pending');assert.equal(result.transfer_id,'tr_test_'+r.id);assert.equal(result.payout_id,'po_test_bank');
- assert.equal(calls.transfers[0].params.amount,7020);assert.equal(calls.payouts[0].params.amount,7020);assert.equal(calls.payouts[0].options.stripeAccount,DEST);
+ assert.equal(calls.transfers[0].params.amount,7800);assert.equal(calls.payouts[0].params.amount,7800);assert.equal(calls.payouts[0].options.stripeAccount,DEST);
  assert.equal(calls.transfers[0].options.idempotencyKey,'test-withdrawal:transfer:'+r.id);
  await request(`/api/studio/test-withdrawals/${r.id}/process`,{});assert.equal(calls.transfers.length,1);assert.equal(calls.payouts.length,1);
  payoutStatus='paid';assert.equal((await request(`/api/studio/test-withdrawals/${r.id}/sync`,{})).request.status,'paid');
  await request(`/api/studio/test-withdrawals/${r.id}/process`,{},owner.cookie,409);
  assert.deepEqual(balances(owner.id),before);
+});
+
+test('a retained v1 sandbox quote keeps its fee, bank amount and retry keys after fee removal',async()=>{
+ const before=balances(owner.id),key=randomUUID(),r=await create(1000,key);
+ // Represent an existing request saved under the former US$1 fee policy.
+ run('UPDATE admin_test_withdrawals SET fee_cents=100,net_cents=900,provider_amount=7020,funding_amount=9424,policy_version=? WHERE id=?','withdrawal-usd-v1',r.id);
+ const replay=await create(1000,key);assert.equal(replay.id,r.id);assert.equal(replay.fee_cents,100);assert.equal(replay.net_cents,900);assert.equal(replay.provider_amount,7020);
+ await request(`/api/studio/test-withdrawals/${r.id}/process`,{});
+ assert.equal(calls.transfers[0].params.amount,7020);assert.equal(calls.payouts[0].params.amount,7020);
+ assert.equal(calls.transfers[0].options.idempotencyKey,'test-withdrawal:transfer:'+r.id);
+ assert.equal((await request('/api/studio/test-withdrawals',undefined)).feeCents,0);assert.deepEqual(balances(owner.id),before);
 });
 
 test('test funds are replenished with a fixed sandbox token only when needed',async()=>{

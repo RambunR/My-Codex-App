@@ -382,7 +382,7 @@ try{
   await request('/api/studio/withdrawals',{amount_cents:999},publisher,400);
   await request('/api/studio/withdrawals',{amount_cents:1000},publisher,400);
   // Earn enough through an actual, entirely local demo purchase to exercise the
-  // USD10 minimum and fee snapshot without fabricating a production balance.
+  // USD10 minimum and zero-fee snapshot without fabricating a production balance.
   const payoutBuyer=(await request('/api/auth/register',{name:'Payout smoke viewer',email:'payout-smoke@example.test',password},'',201)).cookie;
   const payoutFunding=(await request('/api/payments/checkout',{kind:'funding',amount_cents:2000},payoutBuyer)).data;
   await request(`/api/payments/${payoutFunding.paymentId}/demo-confirm`,{},payoutBuyer);
@@ -393,7 +393,7 @@ try{
   await request(`/api/studio/series/${sid}`,{...payoutPricing,price_cents:payoutSeries.price_cents},publisher,200,'PATCH');
   const withdrawal=(await request('/api/studio/withdrawals',{amount_cents:1700,note:'Local test only'},publisher,201)).data;
   const terms=(await request('/api/studio',undefined,publisher)).data.withdrawals.find(row=>row.id===withdrawal.id);
-  assert.equal(terms.amount_micros,17_000_000);assert.equal(terms.fee_micros,1_000_000);assert.equal(terms.payout_micros,16_000_000);
+  assert.equal(terms.amount_micros,17_000_000);assert.equal(terms.fee_micros,0);assert.equal(terms.payout_micros,17_000_000);
   assert.equal(withdrawal.user.earnings_micros,507_000);
   await request(`/api/admin/withdrawals/${withdrawal.id}`,{approve:true},admin);
   await request(`/api/admin/withdrawals/${withdrawal.id}`,{approve:true},admin,409);
