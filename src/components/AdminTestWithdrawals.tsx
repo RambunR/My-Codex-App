@@ -16,7 +16,7 @@ function currencyName(currency:string,locale:string){
 }
 function BankAmount({cents,currency,locale}:{cents:number;currency:string;locale:string}){
  const code=currency.toUpperCase();
- return <bdi>{new Intl.NumberFormat(locale,{style:'currency',currency:code}).format(cents/100)} <span className="bank-currency-code">{code}</span></bdi>;
+ return <bdi>~ {new Intl.NumberFormat(locale,{style:'currency',currency:code}).format(cents/100)} <span className="bank-currency-code">{code}</span></bdi>;
 }
 export function AdminTestWithdrawals(){
  const {t,locale}=useI18n();const {toast}=useApp();const{data,loading,error,refresh}=useApi<TestPayoutDashboard>('/api/studio/test-withdrawals');
@@ -48,11 +48,12 @@ export function AdminTestWithdrawals(){
    <div className="balance-row"><span>{t('withdrawalGross')}</span><strong>{usd((cents??0)*10000)}</strong></div>
    <div className="balance-row"><span>{t('withdrawalFee')}</span><strong>{usd(fee*10000)}</strong></div>
    <div className="balance-row"><span>{t('withdrawalNet')}</span><strong>{usd(net*10000)}</strong></div>
-   <div className="balance-row test-bank-amount"><span>{t('testWithdrawalBankAmount')}</span><output aria-live="polite"><BankAmount cents={Math.round(net*data.exchangeRate)} currency={data.currency} locale={locale}/></output></div>
+   <div className="balance-row test-bank-amount"><span>{t('payoutEstimatedBankAmount')}</span><output aria-live="polite"><BankAmount cents={Math.round(net*data.exchangeRate)} currency={data.currency} locale={locale}/></output></div>
+   <p className="field-hint payout-fee-notice">{t('payoutProviderFeeNotice')}</p>
    <Button className="button primary wide" busy={busy==='request'} disabled={!!busy||!valid||!data.ready} type="submit">{t('requestPayout')}</Button>
   </form><section className="panel"><h2>{t('payoutHistory')} · {t('testPayment')}</h2><p className="field-hint">{t('testWithdrawalStatusHint')}</p>
    {data.requests.length?<div className="test-withdrawal-history">{data.requests.map(request=><article key={request.id}>
-    <div><strong>{usd(request.gross_cents*10000)}</strong><small>{t('withdrawalFee')}: {usd(request.fee_cents*10000)} · {t('withdrawalNet')}: {usd(request.net_cents*10000)}</small><small>{t('testWithdrawalBankAmount')}: <BankAmount cents={request.provider_amount} currency={request.currency} locale={locale}/></small><span className={`status ${request.status}`}>{t(statusKey[request.status])}</span>{request.error_code&&<small className="form-error">{request.error_code}</small>}</div>
+    <div><strong>{usd(request.gross_cents*10000)}</strong><small>{t('withdrawalFee')}: {usd(request.fee_cents*10000)} · {t('withdrawalNet')}: {usd(request.net_cents*10000)}</small><small>{t('payoutEstimatedBankAmount')}: <BankAmount cents={request.provider_amount} currency={request.currency} locale={locale}/></small><span className={`status ${request.status}`}>{t(statusKey[request.status])}</span>{request.error_code&&<small className="form-error">{request.error_code}</small>}</div>
     <div className="test-withdrawal-actions">{['pending','processing','transferred'].includes(request.status)&&<Button className="button primary small" busy={busy===request.id} disabled={!!busy} onClick={()=>act(request.id,'process')}>{t('testWithdrawalProcess')}</Button>}{request.status==='pending'&&<button className="button secondary small" disabled={!!busy} onClick={()=>act(request.id,'reject')}>{t('reject')}</button>}{request.transfer_id&&<button className="button secondary small" disabled={!!busy} onClick={()=>act(request.id,'sync')}>{t('testWithdrawalRefresh')}</button>}</div>
    </article>)}</div>:<p className="muted">{t('noPayouts')}</p>}
   </section></>}

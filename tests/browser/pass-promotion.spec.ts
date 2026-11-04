@@ -59,3 +59,15 @@ test('financial review holds block private quote application and new payment cre
 for(const[locale,width]of [['en',320],['zh-TW',390],['ar',320]] as const)test(`a manually applied code is readable on a ${width}px ${locale} phone`,async({page})=>{
   await page.setViewportSize({width,height:844});await page.addInitScript(value=>localStorage.setItem('drama-language',value),locale);await fixture(page);await page.goto('/studio');await expect(page.locator('html')).toHaveAttribute('lang',locale);if(locale==='ar')await expect(page.locator('html')).toHaveAttribute('dir','rtl');await expect(page.locator('#pass-promo-code')).toHaveValue('');await expect(page.locator('.publisher-landing')).not.toContainText('LINGYING58');await apply(page);await expect(page.locator('.pass-usd-price')).toContainText('7.44');await expect(page.locator('.pass-billing-note')).toContainText('HK$58.00');await noOverflow(page);const input=page.locator('#pass-promo-code');expect(await input.evaluate(node=>getComputedStyle(node).fontSize)).toBe('16px');const bounds=await page.locator('.pass-promo-input-row>button').boundingBox();expect(bounds).not.toBeNull();expect(bounds!.height).toBeGreaterThanOrEqual(44);expect(bounds!.width).toBeGreaterThanOrEqual(44);
 });
+
+
+test('Pass activation and Account keep the processing-fee note next to the creator share without opening Checkout',async({page})=>{
+  await fixture(page);const writes:string[]=[];page.on('request',request=>{if(request.method()==='POST'&&new URL(request.url()).pathname.startsWith('/api/payments/'))writes.push(new URL(request.url()).pathname);});
+  await page.goto('/studio');
+  await expect(page.locator('.activation-card li').filter({hasText:'You keep 70%'})).toContainText('(excluding Stripe transaction fees)');
+  await expect(page.locator('.activation-card .provider-fee-estimate-note')).toContainText('creator’s 70% share');
+  await page.goto('/account');
+  await expect(page.locator('.dramio-pass-benefits')).toContainText('70% creator share (excluding Stripe transaction fees)');
+  await expect(page.locator('.dramio-pass-card .provider-fee-estimate-note')).toContainText('Stripe fees vary by amount, destination and currency');
+  expect(writes).toEqual([]);
+});

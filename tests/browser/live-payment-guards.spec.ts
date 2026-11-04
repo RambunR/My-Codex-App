@@ -60,7 +60,9 @@ test('earnings show the USD10 minimum, no platform fee and processing time befor
   const amount=dialog.getByLabel('Amount to withdraw (USD)');
   await expect(amount).toHaveAttribute('min','10.00');await expect(amount).toHaveValue('10.00');
   await expect(dialog.locator('.balance-row').filter({hasText:'Withdrawal fee'})).toContainText('$0.00');
-  await expect(dialog.locator('.balance-row').filter({hasText:'Net withdrawal'})).toContainText('$10.00');
+  await expect(dialog.locator('.balance-row').filter({hasText:'Before provider fees'})).toContainText('$10.00');
+  await expect(dialog.locator('.payout-fee-notice')).toContainText('creator’s 70% share');
+  await expect(dialog.locator('.balance-row').filter({hasText:'Estimated HKD value'})).toContainText('~ HK$');
   await amount.fill('9.99');await expect(dialog.getByRole('button',{name:'Request payout',exact:true})).toBeDisabled();
   expect(submitted).toEqual([]);
   await amount.fill('10.001');await expect(dialog.getByRole('button',{name:'Request payout',exact:true})).toBeDisabled();

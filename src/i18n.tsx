@@ -19,9 +19,11 @@ import {videoBrandEnglish,videoBrandMessages} from './video-brand-locales';
 import {uploadLeaveEnglish,uploadLeaveMessages} from './upload-leave-locales';
 import {suggestionsEnglish,suggestionsMessages} from './suggestions-locales';
 import {withdrawalEnglish,withdrawalMessages} from './withdrawal-locales';
+import {transactionFeeEnglish,transactionFeeMessages} from './transaction-fee-locales';
 import {testPayoutEnglish,testPayoutMessages} from './test-payout-locales';
 
 const en = {
+  ...transactionFeeEnglish,
   ...testPayoutEnglish,
   ...withdrawalEnglish,
   ...storageUnlimitedEnglish,
@@ -195,6 +197,7 @@ for(const language of LANGUAGES){if(!seriesAccessMessages[language.code])throw n
 for(const language of LANGUAGES){if(!suggestionsMessages[language.code])throw new Error(`Suggestion translations missing: ${language.code}`);Object.assign(dictionaries[language.code],suggestionsMessages[language.code]);}
 for(const language of LANGUAGES)Object.assign(dictionaries[language.code],withdrawalMessages[language.code]);
 for(const language of LANGUAGES)Object.assign(dictionaries[language.code],testPayoutMessages[language.code]);
+for(const language of LANGUAGES)Object.assign(dictionaries[language.code],transactionFeeMessages[language.code]);
 const uploadConfirmationMessages:Record<Locale,string>={
   en:'Upload confirmation was interrupted. Refresh this series before retrying the file.',
   'zh-TW':'上傳確認中斷。請重新整理此系列，再重試上傳檔案。',

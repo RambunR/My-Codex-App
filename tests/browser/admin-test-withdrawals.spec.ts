@@ -23,7 +23,9 @@ test('owner has unlimited simulated earnings and can request, process and reconc
  const f=await fixture(page);await page.goto('/studio');await page.getByRole('button',{name:'Earnings & payouts',exact:true}).click();
  const panel=page.getByRole('region',{name:'Administrator sandbox withdrawals'});
  await expect(panel.getByRole('heading',{name:'Unlimited test allowance'})).toBeVisible();
- await expect(panel).toContainText('real earnings are unchanged');await expect(panel).toContainText('No platform withdrawal fee.');await expect(panel.locator('.balance-row').filter({hasText:'Withdrawal fee'})).toContainText('$0.00');await expect(panel.locator('.test-bank-currency')).toContainText('Hong Kong Dollar (HKD)');await expect(panel.locator('output')).toHaveText('HK$78.00 HKD');
+ await expect(panel).toContainText('real earnings are unchanged');await expect(panel).toContainText('No platform withdrawal fee.');await expect(panel.locator('.balance-row').filter({hasText:'Withdrawal fee'})).toContainText('$0.00');await expect(panel.locator('.test-bank-currency')).toContainText('Hong Kong Dollar (HKD)');await expect(panel.locator('output')).toHaveText('~ HK$78.00 HKD');
+ const formBounds=await panel.locator('form').boundingBox(),calloutBounds=await panel.locator('.earnings-callout').boundingBox();expect(formBounds).not.toBeNull();expect(calloutBounds).not.toBeNull();expect(Math.abs(formBounds!.width-calloutBounds!.width)).toBeLessThanOrEqual(1);
+ await expect(panel.locator('.payout-fee-notice')).toContainText('creator’s 70% share');
  const amount=panel.getByLabel('Amount to withdraw (USD)');await amount.fill('9.99');await expect(panel.getByRole('button',{name:'Request payout',exact:true})).toBeDisabled();
  await amount.fill('10.00');await panel.getByRole('button',{name:'Request payout',exact:true}).click();
  await expect(panel.locator('.test-withdrawal-history')).toContainText('$10.00');
@@ -40,17 +42,17 @@ test('a Japanese interface keeps a USD receiving bank in USD and submits the gro
  const f=await fixture(page,true,true,'usd');await page.addInitScript(()=>localStorage.setItem('drama-language','ja'));
  await page.goto('/studio');await page.getByRole('button',{name:'収益と出金',exact:true}).click();
  const panel=page.locator('.admin-test-withdrawals');await expect(panel.locator('.test-bank-currency')).toContainText('米ドル (USD)');
- await panel.getByRole('spinbutton').fill('20.00');await expect(panel.locator('output')).toHaveText('$20.00 USD');
+ await panel.getByRole('spinbutton').fill('20.00');await expect(panel.locator('output')).toHaveText('~ $20.00 USD');
  await panel.locator('button[type=submit]').click();await expect(panel.locator('.test-withdrawal-history')).toContainText('$20.00 USD');
  expect(f.submissions[0].amount_cents).toBe(2000);
 });
 
 test('saved bank amounts retain their original currency when the receiving currency changes',async({page})=>{
  const f=await fixture(page);await page.goto('/studio');await page.getByRole('button',{name:'Earnings & payouts',exact:true}).click();
- const panel=page.locator('.admin-test-withdrawals');await panel.getByRole('spinbutton').fill('20.00');await expect(panel.locator('output')).toHaveText('HK$156.00 HKD');
+ const panel=page.locator('.admin-test-withdrawals');await panel.getByRole('spinbutton').fill('20.00');await expect(panel.locator('output')).toHaveText('~ HK$156.00 HKD');
  await panel.locator('button[type=submit]').click();await expect(panel.locator('.test-withdrawal-history')).toContainText('HK$156.00 HKD');
  f.setCurrency('usd');await page.reload();await page.getByRole('button',{name:'Earnings & payouts',exact:true}).click();
- await expect(panel.locator('.test-bank-currency')).toContainText('US Dollar (USD)');await expect(panel.locator('output')).toHaveText('$10.00 USD');
+ await expect(panel.locator('.test-bank-currency')).toContainText('US Dollar (USD)');await expect(panel.locator('output')).toHaveText('~ $10.00 USD');
  await expect(panel.locator('.test-withdrawal-history')).toContainText('HK$156.00 HKD');
  expect(f.submissions).toHaveLength(1);
 });
