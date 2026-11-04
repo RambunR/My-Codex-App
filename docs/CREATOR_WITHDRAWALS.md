@@ -4,7 +4,7 @@
 
 New requests have a **US$10 minimum**, a **US$1 fee included in the requested amount**, and a **3–5 day processing window after submission**. A US$10 request reserves US$10 and transfers US$9. The fee is not an additional US$1 debit. Rejection returns the full reserved amount once. Historical requests retain their original amounts with no retroactive fee.
 
-`shared/withdrawals.ts` is the policy source. The earnings callout and confirmation dialog disclose the policy in all 21 interface languages. Gross, fee and net amounts are saved with the request and displayed in creator/administrator history. Live creator withdrawals remain independently disabled by `PAYOUTS_ENABLED=false`; a transfer is not proof of bank settlement.
+`shared/withdrawals.ts` is the policy source. The earnings callout and confirmation dialog disclose the policy in all 21 interface languages. Gross, fee and net amounts are saved with the request and displayed in creator/administrator history. The owner chose to absorb Stripe costs: keep the quoted creator net separate from platform expenses, with no extra Stripe fee deducted from the creator’s withdrawal. Live fee-payer settings and overseas bank-credit guarantees remain unverified. Live creator withdrawals remain independently disabled by `PAYOUTS_ENABLED=false`; a transfer is not proof of bank settlement.
 
 ## Unlimited administrator test allowance
 
@@ -32,7 +32,7 @@ The older context `acct_1StBIlJZDi49uXDa` and recipient `acct_1UXwKKJZDi5L4iq3` 
 ### How the administrator tests
 
 1. Sign in on **https://lingyingdrama.com** with the existing owner administrator account. Select **Studio → Earnings & payouts / 收益與提款** while Stripe test mode is enabled.
-2. Confirm **Unlimited test allowance / 無限測試額度**, enter a finite USD amount and inspect gross, US$1 fee, net and test bank amount. Submit the request.
+2. Confirm **Unlimited test allowance / 無限測試額度**, enter a finite USD amount and inspect gross, US$1 fee, net and test bank amount. The form displays the receiving currency’s localized name, symbol and ISO code from the verified connected account (currently HKD for the owner). The receiving currency follows the bank account, independently of the interface language or browser location; USD input and the US$1 fee stay in USD. For a US$20 request, the saved 7.8 test rate displays US$19 net and HK$148.20 HKD. Each history row continues to use its original saved bank currency and amount if the receiving account changes later. Submit the request.
 3. Click **Process test withdrawal / 處理測試提領** on that request. Test requests can process immediately; the real policy's 3–5 day processing window does not introduce an artificial sandbox delay.
 4. The application verifies the sandbox platform and recipient. If provider test funds are insufficient, it creates a **sandbox-only** funding charge using Stripe's fixed `tok_bypassPending` fixture. This never funds a customer wallet or credits creator earnings.
 5. It transfers the saved net amount to the sandbox recipient, then submits a separate test bank payout. HKD uses the saved indicative test rate (`USD_TO_HKD`, currently 7.8), frozen when requested. For US$10, the quote is US$1 fee, US$9 net and HK$70.20 for the test bank. This is not a live foreign-exchange quote.
@@ -90,7 +90,7 @@ The handler verifies the dedicated signature, requires `livemode:false`, scopes 
 
 The implementation includes ownership/mode guards, wrong-sandbox/live-key rejection, finite minimum/maximum amounts, immutable fees/conversion, no real/test earnings mutation, duplicate/lost-response retries, fee-safe rejection, funding simulation, bank status/failure reconciliation, automatic payout batch matching and late signed test events after switching the UI to live mode.
 
-Validation on 4 November 2026: 418 unit/API tests and the full 228-test browser suite passed; the Cloudflare build and full local Cloudflare integration smoke passed. The four new administrator browser journeys also passed separately after the final phone-layout adjustment. The retained remote sandbox request subsequently passed after the owner saved the required permissions, including a directly retrieved `paid` bank-payout status as recorded above.
+Validation on 4 November 2026: 418 unit/API tests and the full 228-test browser suite passed; the Cloudflare build and full local Cloudflare integration smoke passed. The four new administrator browser journeys also passed separately after the final phone-layout adjustment. The retained remote sandbox request subsequently passed after the owner saved the required permissions, including a directly retrieved `paid` bank-payout status as recorded above. The receiving-bank currency display update passed all 418 unit/API tests, 13 affected browser journeys and the Cloudflare build; its rendered English desktop, Traditional Chinese phone and Arabic phone forms were inspected with a US$20 input and HK$148.20 HKD test bank amount.
 
 Run `npm test`, `npm run build:cloudflare`, the affected administrator/withdrawal browser journeys, and `npm run test:cloudflare`. On slow cold builds, `CLOUDFLARE_TEST_STARTUP_TIMEOUT_MS=180000` extends only the local smoke startup allowance.
 

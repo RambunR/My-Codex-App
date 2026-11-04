@@ -10,8 +10,16 @@ import {TEST_PAYOUT_MAX_CENTS,type TestPayoutDashboard,type TestPayoutStatus} fr
 import './admin-test-withdrawals.css';
 
 const statusKey:Record<TestPayoutStatus,Key>={pending:'pending',processing:'paymentProcessing',transferred:'testWithdrawalTransferred',payout_pending:'testWithdrawalBankPending',paid:'paid',failed:'failed',rejected:'rejected'};
+function currencyName(currency:string,locale:string){
+ const code=currency.toUpperCase();
+ try{return new Intl.DisplayNames(locale,{type:'currency'}).of(code)||code;}catch{return code;}
+}
+function BankAmount({cents,currency,locale}:{cents:number;currency:string;locale:string}){
+ const code=currency.toUpperCase();
+ return <bdi>{new Intl.NumberFormat(locale,{style:'currency',currency:code}).format(cents/100)} <span className="bank-currency-code">{code}</span></bdi>;
+}
 export function AdminTestWithdrawals(){
- const {t}=useI18n();const {toast}=useApp();const{data,loading,error,refresh}=useApi<TestPayoutDashboard>('/api/studio/test-withdrawals');
+ const {t,locale}=useI18n();const {toast}=useApp();const{data,loading,error,refresh}=useApi<TestPayoutDashboard>('/api/studio/test-withdrawals');
  const [amount,setAmount]=useState('10.00'),[busy,setBusy]=useState(''),[failure,setFailure]=useState('');
  const requestKey=useRef<string|null>(null),lastAmount=useRef('');
  const cents=parseUsdCents(amount),fee=data?.feeCents??WITHDRAWAL_POLICY.feeCents,minimum=data?.minimumCents??WITHDRAWAL_POLICY.minimumCents,maximum=data?.maxCents??TEST_PAYOUT_MAX_CENTS;
@@ -36,14 +44,15 @@ export function AdminTestWithdrawals(){
   {data&&<><form className="panel admin-test-withdrawal-form" onSubmit={submit}>
    <label className="field">{t('payoutAmount')}<div className="money-input"><span>US$</span><input type="number" inputMode="decimal" step="0.01" min={(minimum/100).toFixed(2)} max={(maximum/100).toFixed(2)} value={amount} onChange={event=>setAmount(event.target.value)} required/></div></label>
    <p className="field-hint">{usd(minimum*10000)}–{usd(maximum*10000)} {t('testPayment')}</p>
+   <div className="test-bank-currency"><span>{t('testWithdrawalBankCurrency')}</span><strong>{currencyName(data.currency,locale)} <bdi>({data.currency.toUpperCase()})</bdi></strong><p>{t('testWithdrawalBankCurrencyHint')}</p></div>
    <div className="balance-row"><span>{t('withdrawalGross')}</span><strong>{usd((cents??0)*10000)}</strong></div>
    <div className="balance-row"><span>{t('withdrawalFee')}</span><strong>{usd(fee*10000)}</strong></div>
    <div className="balance-row"><span>{t('withdrawalNet')}</span><strong>{usd(net*10000)}</strong></div>
-   <div className="balance-row"><span>{t('testWithdrawalBankAmount')}</span><strong>{data.currency.toUpperCase()} {(Math.round(net*data.exchangeRate)/100).toFixed(2)}</strong></div>
+   <div className="balance-row test-bank-amount"><span>{t('testWithdrawalBankAmount')}</span><output aria-live="polite"><BankAmount cents={Math.round(net*data.exchangeRate)} currency={data.currency} locale={locale}/></output></div>
    <Button className="button primary wide" busy={busy==='request'} disabled={!!busy||!valid||!data.ready} type="submit">{t('requestPayout')}</Button>
   </form><section className="panel"><h2>{t('payoutHistory')} · {t('testPayment')}</h2>
    {data.requests.length?<div className="test-withdrawal-history">{data.requests.map(request=><article key={request.id}>
-    <div><strong>{usd(request.gross_cents*10000)}</strong><small>{t('withdrawalFee')}: {usd(request.fee_cents*10000)} · {t('withdrawalNet')}: {usd(request.net_cents*10000)}</small><small>{t('testWithdrawalBankAmount')}: {request.currency.toUpperCase()} {(request.provider_amount/100).toFixed(2)}</small><span className={`status ${request.status}`}>{t(statusKey[request.status])}</span>{request.error_code&&<small className="form-error">{request.error_code}</small>}</div>
+    <div><strong>{usd(request.gross_cents*10000)}</strong><small>{t('withdrawalFee')}: {usd(request.fee_cents*10000)} · {t('withdrawalNet')}: {usd(request.net_cents*10000)}</small><small>{t('testWithdrawalBankAmount')}: <BankAmount cents={request.provider_amount} currency={request.currency} locale={locale}/></small><span className={`status ${request.status}`}>{t(statusKey[request.status])}</span>{request.error_code&&<small className="form-error">{request.error_code}</small>}</div>
     <div className="test-withdrawal-actions">{['pending','processing','transferred'].includes(request.status)&&<Button className="button primary small" busy={busy===request.id} disabled={!!busy} onClick={()=>act(request.id,'process')}>{t('testWithdrawalProcess')}</Button>}{request.status==='pending'&&<button className="button secondary small" disabled={!!busy} onClick={()=>act(request.id,'reject')}>{t('reject')}</button>}{request.transfer_id&&<button className="button secondary small" disabled={!!busy} onClick={()=>act(request.id,'sync')}>{t('testWithdrawalRefresh')}</button>}</div>
    </article>)}</div>:<p className="muted">{t('noPayouts')}</p>}
   </section></>}
