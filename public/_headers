@@ -1,3 +1,7 @@
+# Only the homepage is canonicalized here. Other SPA routes have distinct content.
+/
+  Link: <https://lingyingdrama.com/>; rel="canonical"
+
 /downloads/aidramio-browser-mcp.zip
   Content-Type: application/zip
   Content-Disposition: attachment; filename="AIDramio-Browser-MCP.zip"

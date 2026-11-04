@@ -86,6 +86,21 @@ try{
   console.log('PASS: Cloudflare canonical redirects run before SPA and static asset serving on alias hosts.');
   await stop();
   await start();
+  for(const route of ['/','/?search-source=fixture']){
+    const home=await fetch(base+route);
+    assert.equal(home.status,200);assert.equal(home.headers.get('link'),'<https://lingyingdrama.com/>; rel="canonical"');
+    const html=await home.text();assert.match(html,/href="\/favicon\.ico"/);assert.match(html,/sizes="192x192" href="\/icon-192\.png"/);
+  }
+  for(const route of ['/browse','/series/fixture']){
+    const page=await fetch(base+route);assert.equal(page.status,200);assert.equal(page.headers.get('link'),null,'Distinct SPA pages must not be canonicalized to the homepage.');await page.body.cancel();
+  }
+  const favicon=await fetch(base+'/favicon.ico');assert.equal(favicon.status,200);assert.match(favicon.headers.get('content-type'),/^image\//);
+  const ico=Buffer.from(await favicon.arrayBuffer());assert.deepEqual([...ico.subarray(0,6)],[0,0,1,0,2,0]);
+  const icon=await fetch(base+'/icon-192.png');assert.equal(icon.status,200);assert.match(icon.headers.get('content-type'),/^image\/png/);
+  const png=Buffer.from(await icon.arrayBuffer());assert.equal(png.readUInt32BE(16),192);assert.equal(png.readUInt32BE(20),192);
+  const robots=await fetch(base+'/robots.txt');assert.equal(robots.status,200);assert.match(robots.headers.get('content-type'),/^text\/plain/);assert.match(await robots.text(),/^Sitemap: https:\/\/lingyingdrama\.com\/sitemap\.xml$/m);
+  const sitemap=await fetch(base+'/sitemap.xml');assert.equal(sitemap.status,200);assert.match(sitemap.headers.get('content-type'),/xml/);assert.match(await sitemap.text(),/<loc>https:\/\/lingyingdrama\.com\/<\/loc>/);
+  console.log('PASS: homepage canonical stays scoped; favicon, crawler instructions and sitemap serve real assets instead of SPA fallback HTML.');
   const cfg=(await request('/api/config')).data;assert.equal(cfg.runtime,'cloudflare');assert.equal(cfg.paymentsMode,'demo');assert.equal(cfg.auth.google,true);
   assert.equal(cfg.limits.maxEpisodeBytes,maxEpisodeBytes);assert.equal(cfg.limits.maxEpisodeSeconds,240);assert.deepEqual(cfg.episodeUpload,{mode:'chunked',chunkBytes});
   assert.deepEqual(cfg.walletFunding.presetAmountsCents,[1000,2500,5000,10000]);assert.deepEqual(cfg.walletFunding.rewards,[{amountCents:5000,bonusCents:500},{amountCents:10000,bonusCents:1500}]);
