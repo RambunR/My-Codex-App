@@ -5,6 +5,7 @@ import {contentAdminEnglish,contentAdminMessages} from './content-admin-locales'
 import {taxonomyEnglish,taxonomyMessages} from './taxonomy-locales';
 import {adminAccountEnglish,adminAccountMessages} from './admin-account-locales';
 import {folderUploadEnglish,folderUploadMessages} from './folder-upload-locales';
+import {uploadGuideEnglish,uploadGuideMessages} from './upload-guide-locales';
 import {passPromotionEnglish,passPromotionMessages} from './pass-promotion-locales';
 import {promoAdminEnglish,promoAdminMessages} from './promo-admin-locales';
 import {seriesLifecycleEnglish,seriesLifecycleMessages} from './series-lifecycle-locales';
@@ -102,6 +103,7 @@ const en = {
   ...taxonomyEnglish,
   ...adminAccountEnglish,
   ...folderUploadEnglish,
+  ...uploadGuideEnglish,
   ...passPromotionEnglish,
   ...promoAdminEnglish,
   ...seriesLifecycleEnglish,
@@ -186,6 +188,7 @@ for(const language of LANGUAGES){if(!contentAdminMessages[language.code])throw n
 for(const language of LANGUAGES){if(!taxonomyMessages[language.code])throw new Error(`Taxonomy translations missing: ${language.code}`);Object.assign(dictionaries[language.code],taxonomyMessages[language.code]);}
 for(const language of LANGUAGES){if(!adminAccountMessages[language.code])throw new Error(`Administrator account translations missing: ${language.code}`);Object.assign(dictionaries[language.code],adminAccountMessages[language.code]);}
 for(const language of LANGUAGES){if(!folderUploadMessages[language.code])throw new Error(`Folder upload translations missing: ${language.code}`);Object.assign(dictionaries[language.code],folderUploadMessages[language.code]);}
+for(const language of LANGUAGES)Object.assign(dictionaries[language.code],uploadGuideMessages[language.code]);
 for(const language of LANGUAGES){if(!passPromotionMessages[language.code])throw new Error(`Pass promotion translations missing: ${language.code}`);Object.assign(dictionaries[language.code],passPromotionMessages[language.code]);}
 for(const language of LANGUAGES){if(!promoAdminMessages[language.code])throw new Error(`Promo admin translations missing: ${language.code}`);Object.assign(dictionaries[language.code],promoAdminMessages[language.code]);}
 for(const language of LANGUAGES){if(!seriesLifecycleMessages[language.code])throw new Error(`Series lifecycle translations missing: ${language.code}`);Object.assign(dictionaries[language.code],seriesLifecycleMessages[language.code]);}
