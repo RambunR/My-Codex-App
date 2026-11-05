@@ -37,12 +37,12 @@ test('publisher saves all classification axes, uploads an episode and finds the 
   await page.locator('#series-title').fill(title);await page.locator('#series-description').fill('A complete animated psychological drama about revenge, created with human direction and AI assistance.');
   await page.locator('#series-genres').getByRole('button',{name:'Romance',exact:true}).click();
   await page.locator('#series-genres').getByRole('button',{name:'Psychological Drama',exact:true}).click();
-  await theme(page,'revenge').click();await theme(page,'secret-baby').click();
+  await theme(page,'revenge').click();await theme(page,'baby-sweetheart').click();
   await page.locator('#series-format').selectOption('animation');await page.locator('#series-creation').selectOption('ai-assisted');
   await page.locator('input[type="file"][accept="image/jpeg,image/png,image/webp"]').setInputFiles(path.resolve('public/images/midnight.jpg'));
-  const created=await saveDetails(page);const createBody=created.request().postDataJSON();expect(createBody).toMatchObject({genres:['psychological'],themes:['revenge','secret-baby'],format:'animation',creation_type:'ai-assisted'});
+  const created=await saveDetails(page);const createBody=created.request().postDataJSON();expect(createBody).toMatchObject({genres:['psychological'],themes:['revenge','baby-sweetheart'],format:'animation',creation_type:'ai-assisted'});
   await expect(page).toHaveURL(/\/studio\/series\//);const id=new URL(page.url()).pathname.split('/').at(-1)!;
-  await page.reload();await expect(page.locator('#series-format')).toHaveValue('animation');await expect(page.locator('#series-creation')).toHaveValue('ai-assisted');await expect(theme(page,'revenge')).toHaveAttribute('aria-pressed','true');await expect(theme(page,'secret-baby')).toHaveAttribute('aria-pressed','true');
+  await page.reload();await expect(page.locator('#series-format')).toHaveValue('animation');await expect(page.locator('#series-creation')).toHaveValue('ai-assisted');await expect(theme(page,'revenge')).toHaveAttribute('aria-pressed','true');await expect(theme(page,'baby-sweetheart')).toHaveAttribute('aria-pressed','true');
   const chooser=page.waitForEvent('filechooser');await page.getByRole('button',{name:'Choose video files',exact:true}).click();await(await chooser).setFiles(path.resolve('public/demo-preview.mp4'));
   await expect(page.locator('.queue-row small')).toHaveText(['Uploaded'],{timeout:30000});
   await page.getByRole('button',{name:'Publish series',exact:true}).click();
@@ -53,7 +53,7 @@ test('publisher saves all classification axes, uploads an episode and finds the 
   await axisSelect(page,'motion-comic').selectOption('animation');await expect(card).toBeVisible();
   await card.locator('.poster-link').click();await expect(page).toHaveURL(`/series/${id}`);
   await expect(page.locator('main a[href="/browse?theme=revenge"]')).toBeVisible();await expect(page.locator('.series-classification a[href="/browse?format=animation"]')).toBeVisible();await expect(page.locator('main a[href="/browse?creation=ai-assisted"]')).toBeVisible();
-  const detail=await(await page.request.get(`/api/series/${id}`)).json();expect(detail.series).toMatchObject({genres:['psychological'],themes:['revenge','secret-baby'],format:'animation',creation_type:'ai-assisted'});expect(detail.episodes).toHaveLength(1);
+  const detail=await(await page.request.get(`/api/series/${id}`)).json();expect(detail.series).toMatchObject({genres:['psychological'],themes:['revenge','baby-sweetheart'],format:'animation',creation_type:'ai-assisted'});expect(detail.episodes).toHaveLength(1);
   await page.setViewportSize({width:390,height:844});await page.goto(`/watch/${id}/${detail.episodes[0].id}`);await expect(page.locator('.watch-series-intro>.eyebrow')).toHaveText('Psychological Drama');await expect(page.locator('video')).toBeVisible();await noOverflow(page);
   await page.evaluate(()=>localStorage.setItem('drama-language','zh-TW'));await page.reload();await expect(page.locator('html')).toHaveAttribute('lang','zh-TW');await expect(page.locator('.watch-series-intro>.eyebrow')).toHaveText('心理劇');await noOverflow(page);
   const after=(await(await page.request.get('/api/auth/me')).json()).user;for(const key of ['wallet_micros','earnings_micros','publisher_active','dramio_pass'])expect(after[key]).toEqual(before[key]);expect(errors).toEqual([]);

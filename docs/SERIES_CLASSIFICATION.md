@@ -5,7 +5,7 @@ LingYing separates four independent choices in Creator Studio, Explore and serie
 | Choice | Purpose | Examples | Creator selection |
 | --- | --- | --- | --- |
 | Genre | The kind of drama | Romance, Thriller, Comedy, Medical Drama | 1–3 of 29 standard genres |
-| Story themes | Plot and character themes | Revenge, Secret Baby, Billionaire & CEO | Optional, up to 5 of 15 themes |
+| Story themes | Plot and character themes | Revenge, Secret Baby, Billionaire & CEO, Baby Sweetheart (寶貝甜心) | Optional, up to 5 of 16 themes |
 | Format | How the series looks | Live-action, Animation, Anime/Donghua, Motion Comics | One format; may remain unspecified |
 | Production method | How it was made | Human-created, AI-assisted, AI-generated | One method |
 

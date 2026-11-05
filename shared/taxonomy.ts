@@ -10,7 +10,7 @@ export const GENRES = [...STANDARD_GENRES,'animation'] as const;
 export const STORY_THEMES = [
   'billionaire-ceo','contract-marriage','enemies-to-lovers','forbidden-romance','second-chance-love',
   'secret-baby','hidden-identity','revenge','betrayal-secrets','strong-heroine','against-all-odds',
-  'historical-romance','time-travel-rebirth','werewolf-romance','mafia',
+  'historical-romance','time-travel-rebirth','werewolf-romance','mafia','baby-sweetheart',
 ] as const;
 export const SERIES_FORMATS = ['live-action','animation','anime-donghua','motion-comic'] as const;
 export const CREATION_TYPES = ['human','ai-assisted','ai-generated'] as const;
