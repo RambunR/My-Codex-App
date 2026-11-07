@@ -1,0 +1,43 @@
+.legal-policy-page{max-width:1120px}
+.legal-policy-page .page-heading{display:block;margin-bottom:22px}
+.legal-policy-page .page-heading h1{line-height:1.2}
+.legal-policy-page .page-heading p{max-width:85ch;font-size:15px;line-height:1.85;margin-top:15px;white-space:normal;overflow-wrap:anywhere}
+.legal-policy-meta{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:15px;margin-bottom:22px}
+.legal-effective-date{font-size:13px;line-height:1.7;color:var(--muted)}
+.legal-effective-date span{display:block;font-size:12px}
+.legal-language-options{display:flex;gap:6px;flex-wrap:wrap}
+.legal-language-options button{border:1px solid var(--line);border-radius:8px;padding:9px 12px;min-height:44px;font-size:13px;color:var(--muted);background:var(--panel)}
+.legal-language-options button[aria-pressed=true]{color:#271530;background:var(--brand-gradient);border-color:var(--accent);font-weight:650}
+.legal-language-options button:focus-visible,.legal-policy-page a:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.legal-language-notice{font-size:14px;line-height:1.75;border-inline-start:3px solid var(--accent);padding:12px 16px;margin:0 0 22px;background:var(--panel);overflow-wrap:anywhere}
+.legal-policy-page .panel{padding:25px 28px}
+.legal-policy-page .panel h2{font-size:19px;line-height:1.5;letter-spacing:0;margin-bottom:15px;overflow-wrap:anywhere}
+.legal-policy-page .company-contact address{font-style:normal;overflow-wrap:anywhere}
+.legal-policy-page .company-contact a{display:inline-flex;align-items:center;gap:8px;max-width:100%;font-size:14px;line-height:1.7;color:var(--accent-soft);overflow-wrap:anywhere}
+.legal-policy-page .company-contact a svg{flex-shrink:0}
+.legal-summary{background:linear-gradient(125deg,#2b1d3d,var(--panel));border-color:#c7a5ff40!important}
+.legal-policy-page .legal-summary ul,.legal-policy-page .legal-section ul{margin:0;padding-inline-start:22px}
+.legal-policy-page .legal-summary li,.legal-policy-page .legal-section li{font-size:15px;line-height:1.9;color:#d5cbdf;overflow-wrap:anywhere}
+.legal-policy-page .legal-summary li+li,.legal-policy-page .legal-section li+li{margin-top:10px}
+.legal-toc ol{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 24px;list-style:none;padding:0;margin:0}
+.legal-toc a{display:block;padding:7px 0;min-height:44px;font-size:14px;line-height:1.7;color:var(--accent-soft);text-decoration:underline;text-decoration-color:#c7a5ff55;text-underline-offset:4px;overflow-wrap:anywhere}
+.legal-toc a:hover,.legal-contact-link:hover,.legal-related-policies a:hover{text-decoration-color:currentColor}
+.legal-section{scroll-margin-top:100px}
+.legal-section:focus{outline:2px solid var(--accent);outline-offset:2px}
+.legal-policy-page .legal-section p{font-size:15px;line-height:1.95;color:#cfc4da;white-space:normal;max-width:none;overflow-wrap:anywhere}
+.legal-policy-page .legal-section p+p{margin-top:15px}
+.legal-policy-page .legal-section ul{margin-top:15px}
+.legal-contact-link{display:inline-block;margin-top:17px;max-width:100%;font-size:14px;line-height:1.8;color:var(--accent-soft);text-decoration:underline;text-decoration-color:#c7a5ff55;text-underline-offset:4px;overflow-wrap:anywhere}
+.legal-related-policies{display:flex;gap:15px 25px;flex-wrap:wrap;padding:5px 0 12px}
+.legal-related-policies a{display:inline-block;min-height:44px;padding-block:10px;color:var(--accent-soft);font-size:14px;text-decoration:underline;text-decoration-color:#c7a5ff55;text-underline-offset:4px}
+@media(max-width:640px){
+  .legal-policy-page .page-heading p{font-size:14px;line-height:1.85}
+  .legal-policy-page .panel{padding:21px 19px}
+  .legal-policy-page .panel h2{font-size:18px}
+  .legal-policy-page .legal-summary li,.legal-policy-page .legal-section li,.legal-policy-page .legal-section p{font-size:14px;line-height:1.9}
+  .legal-toc ol{grid-template-columns:minmax(0,1fr);gap:3px}
+  .legal-policy-page .company-contact a{font-size:13px;display:flex;align-items:flex-start}
+  .legal-policy-page .company-contact a svg{margin-top:2px;width:16px}
+  .legal-policy-page .company-contact a{word-break:break-word}
+  .legal-section{scroll-margin-top:85px}
+}
