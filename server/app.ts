@@ -16,6 +16,8 @@ import { AppError, assert } from './errors.js';
 import { readSession, requireAuth, requirePublisher, requireAdmin, hashPassword, verifyPassword, createSession, destroySession, getUser, rateLimit } from './auth.js';
 import { prepareVideo, prepareCover, putObject, serveObject, removeTempFile } from './storage.js';
 import { createCheckout, cancelCheckout, settlePayment, unlockEpisode, requestWithdrawal,returnWithdrawalFunds, addLedger, stripe,paymentsReady,stripeConfigured,stripeModeMatches,stripeTestPayments,assertPayoutsEnabled } from './finance.js';
+import {requireCreatorPassConsent} from './creator-pass-consent.js';
+import {LEGAL_POLICY_VERSION,CREATOR_PASS_DISCLOSURE_VERSION} from '../shared/creator-pass-consent.js';
 import {processRiskEvent,recordPaymentLink,adminPaymentReviews,resolvePaymentReview,assertPaymentAccountClear} from './payment-risk.js';
 import {ensurePlatformOwnerAccess,creatorDisplayName} from './owner.js';
 import {publicSeriesAllowedSql,assertSeriesAvailable,assertSeriesWritable,moderationState,setSeriesModeration,setSeriesFeatured,recordSeriesMetadataEdit,adminModerationEvents,listAdminSeries} from './moderation.js';
@@ -177,7 +179,7 @@ export function createApp() {
   registerEmailAuth(app);
   registerPublisherProfiles(app,{catalogSelect,serializeSeries});
   app.get('/api/health', (_req,res) => res.json({ ok: true, database: !!one('SELECT 1 AS ready') }));
-  app.get('/api/config', async (_req,res) => {initializePromotions();if(config.payments==='stripe'&&stripeConfigured())await ensureStripeWebhookReady(stripe);return res.json({ brand: 'LingYing', languages: LANGUAGES, genres: GENRES,standardGenres:STANDARD_GENRES,storyThemes:STORY_THEMES,formats:SERIES_FORMATS,creationTypes:CREATION_TYPES, passPromotion:{enabled:true},paymentsMode: config.payments,paymentsReady:paymentsReady(),paymentsConfigured:stripeConfigured(),paymentSetup:stripeWebhookReadiness(),sandbox:config.sandbox,paymentsTestMode:stripeTestPayments()||config.payments==='demo',payoutsEnabled:config.payoutsEnabled&&!stripeTestPayments(),uploadsEnabled:!config.sandbox,usdToHkd: config.usdToHkd,
+  app.get('/api/config', async (_req,res) => {initializePromotions();if(config.payments==='stripe'&&stripeConfigured())await ensureStripeWebhookReady(stripe);return res.json({ brand: 'LingYing', languages: LANGUAGES, genres: GENRES,standardGenres:STANDARD_GENRES,storyThemes:STORY_THEMES,formats:SERIES_FORMATS,creationTypes:CREATION_TYPES, passPromotion:{enabled:true},creatorPassConsent:{policyVersion:LEGAL_POLICY_VERSION,disclosureVersion:CREATOR_PASS_DISCLOSURE_VERSION},paymentsMode: config.payments,paymentsReady:paymentsReady(),paymentsConfigured:stripeConfigured(),paymentSetup:stripeWebhookReadiness(),sandbox:config.sandbox,paymentsTestMode:stripeTestPayments()||config.payments==='demo',payoutsEnabled:config.payoutsEnabled&&!stripeTestPayments(),uploadsEnabled:!config.sandbox,usdToHkd: config.usdToHkd,
     limits: { maxEpisodeSeconds: MAX_EPISODE_SECONDS, maxEpisodeBytes: MAX_EPISODE_BYTES, quotaBytes: DEFAULT_QUOTA_BYTES, activationHkd: 88, minimumPriceUsd: 0.1, creatorShare: 0.7, minimumPayoutUsd: WITHDRAWAL_POLICY.minimumCents/100,minWalletFundingUsd:MIN_WALLET_FUNDING_CENTS/100,maxWalletFundingUsd:MAX_WALLET_FUNDING_CENTS/100 },withdrawalPolicy:WITHDRAWAL_POLICY,walletFunding:WALLET_FUNDING_OPTIONS, demo: config.seed,episodeUpload:{mode:chunkedEpisodeUploadsEnabled()?'chunked':'multipart',chunkBytes:EPISODE_UPLOAD_CHUNK_BYTES}, runtime: (config as any).runtime || 'node', videoFormats: (config as any).videoFormats || ['mp4','mov','webm','m4v'], auth:{google:googleEnabled(),apple:appleEnabled(),email:emailAuthEnabled()} });});
   app.get('/api/auth/me', (req,res) => res.json({ user: req.user || null }));
   app.post('/api/auth/register', rateLimit('register', 12, 15 * 60_000), async (req,res) => {
@@ -281,8 +283,9 @@ export function createApp() {
     res.setHeader('Cache-Control','private, no-store');res.json({promotion:{code,amountHkdCents,regularAmountHkdCents,currency,revision}});
   });
   app.post('/api/payments/checkout', requireAuth, rateLimit('checkout',20,60_000), async (req,res) => {
-    const body=z.discriminatedUnion('kind',[z.object({kind:z.literal('activation'),promo_code:z.string().trim().min(1).max(64).optional(),promo_revision:z.number().int().positive().max(1000000000).optional()}),z.object({kind:z.literal('funding'),amount_cents:z.number().int().min(MIN_WALLET_FUNDING_CENTS).max(MAX_WALLET_FUNDING_CENTS),promo_code:z.never().optional(),promo_revision:z.never().optional()})]).and(z.object({language:language.optional()})).parse(req.body);
-    res.json(await createCheckout(req.user!.id,body.kind,body.kind==='funding'?body.amount_cents:8800,body.language,body.promo_code,body.promo_revision));
+    const consent=req.body?.kind==='activation'?requireCreatorPassConsent(req.body.creator_consent):undefined;
+    const body=z.discriminatedUnion('kind',[z.object({kind:z.literal('activation'),promo_code:z.string().trim().min(1).max(64).optional(),promo_revision:z.number().int().positive().max(1000000000).optional(),creator_consent:z.object({accepted:z.literal(true),policy_version:z.string().min(1).max(64),disclosure_version:z.string().min(1).max(64)}).strict()}),z.object({kind:z.literal('funding'),amount_cents:z.number().int().min(MIN_WALLET_FUNDING_CENTS).max(MAX_WALLET_FUNDING_CENTS),promo_code:z.never().optional(),promo_revision:z.never().optional()})]).and(z.object({language:language.optional()})).parse(req.body);
+    res.json(await createCheckout(req.user!.id,body.kind,body.kind==='funding'?body.amount_cents:8800,body.language,body.promo_code,body.promo_revision,consent));
   });
   app.post('/api/payments/:id/cancel',requireAuth,rateLimit('checkout-cancel',30,60_000),async(req,res)=>{
     res.json(await cancelCheckout(req.user!.id,id(req)));

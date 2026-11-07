@@ -17,6 +17,8 @@ import {assertSeriesAvailable} from './moderation.js';
 import {fundingRewardQuote} from '../shared/funding-rewards.js';
 import {storeFundingQuote,fundingCreditForPayment} from './funding-rewards.js';
 import {WITHDRAWAL_POLICY} from '../shared/withdrawals.js';
+import {type CreatorPassConsent} from '../shared/creator-pass-consent.js';
+import {requireCreatorPassConsent,recordCreatorPassConsent} from './creator-pass-consent.js';
 
 export let stripe = config.stripeKey ? new Stripe(config.stripeKey, {httpClient:Stripe.createFetchHttpClient()}) : null;
 const stripeLocales:Record<string,Stripe.Checkout.SessionCreateParams.Locale>={en:'en','zh-TW':'zh-TW','zh-CN':'zh',ja:'ja',ko:'ko',id:'id','pt-BR':'pt-BR',es:'es-419',vi:'vi',th:'th',fil:'fil',tr:'tr',ru:'ru',fr:'fr',de:'de',ms:'ms'};
@@ -115,7 +117,8 @@ export function requestWithdrawal(userId: string, amountCents: number, note = ''
     return id;
   });
 }
-export async function createCheckout(userId: string, kind: 'funding' | 'activation', cents: number, languageCode?:string,promoCode?:string,promoRevision?:number) {
+export async function createCheckout(userId: string, kind: 'funding' | 'activation', cents: number, languageCode?:string,promoCode?:string,promoRevision?:number,creatorConsent?:CreatorPassConsent) {
+  const consent=kind==='activation'?requireCreatorPassConsent(creatorConsent):undefined;
   assert(promoCode===undefined||kind==='activation',400,'PROMOTION_NOT_APPLICABLE','Promotion codes apply only to Dramio Pass, not wallet deposits.');
   const promotion=promoCode===undefined?null:quotePromotion(userId,promoCode);
   const assertRevision=()=>{if(promotion)assert(promoRevision===promotion.revision||promoRevision===undefined&&promotion.code===PASS_PROMOTION_CODE&&promotion.amountHkdCents===PASS_PROMOTION_HKD_CENTS,409,'PROMOTION_CHANGED','This promotion changed. Apply the code again to confirm the current price.');};
@@ -144,17 +147,18 @@ export async function createCheckout(userId: string, kind: 'funding' | 'activati
   // supported locale, with English for languages its hosted UI does not offer.
   const locale=stripeLocales[checkoutLanguage]||'en';
   for(let attempt=0;attempt<3;attempt++){
-    const payment=transaction(()=>{
+    const payment=transaction<Record<string,any>|null>(()=>{
       if(kind==='activation'){
         if(financeAccount(userId)?.publisher_active)return null;
         const pending=one(`SELECT * FROM ${paymentTable()} WHERE user_id=? AND kind='activation' AND status='pending' AND provider=? ORDER BY created_at DESC LIMIT 1`,userId,config.payments);
-        if(pending)return pending;
+        if(pending)return{...pending,created:false};
       }
       if(promotion){const fresh=quotePromotion(userId,promotion.code);assert(fresh.revision===promotion.revision&&fresh.amountHkdCents===promotion.amountHkdCents,409,'PROMOTION_CHANGED','This promotion changed. Apply the code again to confirm the current price.');}
       const id=crypto.randomUUID();run(`INSERT INTO ${paymentTable()} (id,user_id,kind,amount_cents,currency,provider) VALUES (?,?,?,?,?,?)`,id,userId,kind,amount,currency,config.payments);
       if(promotion)storePromotionQuote(id,promotion);
       if(kind==='funding')storeFundingQuote(id,userId,amount);
-      return{id,provider_session:null,amount_cents:amount,currency};
+      if(consent)recordCreatorPassConsent(id,userId,consent,checkoutLanguage);
+      return{id,provider_session:null,amount_cents:amount,currency,created:true};
     });
     if(!payment)return{alreadyPaid:true};
     const id=payment.id as string;
@@ -162,7 +166,8 @@ export async function createCheckout(userId: string, kind: 'funding' | 'activati
     const messages=checkoutCopy(checkoutLanguage,kind==='funding'?amount:0,funding?.bonusCents||0);
     const sameQuote=kind!=='activation'||payment.amount_cents===amount&&payment.currency===currency&&(promotion?validPromotionPayment({...payment,id})&&promotionSnapshot(id)?.code===promotion.code:!promotionSnapshot(id));
     const assertSameQuote=()=>{if(!sameQuote)throw new AppError(409,'ACTIVATION_CHECKOUT_CONFLICT','Close your existing unpaid Dramio Pass checkout before changing its promotion.',{paymentId:id});};
-    if(config.payments==='demo'){assertSameQuote();return{demo:true,paymentId:id,amount_cents:amount,currency,...(funding?{funding}:{})};}
+    const recordResumeConsent=()=>{if(consent&&!payment.created)transaction(()=>recordCreatorPassConsent(id,userId,consent,checkoutLanguage));};
+    if(config.payments==='demo'){assertSameQuote();recordResumeConsent();return{demo:true,paymentId:id,amount_cents:amount,currency,...(funding?{funding}:{})};}
     if(payment.provider_session){
       const existing=await stripe!.checkout.sessions.retrieve(payment.provider_session);
       if(financeAccount(userId)?.publisher_active)return{alreadyPaid:true};
@@ -170,7 +175,11 @@ export async function createCheckout(userId: string, kind: 'funding' | 'activati
       if(existing.payment_status==='paid'){
         settlePayment(id,{amount:existing.amount_total!,currency:existing.currency!,session:existing.id,livemode:existing.livemode,sessionObject:existing});return{alreadyPaid:true};
       }
-      if(existing.status==='open'){assertSameQuote();return{url:existing.url,paymentId:id,...(funding?{funding}:{})};}
+      if(existing.status==='open'){
+        assertSameQuote();
+        if(consent)assert(existing.payment_status==='unpaid',409,'PAYMENT_PROCESSING','Your payment is still processing. Please wait before trying again.');
+        recordResumeConsent();return{url:existing.url,paymentId:id,...(funding?{funding}:{})};
+      }
       assert(existing.status!=='complete',409,'PAYMENT_PROCESSING','Your payment is still processing. Please wait before trying again.');
       run(`UPDATE ${paymentTable()} SET status='expired' WHERE id=? AND status='pending'`,id);continue;
     }
@@ -187,7 +196,14 @@ export async function createCheckout(userId: string, kind: 'funding' | 'activati
       assert(stripeModeMatches(session.livemode),400,'PAYMENT_MODE_MISMATCH','Payment mode does not match this application.');
       run(`UPDATE ${paymentTable()} SET provider_session=? WHERE id=? AND status='pending'`,session.id,id);
       recordPaymentLink(id,session);
+      if(consent&&!payment.created&&session.payment_status==='paid'){
+        settlePayment(id,{amount:session.amount_total!,currency:session.currency!,session:session.id,livemode:session.livemode,sessionObject:session});return{alreadyPaid:true};
+      }
       if(kind==='activation'&&financeAccount(userId)?.publisher_active)return{alreadyPaid:true};
+      // A legacy pending payment may already have a provider Session after a
+      // timeout. Only append a new acknowledgement once its unpaid state is
+      // verified; paid history never manufactures a consent record.
+      if(session.status==='open'&&session.payment_status==='unpaid')recordResumeConsent();
       return{url:session.url,paymentId:id,...(funding?{funding}:{})};
     }catch(error){
       // A timeout can occur after Stripe created Checkout. Retain this pending

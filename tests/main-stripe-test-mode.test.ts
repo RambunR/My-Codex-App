@@ -1,3 +1,4 @@
+import {LEGAL_POLICY_VERSION,CREATOR_PASS_DISCLOSURE_VERSION} from '../shared/creator-pass-consent';
 import {after,before,beforeEach,afterEach,test,mock} from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp,rm} from 'node:fs/promises';
@@ -5,6 +6,8 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
 import type {Server} from 'node:http';
+
+const creatorConsent={accepted:true,policy_version:LEGAL_POLICY_VERSION,disclosure_version:CREATOR_PASS_DISCLOSURE_VERSION};
 
 const dir=await mkdtemp(path.join(tmpdir(),'aidramio-main-stripe-test-'));
 process.env.DATA_DIR=dir;process.env.NODE_ENV='test';process.env.SEED_DEMO='false';
@@ -110,13 +113,13 @@ test('HK$88 test activation reuses Checkout, enables the current studio, and nev
     sessions.set(session.id,session);assert.equal(options.idempotencyKey,'checkout:'+params.metadata.paymentId);return session as any;
   });
   mock.method(finance.stripe!.checkout.sessions,'retrieve',async(sessionId:string)=>{assert(sessions.has(sessionId));return sessions.get(sessionId);});
-  const first=await request('/api/payments/checkout',{kind:'activation',amount_cents:1},user.cookie);
-  const again=await request('/api/payments/checkout',{kind:'activation'},user.cookie);assert.equal(first.data.paymentId,again.data.paymentId);assert.equal(creates,1);
+  const first=await request('/api/payments/checkout',{kind:'activation',creator_consent:creatorConsent,amount_cents:1},user.cookie);
+  const again=await request('/api/payments/checkout',{kind:'activation',creator_consent:creatorConsent},user.cookie);assert.equal(first.data.paymentId,again.data.paymentId);assert.equal(creates,1);
   const p=one('SELECT * FROM test_payments WHERE id=?',first.data.paymentId)!;assert.equal(p.amount_cents,8800);assert.equal(p.currency,'hkd');
   await webhook({id:p.id,userId:user.id,session:p.provider_session,amount:8800,currency:'hkd'});
   assert.equal(getUser(user.id)!.publisher_active,1);assert.equal(getUser(user.id)!.role,'publisher');assert.equal(getUser(user.id)!.wallet_micros,0);
   assert.equal(liveAccount(user.id).publisher_active,0);assert.equal(liveAccount(user.id).role,'viewer');
-  await request('/api/payments/checkout',{kind:'activation'},user.cookie,409);
+  await request('/api/payments/checkout',{kind:'activation',creator_consent:creatorConsent},user.cookie,409);
   const body={title:'Current website test drama',description:'A valid drama uploaded through the existing website studio.',language:'en',genres:['drama'],creation_type:'ai-generated',price_cents:10,free_episodes:1};
   const created=await request('/api/studio/series',body,user.cookie,201);assert.equal(one('SELECT creator_id FROM series WHERE id=?',created.data.id)!.creator_id,user.id);
   config.stripeTestMode=false;assert.equal(getUser(user.id)!.publisher_active,0);assert.equal(getUser(user.id)!.role,'viewer');

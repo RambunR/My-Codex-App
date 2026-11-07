@@ -107,6 +107,8 @@ try{
   const sitemap=await fetch(base+'/sitemap.xml');assert.equal(sitemap.status,200);assert.match(sitemap.headers.get('content-type'),/xml/);assert.match(await sitemap.text(),/<loc>https:\/\/lingyingdrama\.com\/<\/loc>/);
   console.log('PASS: homepage canonical stays scoped; favicon, crawler instructions and sitemap serve real assets instead of SPA fallback HTML.');
   const cfg=(await request('/api/config')).data;assert.equal(cfg.runtime,'cloudflare');assert.equal(cfg.paymentsMode,'demo');assert.equal(cfg.auth.google,true);
+  assert.deepEqual(cfg.creatorPassConsent,{policyVersion:'2026-11-08',disclosureVersion:'creator-pass-ack-v1'});
+  const creatorConsent={accepted:true,policy_version:cfg.creatorPassConsent.policyVersion,disclosure_version:cfg.creatorPassConsent.disclosureVersion};
   assert.equal(cfg.limits.maxEpisodeBytes,maxEpisodeBytes);assert.equal(cfg.limits.maxEpisodeSeconds,240);assert.deepEqual(cfg.episodeUpload,{mode:'chunked',chunkBytes});
   assert.deepEqual(cfg.walletFunding.presetAmountsCents,[1000,2500,5000,10000]);assert.deepEqual(cfg.walletFunding.rewards,[{amountCents:5000,bonusCents:500},{amountCents:10000,bonusCents:1500}]);
   assert.ok(cfg.standardGenres.includes('romantic-comedy'));assert.ok(cfg.standardGenres.includes('medical'));
@@ -160,7 +162,11 @@ try{
   await request('/api/auth/login',{email:'viewer@example.test',password:'wrong'},'',401);
   await request('/api/admin',undefined,publisher,403);
   await request('/api/studio/series',{},publisher,403);
-  const activation=(await request('/api/payments/checkout',{kind:'activation'},publisher)).data;assert.equal(activation.amount_cents,8800);assert.equal(activation.currency,'hkd');
+  assert.equal((await request('/api/payments/checkout',{kind:'activation'},publisher,400)).data.error.code,'CREATOR_CONSENT_REQUIRED');
+  assert.equal((await request('/api/payments/checkout',{kind:'activation',creator_consent:{...creatorConsent,policy_version:'2026-11-07'}},publisher,409)).data.error.code,'CREATOR_POLICY_CHANGED');
+  assert.deepEqual((await request('/api/wallet',undefined,publisher)).data.payments,[],'Rejected acknowledgement must not create an unpaid payment.');
+  const activation=(await request('/api/payments/checkout',{kind:'activation',creator_consent:creatorConsent},publisher)).data;assert.equal(activation.amount_cents,8800);assert.equal(activation.currency,'hkd');
+  assert.equal((await request('/api/payments/checkout',{kind:'activation',creator_consent:creatorConsent},publisher)).data.paymentId,activation.paymentId,'An explicit acknowledgement retry must reuse the original unpaid checkout.');
   await request(`/api/payments/${activation.paymentId}/demo-confirm`,{},viewer,404);
   await Promise.all([0,1].map(()=>request(`/api/payments/${activation.paymentId}/demo-confirm`,{},publisher)));
   const activated=(await request('/api/auth/me',undefined,publisher)).data.user;assert.equal(activated.publisher_active,1);assert.equal(activated.quota_bytes,5*1024**3);
@@ -204,10 +210,10 @@ try{
   const initialPromotions=(await request('/api/admin/promotions',undefined,admin)).data;
   const initialLaunch=initialPromotions.promotions.find(row=>row.code==='LINGYING58');assert.equal(initialLaunch.enabled,true);assert.equal(initialLaunch.max_redemptions,null);assert.equal(initialLaunch.amount_hkd_cents,5800);
   const promotion=(await request('/api/auth/register',{email:'promotion@example.test',name:'Local Promotion Creator',password},'',201)).cookie;
-  await request('/api/payments/checkout',{kind:'activation',promo_code:'INVALID'},promotion,400);
+  await request('/api/payments/checkout',{kind:'activation',creator_consent:creatorConsent,promo_code:'INVALID'},promotion,400);
   await request('/api/payments/checkout',{kind:'funding',amount_cents:500,promo_code:'LINGYING58'},promotion,400);
   const promotionQuote=(await request('/api/payments/promotion/quote',{promo_code:' lingying58 '},promotion)).data.promotion;assert.equal(promotionQuote.amountHkdCents,5800);
-  const promoted=(await request('/api/payments/checkout',{kind:'activation',promo_code:promotionQuote.code,promo_revision:promotionQuote.revision,amount_cents:1},promotion)).data;
+  const promoted=(await request('/api/payments/checkout',{kind:'activation',creator_consent:creatorConsent,promo_code:promotionQuote.code,promo_revision:promotionQuote.revision,amount_cents:1},promotion)).data;
   assert.equal(promoted.amount_cents,5800);assert.equal(promoted.currency,'hkd');
   assert.equal((await request('/api/auth/me',undefined,promotion)).data.user.publisher_active,0);
   await Promise.all([0,1].map(()=>request(`/api/payments/${promoted.paymentId}/demo-confirm`,{},promotion)));
@@ -216,7 +222,7 @@ try{
   const promotedWallet=(await request('/api/wallet',undefined,promotion)).data;
   assert.equal(promotedWallet.ledger.filter(row=>row.kind==='activation').length,1);
   assert.equal(promotedWallet.ledger.find(row=>row.kind==='activation').payment_amount_cents,5800);
-  await request('/api/payments/checkout',{kind:'activation',promo_code:'LINGYING58'},promotion,409);
+  await request('/api/payments/checkout',{kind:'activation',creator_consent:creatorConsent,promo_code:'LINGYING58'},promotion,409);
   console.log('PASS: Cloudflare HK$58 promotion validates code, preserves exact receipt, activates once, and never funds a wallet.');
 
   const managedPromotion=(await request('/api/admin/promotions',{code:'RUNTIME25',discount_type:'percent',discount_value:25},admin,201)).data.promotion;
@@ -225,13 +231,13 @@ try{
   await request('/api/payments/promotion/quote',{promo_code:'RUNTIME25'},viewer,400);
   await request(`/api/admin/promotions/${managedPromotion.id}`,{enabled:true,discount_type:'amount',discount_value:2000,max_redemptions:2},admin,200,'PATCH');
   const changedQuote=(await request('/api/payments/promotion/quote',{promo_code:'RUNTIME25'},viewer)).data.promotion;assert.equal(changedQuote.amountHkdCents,6800);
-  await request('/api/payments/checkout',{kind:'activation',promo_code:'RUNTIME25',promo_revision:managedPromotion.revision},viewer,409);
+  await request('/api/payments/checkout',{kind:'activation',creator_consent:creatorConsent,promo_code:'RUNTIME25',promo_revision:managedPromotion.revision},viewer,409);
   const managedState=(await request('/api/admin/promotions',undefined,admin)).data;assert.ok(managedState.events.some(event=>event.promotion_id===managedPromotion.id));
   console.log('PASS: Cloudflare private-code discovery, administrator CRUD/audit, disable/re-enable, exact quotes and stale-revision rejection.');
 
 
 
-  const body={title:'Cloudflare Published Drama',description:'A real upload used to validate durable financial and media storage.',language:'zh-TW',genres:['romance'],themes:['revenge','hidden-identity'],format:'animation',creation_type:'human',price_cents:501,free_episodes:1};
+  const body={title:'Cloudflare Published Drama',description:'A real upload used to validate durable financial and media storage.',language:'zh-TW',genres:['romance'],themes:['revenge','hidden-identity','entrepreneurship'],format:'animation',creation_type:'human',price_cents:501,free_episodes:1};
   const sid=(await request('/api/studio/series',body,publisher,201)).data.id;
   const privateClassification=(await request(`/api/studio/series/${sid}`,undefined,publisher)).data.series;
   assert.deepEqual(privateClassification.themes,body.themes);assert.equal(privateClassification.format,body.format);
@@ -326,7 +332,7 @@ try{
   const large=(await request(`/api/studio/series/${sid}/episode-uploads`,{title:'Too large',number:3,filename:'oversized.mp4',size:maxEpisodeBytes+1},publisher,413)).data;assert.equal(large.error.code,'FILE_TOO_LARGE');
   assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.used_bytes,used);
   await request(`/api/studio/series/${sid}/status`,{status:'published'},publisher);
-  const newestPath='/api/series?'+new URLSearchParams({sort:'new',language:body.language,genre:body.genres[0],theme:body.themes[0],format:body.format,creation:body.creation_type});
+  const newestPath='/api/series?'+new URLSearchParams({sort:'new',language:body.language,genre:body.genres[0],theme:'entrepreneurship',format:body.format,creation:body.creation_type});
   const newest=(await request(newestPath)).data.series;assert.equal(newest[0].id,sid);
   assert.deepEqual(newest[0].themes,body.themes);assert.equal(newest[0].format,body.format);
   assert.equal((await request('/api/series?theme=revenge&format=live-action')).data.series.some(s=>s.id===sid),false);
@@ -730,6 +736,7 @@ try{
   assert.equal((await request(`/api/studio/series/${sid}`,undefined,admin)).data.series.taken_down,false);
   const retainedClassification=(await request(`/api/studio/series/${sid}`,undefined,publisher)).data.series;
   assert.deepEqual(retainedClassification.themes,body.themes);assert.equal(retainedClassification.format,body.format);
+  assert.ok((await request('/api/series?'+new URLSearchParams({q:body.title,theme:'entrepreneurship',language:body.language,format:body.format}))).data.series.some(item=>item.id===sid),'The added story theme stays filterable after a Cloudflare runtime restart.');
   assert.deepEqual(retainedClassification.subtitle_languages,selectedSubtitles);assert.deepEqual(retainedLikes.series.subtitle_languages,selectedSubtitles);
   assert.equal(retainedClassification.cover_aspect_ratio,'9:16');
   assert.equal((await request('/api/series/tokyo-tomorrow')).data.series.cover_aspect_ratio,'2:3');

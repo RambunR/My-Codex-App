@@ -1,3 +1,4 @@
+import {LEGAL_POLICY_VERSION,CREATOR_PASS_DISCLOSURE_VERSION} from '../shared/creator-pass-consent';
 import {after,before,test,mock} from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp,rm} from 'node:fs/promises';
@@ -5,6 +6,8 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
 import type {Server} from 'node:http';
+
+const creatorConsent={accepted:true,policy_version:LEGAL_POLICY_VERSION,disclosure_version:CREATOR_PASS_DISCLOSURE_VERSION};
 
 const dir=await mkdtemp(path.join(tmpdir(),'aidramio-payments-'));
 process.env.DATA_DIR=dir;process.env.PAYMENTS_MODE='demo';process.env.NODE_ENV='test';process.env.SEED_DEMO='false';
@@ -86,7 +89,7 @@ test('a custom US$234.56 deposit credits that exact amount once and never grants
 
 test('publisher activation stays a one-time HK$88 charge separate from USD wallet funds and preserves administrator role',async()=>{
   const user=await viewer();await fund(user.cookie,500);
-  const attempts=await Promise.all([0,1].map(()=>request('/api/payments/checkout',{kind:'activation',amount_cents:1,currency:'usd'},user.cookie)));
+  const attempts=await Promise.all([0,1].map(()=>request('/api/payments/checkout',{kind:'activation',creator_consent:creatorConsent,amount_cents:1,currency:'usd'},user.cookie)));
   assert.equal(attempts[0].data.paymentId,attempts[1].data.paymentId,'Reuse the pending one-time activation checkout.');
   assert.equal(attempts[0].data.amount_cents,8800);assert.equal(attempts[0].data.currency,'hkd');
   const id=attempts[0].data.paymentId;
@@ -94,11 +97,11 @@ test('publisher activation stays a one-time HK$88 charge separate from USD walle
   const activated=(await request('/api/auth/me',undefined,user.cookie)).data.user;
   assert.equal(activated.publisher_active,1);assert.equal(activated.role,'publisher');assert.equal(activated.wallet_micros,5_000_000);
   assert.equal(activated.quota_bytes,5*1024**3);
-  await request('/api/payments/checkout',{kind:'activation'},user.cookie,409);
+  await request('/api/payments/checkout',{kind:'activation',creator_consent:creatorConsent},user.cookie,409);
   assert.equal(one("SELECT COUNT(*) AS n FROM payments WHERE user_id=? AND kind='activation'",user.id)!.n,1);
   assert.equal(one("SELECT COUNT(*) AS n FROM ledger WHERE user_id=? AND kind='activation'",user.id)!.n,1);
   const admin=await viewer();run("UPDATE users SET role='admin' WHERE id=?",admin.id);
-  const adminCheckout=await request('/api/payments/checkout',{kind:'activation'},admin.cookie);
+  const adminCheckout=await request('/api/payments/checkout',{kind:'activation',creator_consent:creatorConsent},admin.cookie);
   await request(`/api/payments/${adminCheckout.data.paymentId}/demo-confirm`,{},admin.cookie);
   const current=(await request('/api/auth/me',undefined,admin.cookie)).data.user;assert.equal(current.role,'admin');assert.equal(current.publisher_active,1);assert.equal(current.wallet_micros,0);
 });
@@ -150,7 +153,7 @@ test('production cannot create checkouts or settle deposits with test keys or in
       const checkout=provider?mock.method(provider.checkout.sessions,'create',()=>{throw new Error('An unavailable production configuration must not call Stripe.');}):undefined;
       try{
         const funding=await request('/api/payments/checkout',{kind:'funding',amount_cents:500},user.cookie,503);assert.equal(funding.data.error.code,'PAYMENTS_UNAVAILABLE');
-        const activation=await request('/api/payments/checkout',{kind:'activation'},user.cookie,503);assert.equal(activation.data.error.code,'PAYMENTS_UNAVAILABLE');
+        const activation=await request('/api/payments/checkout',{kind:'activation',creator_consent:creatorConsent},user.cookie,503);assert.equal(activation.data.error.code,'PAYMENTS_UNAVAILABLE');
         const event=await webhook(p,{},503);assert.equal(event.error.code,'PAYMENTS_UNAVAILABLE');
         assert.equal(balance(user.id),0);assert.equal(one('SELECT status FROM payments WHERE id=?',p.id)!.status,'pending');
         assert.equal(one('SELECT COUNT(*) AS n FROM payments WHERE user_id=?',user.id)!.n,1);
@@ -216,9 +219,9 @@ test('a configured HK$88 activation price retains one Checkout session across a 
       return session as any;
     });
     retrieve=mock.method(provider.checkout.sessions,'retrieve',async(id:string)=>{const found=[...sessions.values()].find(s=>s.id===id);assert.ok(found);return found as any;});
-    await assert.rejects(finance.createCheckout(userId,'activation',500),(e:any)=>e.status===502&&e.code==='CHECKOUT_UNAVAILABLE');
+    await assert.rejects(finance.createCheckout(userId,'activation',500,undefined,undefined,undefined,creatorConsent),(e:any)=>e.status===502&&e.code==='CHECKOUT_UNAVAILABLE');
     const pending=one("SELECT * FROM payments WHERE user_id=? AND kind='activation'",userId)!;assert.equal(pending.status,'pending');assert.equal(pending.provider_session,null);assert.equal(pending.amount_cents,8800);assert.equal(pending.currency,'hkd');
-    const retried=await Promise.all(Array.from({length:6},()=>finance.createCheckout(userId,'activation',1)));
+    const retried=await Promise.all(Array.from({length:6},()=>finance.createCheckout(userId,'activation',1,undefined,undefined,undefined,creatorConsent)));
     assert.ok(retried.every(result=>'paymentId' in result&&result.paymentId===pending.id));assert.equal(new Set(calls.map(c=>c.key)).size,1);assert.equal(sessions.size,1);
     assert.equal(calls[0].key,'checkout:'+pending.id);assert.ok(calls.every(c=>c.params.metadata.paymentId===pending.id));
     assert.equal(one("SELECT COUNT(*) AS n FROM payments WHERE user_id=? AND kind='activation'",userId)!.n,1);
@@ -227,7 +230,7 @@ test('a configured HK$88 activation price retains one Checkout session across a 
     await Promise.all([webhook(paid),webhook(paid)]);
     assert.equal(one('SELECT publisher_active FROM users WHERE id=?',userId)!.publisher_active,1);assert.equal(balance(userId),0);
     assert.equal(one("SELECT COUNT(*) AS n FROM ledger WHERE user_id=? AND kind='activation'",userId)!.n,1);
-    await assert.rejects(finance.createCheckout(userId,'activation',8800),(e:any)=>e.status===409&&e.code==='ALREADY_ACTIVE');
+    await assert.rejects(finance.createCheckout(userId,'activation',8800,undefined,undefined,undefined,creatorConsent),(e:any)=>e.status===409&&e.code==='ALREADY_ACTIVE');
     assert.equal(sessions.size,1);
   }finally{create?.mock.restore();retrieve?.mock.restore();price?.mock.restore();Object.assign(config,previous);finance.configureStripe();}
 });
@@ -258,7 +261,7 @@ test('bad configured activation prices fail before creating a payment row or cal
     const invalid=[{currency:'usd'},{unit_amount:8799},{active:false},{type:'recurring',recurring:{interval:'month'}},{livemode:true}];
     for(let i=0;i<=invalid.length;i++){
       config.stripeActivationPriceId='price_bad_fixture_'+i;current=invalid[i]||{};failure=i===invalid.length;
-      await assert.rejects(finance.createCheckout(userId,'activation',8800),(e:any)=>e.status===503&&e.code==='PAYMENT_CONFIG_ERROR');
+      await assert.rejects(finance.createCheckout(userId,'activation',8800,undefined,undefined,undefined,creatorConsent),(e:any)=>e.status===503&&e.code==='PAYMENT_CONFIG_ERROR');
       assert.equal(one('SELECT COUNT(*) AS n FROM payments WHERE user_id=?',userId)!.n,0);assert.equal(checkoutCalls,0);assert.equal(balance(userId),0);
     }
   }finally{create?.mock.restore();price?.mock.restore();Object.assign(config,previous);finance.configureStripe();}

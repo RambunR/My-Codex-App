@@ -1,3 +1,4 @@
+import {LEGAL_POLICY_VERSION,CREATOR_PASS_DISCLOSURE_VERSION} from '../shared/creator-pass-consent';
 import {after,before,beforeEach,mock,test} from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp,rm} from 'node:fs/promises';
@@ -5,6 +6,8 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
 import type {Server} from 'node:http';
+
+const creatorConsent={accepted:true,policy_version:LEGAL_POLICY_VERSION,disclosure_version:CREATOR_PASS_DISCLOSURE_VERSION};
 
 const dir=await mkdtemp(path.join(tmpdir(),'lingying-stripe-site-origin-'));
 process.env.DATA_DIR=dir;process.env.NODE_ENV='test';process.env.SEED_DEMO='false';
@@ -47,7 +50,7 @@ test('custom-domain wallet and pass Checkouts keep stable financial identity and
   const created=mock.method(finance.stripe!.checkout.sessions,'create',async(params:any):Promise<any>=>{calls.push(params);return{id:'cs_test_new_site_'+randomUUID(),livemode:false,url:'https://checkout.stripe.com/local-fixture'};});
   try{
     for(const kind of ['funding','activation'] as const){
-      const result=await request('/api/payments/checkout',kind==='funding'?{kind,amount_cents:500}:{kind},user.cookie);
+      const result=await request('/api/payments/checkout',kind==='funding'?{kind,amount_cents:500}:{kind,creator_consent:creatorConsent},user.cookie);
       const call=calls.at(-1),destination=kind==='funding'?'wallet':'studio';
       assert.equal(call.metadata.site,oldSite);assert.equal(call.metadata.financialMode,'test');
       assert.equal(call.success_url,customSite+`/${destination}?checkout=success&session_id={CHECKOUT_SESSION_ID}`);

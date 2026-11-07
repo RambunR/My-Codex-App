@@ -1,6 +1,6 @@
 import {COMPANY_NAME,CONTACT_EMAIL} from './company';
 
-export const LEGAL_POLICY_VERSION='2026-11-07';
+export {LEGAL_POLICY_VERSION} from '../shared/creator-pass-consent';
 export type LegalLocale='en'|'zh-TW'|'zh-CN';
 export type LegalPolicyType='terms'|'privacy';
 export interface LegalSection{id:string;title:string;paragraphs:string[];items?:string[];contact?:boolean}
@@ -11,7 +11,7 @@ export interface LegalPolicyCopy{
 }
 
 const en:LegalPolicyCopy={
-  effective:'Effective date',date:'7 November 2026',version:'Version',contents:'On this page',summary:'Key points',contact:'Contact the company',languages:'Policy language',related:'Related policies',
+  effective:'Effective date',date:'8 November 2026',version:'Version',contents:'On this page',summary:'Key points',contact:'Contact the company',languages:'Policy language',related:'Related policies',
   fallback:'This policy is available in English, Traditional Chinese and Simplified Chinese. English is shown for your selected interface language.',
   terms:{title:'Terms of Use',intro:`These Terms describe the conditions for using LingYing, operated by ${COMPANY_NAME} (the “Company”, “we” or “us”). They apply to the extent they form a valid agreement with you. Read them before registering, purchasing a Dramio Pass or publishing content. Your rights that cannot legally be excluded continue to apply.`,
     summary:[
@@ -25,6 +25,7 @@ const en:LegalPolicyCopy={
         'You must be at least 18 and legally able to enter a contract to purchase, publish or request withdrawals. Anyone below 18 may browse only with a parent or guardian’s permission and where the content is lawful and age-appropriate. Provide accurate information, protect your credentials and report suspected unauthorised access. Do not share or sell accounts, impersonate others or evade restrictions.',
       ]},
       {id:'creator-pass',title:'2. Dramio Pass: publishing access, not guaranteed results',paragraphs:[
+        'Before opening a new Pass checkout, review these Terms, acknowledge the Privacy Policy and expressly confirm that results are not guaranteed using the required checkbox. We record the accepted versions, language, time and related payment as evidence of that acknowledgement. This acknowledgement does not provide consent to unrelated marketing.',
         'Dramio Pass is a one-time payment for access to the creator publishing features described at purchase, subject to these Terms, account eligibility, content review and technical limits. The regular price is HK$88; a valid promotion may change the amount shown at checkout. Actual billing is in HKD. Other-currency displays are indicative estimates. The Pass is not a purchase of viewers, advertising, investment returns or employment.',
         'Buying a Pass, uploading content or being featured does not guarantee approval, distribution, recommendations, any minimum view count, followers, paid unlocks, sales, revenue, income or recovery of production and Pass costs. Earnings may be zero. Results depend on audience demand, content, pricing, lawful availability and other factors. Examples, estimates, promotional language and another creator’s results are not promises of your results.',
         'Regular publishers currently receive a 5 GiB storage allowance. Administrator-owned media may have different access. The current episode limits are 4 minutes and 200 MiB per input file; covers are subject to separate limits. Any storage increase or additional service must be separately approved and quoted. A Pass does not exempt content from moderation or provide an unconditional right to permanent hosting.',
@@ -83,7 +84,7 @@ const en:LegalPolicyCopy={
     {id:'data-collected',title:'2. Information collected',paragraphs:[
       'Account and identity information includes your name, email address, language, account role and status, authentication-provider identifiers, timestamps and storage allowance. Password registration uses a salted password hash rather than a stored plain-text password. Google or Apple sign-in can supply an account identifier, name and email, including an Apple relay email; we do not request your Google or Apple password, Gmail messages, contacts or Drive files, and do not store their access or refresh tokens for sign-in.',
       'Content and activity information includes uploaded video, artwork, titles, descriptions, classifications and declared languages; public publisher-profile information; likes, saved stories, watch progress, playback events, viewing time and related aggregate statistics. Account-linked or random guest identifiers are hashed for playback measurement. A hash is a protective measure, not a promise that the data is completely anonymous.',
-      'Transaction and support information includes payment and purchase identifiers, amounts and currencies, wallet and creator-ledger entries, Pass status, withdrawal requests, connected-payment-account references, fraud or payment reviews, moderation records and messages you send us. Hosting and security systems may process IP addresses, request times, browser/device information and diagnostic records. Raw IP addresses are not stored in the application’s playback-measurement records, but may be processed for network delivery, security and rate limiting.',
+      'Transaction and support information includes payment and purchase identifiers, amounts and currencies, wallet and creator-ledger entries, Pass status, policy and acknowledgement versions, acceptance times and languages linked to Pass payments, withdrawal requests, connected-payment-account references, fraud or payment reviews, moderation records and messages you send us. Hosting and security systems may process IP addresses, request times, browser/device information and diagnostic records. Raw IP addresses are not stored in the application’s playback-measurement records, but may be processed for network delivery, security and rate limiting.',
     ]},
     {id:'purposes',title:'3. Why information is used and what is optional',paragraphs:[
       'We use information to authenticate users; provide viewing, purchases and publishing; remember choices; process and reconcile payments; calculate creator statistics; review content and rights complaints; prevent abuse; troubleshoot; answer support requests; and meet legal or regulatory requirements. We use data for these purposes or directly related purposes permitted by law. A new use unrelated to the original collection purpose will require an appropriate notice and consent where required.',
@@ -126,7 +127,7 @@ const en:LegalPolicyCopy={
 };
 
 const zhTW:LegalPolicyCopy={
-  effective:'生效日期',date:'2026年11月7日',version:'版本',contents:'本頁內容',summary:'重點摘要',contact:'聯絡公司',languages:'政策語言',related:'相關政策',fallback:en.fallback,
+  effective:'生效日期',date:'2026年11月8日',version:'版本',contents:'本頁內容',summary:'重點摘要',contact:'聯絡公司',languages:'政策語言',related:'相關政策',fallback:en.fallback,
   terms:{title:'使用條款',intro:`本條款說明使用 LingYing 靈映的條件。平台由 ${COMPANY_NAME}（下稱「公司」、「我們」）營運，並在與您構成有效協議的範圍內適用。請在註冊、購買 Dramio Pass 或發布內容前閱讀本條款。法律規定不得排除的權利仍然適用。`,summary:[
     'Dramio Pass 提供發布功能的使用權。購買通行證不保證內容獲批、宣傳、觀看次數、銷售、營收或收入；收益可能為零。',
     '您必須擁有上傳內容所需的全部權利。公司可限制或移除侵權、違法或不適當的內容。',
@@ -138,6 +139,7 @@ const zhTW:LegalPolicyCopy={
       '購買、發布內容或申請提領者須年滿18歲，並具備訂立合約的法律能力。未滿18歲人士只可在家長或監護人同意下瀏覽合法且適齡的內容。請提供準確資料、保管登入憑證，並及時報告疑似未經授權的存取。不得分享或出售帳戶、冒充他人或規避限制。',
     ]},
     {id:'creator-pass',title:'2. Dramio Pass：發布權限，不保證成果',paragraphs:[
+      '開啟新的通行證結帳前，請閱讀本條款、知悉私隱政策，並透過必填確認方格明確確認成果不獲保證。我們會記錄所接受的版本、語言、時間及相關付款，作為該項確認的紀錄。這不構成對無關直接促銷的同意。',
       'Dramio Pass 是使用購買時所描述之創作者發布功能的一次性付款，並受本條款、帳戶資格、內容審核及技術限制約束。標準價格為一次港幣88元；有效優惠可能改變結帳顯示的金額。實際以港幣收費，其他貨幣顯示僅供估算。通行證並非購買觀眾、廣告、投資回報或僱傭關係。',
       '購買通行證、上傳內容或獲平台推薦，均不保證審核通過、分發、推薦曝光、最低觀看次數、追蹤者、付費解鎖、銷售、營收、收入，亦不保證收回製作費或通行證成本。收益可能為零。成果取決於觀眾需求、內容、定價、合法可用性及其他因素。示例、估算、宣傳用語及其他創作者的成果，均非對您成果的承諾。',
       '一般發布者目前獲5 GiB儲存額度，管理員自有媒體的權限可能不同。目前每集輸入檔案上限為4分鐘及200 MiB，封面另有上限。增加儲存額度或其他服務須另行批准及報價。通行證不豁免內容審核，也不提供無條件永久託管的權利。',
@@ -196,7 +198,7 @@ const zhTW:LegalPolicyCopy={
     {id:'data-collected',title:'2. 所收集的資料',paragraphs:[
       '帳戶及身份資料包括姓名、電郵、語言、帳戶角色及狀態、身份驗證服務商識別碼、時間紀錄及儲存額度。密碼註冊使用加鹽雜湊值，不儲存明文密碼。Google 或 Apple 登入可提供帳戶識別碼、姓名及電郵，包括 Apple 轉送電郵；我們不要求 Google 或 Apple 密碼、Gmail 郵件、通訊錄或 Drive 檔案，也不為登入儲存其存取或更新權杖。',
       '內容及活動資料包括上傳影片、美術、標題、描述、分類及所聲明的語言；公開發布者資料；讚好、片單、觀看進度、播放事件、觀看時間及相關整體統計。與帳戶相關或隨機訪客識別碼會經雜湊處理作播放統計用途。雜湊是一項保障措施，並非資料完全匿名的保證。',
-      '交易及支援資料包括付款和購買識別碼、金額及貨幣、錢包和創作者帳目、通行證狀態、提領申請、關聯支付帳戶參考、欺詐或付款覆核、審核紀錄及您寄給我們的訊息。託管及安全系統可能處理IP位址、請求時間、瀏覽器／裝置資料及診斷紀錄。應用程式的播放統計紀錄不儲存原始IP位址，但網絡傳送、安全及速率限制可能處理IP。',
+      '交易及支援資料包括付款和購買識別碼、金額及貨幣、錢包和創作者帳目、通行證狀態、與通行證付款相關的政策及確認版本、接受時間及語言、提領申請、關聯支付帳戶參考、欺詐或付款覆核、審核紀錄及您寄給我們的訊息。託管及安全系統可能處理IP位址、請求時間、瀏覽器／裝置資料及診斷紀錄。應用程式的播放統計紀錄不儲存原始IP位址，但網絡傳送、安全及速率限制可能處理IP。',
     ]},
     {id:'purposes',title:'3. 使用目的及可選資料',paragraphs:[
       '資料用於身份驗證、觀看、購買及發布服務、記憶選項、處理和核對付款、計算創作者統計、內容及權利投訴覆核、預防濫用、排解故障、回應支援要求，以及履行法律或監管義務。我們只按上述用途或法律允許的直接相關用途使用資料。與原收集目的無直接關係的新用途，將按需要另行通知並取得同意。',
@@ -239,7 +241,7 @@ const zhTW:LegalPolicyCopy={
 };
 
 const zhCN:LegalPolicyCopy={
-  effective:'生效日期',date:'2026年11月7日',version:'版本',contents:'本页内容',summary:'重点摘要',contact:'联系公司',languages:'政策语言',related:'相关政策',fallback:en.fallback,
+  effective:'生效日期',date:'2026年11月8日',version:'版本',contents:'本页内容',summary:'重点摘要',contact:'联系公司',languages:'政策语言',related:'相关政策',fallback:en.fallback,
   terms:{title:'使用条款',intro:`本条款说明使用 LingYing 灵映的条件。平台由 ${COMPANY_NAME}（下称“公司”“我们”）运营，并在与您构成有效协议的范围内适用。请在注册、购买 Dramio Pass 或发布内容前阅读本条款。法律规定不得排除的权利仍然适用。`,summary:[
     'Dramio Pass 提供发布功能的使用权。购买通行证不保证内容获批、宣传、观看次数、销售、营收或收入；收益可能为零。',
     '您必须拥有上传内容所需的全部权利。公司可限制或移除侵权、违法或不适当的内容。',
@@ -251,6 +253,7 @@ const zhCN:LegalPolicyCopy={
       '购买、发布内容或申请提现者须年满18岁，并具备订立合同的法律能力。未满18岁人士只可在家长或监护人同意下浏览合法且适龄的内容。请提供准确资料、保管登录凭证，并及时报告疑似未经授权的访问。不得分享或出售账户、冒充他人或规避限制。',
     ]},
     {id:'creator-pass',title:'2. Dramio Pass：发布权限，不保证成果',paragraphs:[
+      '开启新的通行证结账前，请阅读本条款、知悉隐私政策，并通过必填确认框明确确认成果不获保证。我们会记录所接受的版本、语言、时间及相关付款，作为该项确认的记录。这不构成对无关直接营销的同意。',
       'Dramio Pass 是使用购买时所描述的创作者发布功能的一次性付款，并受本条款、账户资格、内容审核及技术限制约束。标准价格为一次港币88元；有效优惠可能改变结账显示的金额。实际以港币收费，其他货币显示仅供估算。通行证并非购买观众、广告、投资回报或雇佣关系。',
       '购买通行证、上传内容或获平台推荐，均不保证审核通过、分发、推荐曝光、最低观看次数、关注者、付费解锁、销售、营收、收入，也不保证收回制作费或通行证成本。收益可能为零。成果取决于观众需求、内容、定价、合法可用性及其他因素。示例、估算、宣传用语及其他创作者的成果，均非对您成果的承诺。',
       '一般发布者目前获5 GiB存储额度，管理员自有媒体的权限可能不同。目前每集输入文件上限为4分钟及200 MiB，封面另有上限。增加存储额度或其他服务须另行批准及报价。通行证不豁免内容审核，也不提供无条件永久托管的权利。',
@@ -309,7 +312,7 @@ const zhCN:LegalPolicyCopy={
     {id:'data-collected',title:'2. 所收集的资料',paragraphs:[
       '账户及身份资料包括姓名、电邮、语言、账户角色及状态、身份验证服务商识别码、时间记录及存储额度。密码注册使用加盐哈希值，不存储明文密码。Google 或 Apple 登录可提供账户识别码、姓名及电邮，包括 Apple 转发电邮；我们不要求 Google 或 Apple 密码、Gmail 邮件、通讯录或 Drive 文件，也不为登录存储其访问或刷新令牌。',
       '内容及活动资料包括上传视频、美术、标题、描述、分类及所声明的语言；公开发布者资料；点赞、片单、观看进度、播放事件、观看时间及相关整体统计。与账户相关或随机访客识别码会经哈希处理作播放统计用途。哈希是一项保护措施，并非资料完全匿名的保证。',
-      '交易及支持资料包括付款和购买识别码、金额及货币、钱包和创作者账目、通行证状态、提现申请、关联支付账户参考、欺诈或付款复核、审核记录及您寄给我们的消息。托管及安全系统可能处理IP地址、请求时间、浏览器／设备资料及诊断记录。应用程序的播放统计记录不存储原始IP地址，但网络传送、安全及速率限制可能处理IP。',
+      '交易及支持资料包括付款和购买识别码、金额及货币、钱包和创作者账目、通行证状态、与通行证付款相关的政策及确认版本、接受时间及语言、提现申请、关联支付账户参考、欺诈或付款复核、审核记录及您寄给我们的消息。托管及安全系统可能处理IP地址、请求时间、浏览器／设备资料及诊断记录。应用程序的播放统计记录不存储原始IP地址，但网络传送、安全及速率限制可能处理IP。',
     ]},
     {id:'purposes',title:'3. 使用目的及可选资料',paragraphs:[
       '资料用于身份验证、观看、购买及发布服务、记忆选项、处理和核对付款、计算创作者统计、内容及权利投诉复核、预防滥用、排查故障、回应支持要求，以及履行法律或监管义务。我们只按上述用途或法律允许的直接相关用途使用资料。与原收集目的无直接关系的新用途，将按需要另行通知并取得同意。',

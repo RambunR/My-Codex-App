@@ -5,7 +5,7 @@ LingYing separates four independent choices in Creator Studio, Explore and serie
 | Choice | Purpose | Examples | Creator selection |
 | --- | --- | --- | --- |
 | Genre | The kind of drama | Romance, Thriller, Comedy, Medical Drama | 1–3 of 29 standard genres |
-| Story themes | Plot and character themes | Revenge, Secret Baby, Billionaire & CEO, Baby Sweetheart (寶貝甜心) | Optional, up to 5 of 16 themes |
+| Story themes | Plot and character themes | Revenge, Secret Baby, Entrepreneurship (創業), Found Family | Optional, up to 5 of 26 themes |
 | Format | How the series looks | Live-action, Animation, Anime/Donghua, Motion Comics | One format; may remain unspecified |
 | Production method | How it was made | Human-created, AI-assisted, AI-generated | One method |
 
@@ -20,6 +20,23 @@ Open [Creator Studio](https://lingyingdrama.com/studio), create or manage a seri
 After publication, Explore opens on Newest with the series' spoken language, first genre, first theme (when present), format (when present) and production method selected. The first publication date keeps its existing semantics.
 
 All new classification labels and helper text are translated in the existing 21 interface languages, including right-to-left Arabic and Urdu. Creator-written titles and descriptions retain their uploaded language.
+
+On 8 November 2026, ten choices were added to the existing sixteen:
+
+| Stable ID | English label | Traditional Chinese | Simplified Chinese |
+| --- | --- | --- | --- |
+| `entrepreneurship` | Entrepreneurship | 創業 | 创业 |
+| `business-rivalry` | Business Rivalry | 商戰 | 商战 |
+| `inheritance-succession` | Inheritance & Succession | 繼承與接班 | 继承与接班 |
+| `family-feud` | Family Feud | 家族恩怨 | 家族恩怨 |
+| `love-triangle` | Love Triangle | 三角戀 | 三角恋 |
+| `redemption` | Redemption | 救贖 | 救赎 |
+| `friendship` | Friendship | 友情 | 友情 |
+| `self-discovery` | Self-Discovery | 自我探索 | 自我探索 |
+| `survival` | Survival | 生存挑戰 | 生存挑战 |
+| `found-family` | Found Family | 非血緣的家人 | 非血缘的家人 |
+
+These are additional choices in creator/admin classification controls, public series metadata links and Explore filters. Existing identifiers and saved choices keep their meaning. No existing series is automatically assigned a new theme, and the maximum remains five themes per series.
 
 ## Existing series and API compatibility
 

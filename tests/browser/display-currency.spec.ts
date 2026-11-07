@@ -1,4 +1,5 @@
 import {test,expect,type Page} from '@playwright/test';
+import {agreeToCreatorPass,creatorConsent} from './helpers/creator-pass-consent';
 const viewer={id:'display-currency-viewer',name:'Currency Viewer',email:'currency@browser.test',role:'viewer',publisher_active:0,wallet_micros:0,earnings_micros:0,quota_bytes:5*1024**3,used_bytes:0,language:'en',payment_review:false,dramio_pass:{active:false,test:false,purchased_at:null}};
 async function quote(page:Page,country:string,currency:string,ratePerHkd:number){await page.route('**/api/display-currency',route=>route.fulfill({json:{quote:{country,currency,ratePerHkd,asOf:'2026-11-04'}}}));}
 
@@ -12,7 +13,7 @@ test('a Taiwan visitor sees NT$ estimates in the Pass header, CTA, regular/disco
   await expect(page.locator('.activation-card>button.primary')).toContainText('≈ NT$366.87');await expect(page.locator('.pass-billing-note')).toContainText('HK$88.00');
   await page.locator('#pass-promo-code').fill('PRIVATE58');await page.locator('.pass-promo-form button').click();
   await expect(page.locator('.pass-local-price')).toContainText('241.80');await expect(page.locator('.pass-original-price')).toContainText('≈ NT$366.87');await expect(page.locator('.pass-billing-note')).toContainText('HK$58.00');
-  await page.locator('.activation-card>button.primary').click();await expect(page.getByRole('dialog')).toContainText('HK$58.00');expect(writes).toEqual([{kind:'activation',amount_cents:8800,language:'zh-TW',promo_code:'PRIVATE58',promo_revision:1}]);
+  await agreeToCreatorPass(page);await page.locator('.activation-card>button.primary').click();await expect(page.getByRole('dialog')).toContainText('HK$58.00');expect(writes).toEqual([{kind:'activation',amount_cents:8800,language:'zh-TW',promo_code:'PRIVATE58',promo_revision:1,creator_consent:creatorConsent}]);
   await page.goto('/account');await expect(page.locator('.dramio-pass-price>strong')).toHaveAttribute('data-currency','TWD');await expect(page.locator('.dramio-pass-price')).toContainText('≈ NT$366.87');await expect(page.locator('.dramio-pass-billing-note')).toContainText('HK$88.00');
 });
 

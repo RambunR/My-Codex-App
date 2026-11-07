@@ -1,4 +1,5 @@
 import {test,expect} from '@playwright/test';
+import {agreeToCreatorPass} from './helpers/creator-pass-consent';
 import path from 'node:path';
 test('desktop catalogue, search, genre and language filters navigate to real series',async({page})=>{
   const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
@@ -18,7 +19,7 @@ test('registration, test wallet funding and a paid unlock persist across reload'
 });
 test('publisher pays activation, creates a series, uploads a folder, edits and publishes',async({page})=>{
   await page.goto('/auth?mode=register&next=/studio');await page.getByLabel('Name',{exact:true}).fill('Browser Creator');await page.getByLabel('Email address',{exact:true}).fill(`creator-${Date.now()}@browser.test`);await page.getByLabel('Password',{exact:true}).fill('BrowserPass123!');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Create account',exact:true}).last().click();await expect(page).toHaveURL('/studio');
-  await page.getByRole('button',{name:'Get Dramio Pass · HK$88'}).click();await expect(page.getByRole('dialog')).toContainText('HK$88.00');await page.getByRole('button',{name:'Confirm test payment'}).click();await page.getByRole('link',{name:'New series',exact:true}).first().click();
+  await agreeToCreatorPass(page);await page.getByRole('button',{name:'Get Dramio Pass · HK$88'}).click();await expect(page.getByRole('dialog')).toContainText('HK$88.00');await page.getByRole('button',{name:'Confirm test payment'}).click();await page.getByRole('link',{name:'New series',exact:true}).first().click();
   const title=`A Browser Original ${Date.now()}`;
   await page.getByLabel('Series title',{exact:true}).fill(title);await page.getByLabel('Synopsis',{exact:true}).fill('A short original story published through the complete creator workflow.');await page.getByLabel('Drama language',{exact:false}).selectOption('zh-TW');
   const genres=page.locator('#series-genres');

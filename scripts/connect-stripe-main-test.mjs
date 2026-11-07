@@ -114,13 +114,16 @@ export async function verifyMainTest({stripe,request=fetch,dispatcher,report=eve
     const response=await request(SITE+route,{method,dispatcher,signal:AbortSignal.timeout(20_000),headers:{...(body===undefined?{}:{'Content-Type':'application/json',Origin:SITE}),...(cookie?{Cookie:cookie}:{})},body:body===undefined?undefined:JSON.stringify(body)});
     const data=await response.json();if(!response.ok)throw Object.assign(new Error(data.error?.message||'Main test payment API request failed.'),{statusCode:response.status});return{data,response};
   }
-  let ready=false;
+  let ready=false,policy;
   for(let attempt=0;attempt<120;attempt++){
-    try{const {data}=await api('/api/config');check(data.sandbox===false&&data.paymentsTestMode===true&&data.uploadsEnabled===true&&data.auth?.google===true,'The main site must explicitly identify Stripe test payments while preserving Google login and uploads.','verify_public_main_test');if(data.paymentsReady===true){ready=true;break;}}
+    try{const {data}=await api('/api/config');check(data.sandbox===false&&data.paymentsTestMode===true&&data.uploadsEnabled===true&&data.auth?.google===true,'The main site must explicitly identify Stripe test payments while preserving Google login and uploads.','verify_public_main_test');if(data.paymentsReady===true){ready=true;policy=data.creatorPassConsent;break;}}
     catch(error){if(error.operation==='verify_public_main_test')throw error;}
     await sleep(500);
   }
   check(ready,'Main test payment credentials did not become ready after configuration.','wait_main_test_ready');
+  check(typeof policy?.policyVersion==='string'&&policy.policyVersion.length>0&&typeof policy?.disclosureVersion==='string'&&policy.disclosureVersion.length>0,'The site did not publish its creator Pass agreement versions.','verify_creator_pass_policy');
+  // This acknowledgement belongs only to the synthetic unpaid-test identity below.
+  const creatorConsent={accepted:true,policy_version:policy.policyVersion,disclosure_version:policy.disclosureVersion};
   const password=randomBytes(32).toString('base64url'),email='stripe-setup-'+randomBytes(12).toString('hex')+'@test-payments.aidramio.invalid';secretBag.push(password,email);
   const registered=await operation('register_main_test_verification_user',()=>api('/api/auth/register',{body:{name:'Payment setup check',email,password}}));
   const userId=registered.data.user?.id;
@@ -130,14 +133,14 @@ export async function verifyMainTest({stripe,request=fetch,dispatcher,report=eve
   function checkoutId(url){secretBag.push(url);const parsed=new URL(url);check(parsed.protocol==='https:'&&parsed.hostname==='checkout.stripe.com','Unexpected Checkout origin.','verify_checkout');const id=parsed.pathname.match(/(?:^|\/)(cs_test_[A-Za-z0-9_]+)/)?.[1];check(id,'Checkout did not contain a test Session identifier.','verify_checkout');return id;}
   try{
     for(const spec of [{kind:'funding',amount:23456,currency:'usd'},{kind:'activation',amount:8800,currency:'hkd'}]){
-      const checkout=await operation('create_'+spec.kind+'_checkout',()=>api('/api/payments/checkout',{cookie,body:{kind:spec.kind,...(spec.kind==='funding'?{amount_cents:spec.amount}:{})}}));
+      const checkout=await operation('create_'+spec.kind+'_checkout',()=>api('/api/payments/checkout',{cookie,body:{kind:spec.kind,...(spec.kind==='funding'?{amount_cents:spec.amount}:{creator_consent:creatorConsent})}}));
       const id=checkoutId(checkout.data.url);
       const session=await operation('retrieve_'+spec.kind+'_checkout',()=>stripe.checkout.sessions.retrieve(id));
       check(session.livemode===false&&session.mode==='payment'&&session.client_reference_id===checkout.data.paymentId&&session.metadata?.paymentId===checkout.data.paymentId&&session.metadata?.userId===userId&&session.metadata?.app==='aidramio'&&session.metadata?.site===SITE&&session.metadata?.financialMode==='test','Checkout identity does not match the main-site test verification request.','verify_'+spec.kind+'_checkout');
       sessions.push({id,paymentId:checkout.data.paymentId,kind:spec.kind,expired:false});
       check(session.amount_total===spec.amount&&session.currency===spec.currency&&session.status==='open'&&session.payment_status==='unpaid','Checkout amount, currency or unpaid status is incorrect.','verify_'+spec.kind+'_checkout');
       if(spec.kind==='activation'){
-        const again=await operation('repeat_activation_checkout',()=>api('/api/payments/checkout',{cookie,body:{kind:'activation'}}));
+        const again=await operation('repeat_activation_checkout',()=>api('/api/payments/checkout',{cookie,body:{kind:'activation',creator_consent:creatorConsent}}));
         check(checkoutId(again.data.url)===id&&again.data.paymentId===checkout.data.paymentId,'One-time activation did not reuse its pending Checkout.','repeat_activation_checkout');
       }
       report({operation:'verify_'+spec.kind+'_checkout',status:'passed',checkout_session_id:id,payment_id:checkout.data.paymentId});

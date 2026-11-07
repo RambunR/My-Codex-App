@@ -1,3 +1,4 @@
+import {LEGAL_POLICY_VERSION,CREATOR_PASS_DISCLOSURE_VERSION} from '../shared/creator-pass-consent';
 import {after,before,beforeEach,test,mock} from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp,rm} from 'node:fs/promises';
@@ -5,6 +6,8 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
 import type {Server} from 'node:http';
+
+const creatorConsent={accepted:true,policy_version:LEGAL_POLICY_VERSION,disclosure_version:CREATOR_PASS_DISCLOSURE_VERSION};
 
 const dir=await mkdtemp(path.join(tmpdir(),'lingying-pass-promotion-'));
 process.env.DATA_DIR=dir;process.env.NODE_ENV='test';process.env.SEED_DEMO='false';process.env.PAYMENTS_MODE='stripe';
@@ -56,7 +59,7 @@ test('public config exposes only a blank promo field capability and bootstrap fl
 test('normalized promo creates exact HK$58 inline Checkout and immutable server proof without funding a wallet',async()=>{
  const user=await viewer(),f=stripeFixture();config.stripeActivationPriceId='price_regular_88_fixture';
  try{
-  const result=await request('/api/payments/checkout',{kind:'activation',promo_code:' lingying58 ',amount_cents:1,currency:'usd'},user.cookie),p=payment(result.data.paymentId);
+  const result=await request('/api/payments/checkout',{kind:'activation',creator_consent:creatorConsent,promo_code:' lingying58 ',amount_cents:1,currency:'usd'},user.cookie),p=payment(result.data.paymentId);
   assert.equal(p.amount_cents,5800);assert.equal(p.currency,'hkd');assert.equal(p.status,'pending');
   const quote=one('SELECT * FROM activation_promotion_quotes WHERE payment_id=? AND financial_mode=?',p.id,'default')!;assert.equal(quote.code,'LINGYING58');assert.equal(quote.amount_cents,5800);assert.equal(quote.regular_amount_cents,8800);
   const params=f.creates[0].params;assert.equal(params.line_items[0].price,undefined);assert.equal(params.line_items[0].price_data.unit_amount,5800);assert.equal(params.line_items[0].price_data.currency,'hkd');assert.equal(params.metadata.promotionCode,'LINGYING58');assert.equal(params.customer_email,one('SELECT email FROM users WHERE id=?',user.id)!.email);assert.equal(params.payment_intent_data.metadata.promotionCode,'LINGYING58');assert.ok(params.success_url.includes('promo=LINGYING58'));assert.ok(params.cancel_url.includes('promo=LINGYING58'));
@@ -67,8 +70,8 @@ test('normalized promo creates exact HK$58 inline Checkout and immutable server 
 test('invalid, disabled and funding promo codes cannot create a payment or call Stripe',async()=>{
  const user=await viewer(),f=stripeFixture();
  try{
-  for(const code of ['', 'WRONG',false,58,'a'.repeat(65)])await request('/api/payments/checkout',{kind:'activation',promo_code:code},user.cookie,400);
-  run("UPDATE managed_pass_promotions SET enabled=0 WHERE code='LINGYING58'");const disabled=await request('/api/payments/checkout',{kind:'activation',promo_code:'LINGYING58'},user.cookie,400);assert.equal(disabled.data.error.code,'INVALID_PROMOTION');
+  for(const code of ['', 'WRONG',false,58,'a'.repeat(65)])await request('/api/payments/checkout',{kind:'activation',creator_consent:creatorConsent,promo_code:code},user.cookie,400);
+  run("UPDATE managed_pass_promotions SET enabled=0 WHERE code='LINGYING58'");const disabled=await request('/api/payments/checkout',{kind:'activation',creator_consent:creatorConsent,promo_code:'LINGYING58'},user.cookie,400);assert.equal(disabled.data.error.code,'INVALID_PROMOTION');
   run("UPDATE managed_pass_promotions SET enabled=1 WHERE code='LINGYING58'");await request('/api/payments/checkout',{kind:'funding',amount_cents:500,promo_code:'LINGYING58'},user.cookie,400);
   await assert.rejects(finance.createCheckout(user.id,'funding',500,'en','LINGYING58'),(error:any)=>error.code==='PROMOTION_NOT_APPLICABLE');
   assert.equal(one('SELECT COUNT(*) AS n FROM payments WHERE user_id=?',user.id)!.n,0);assert.equal(f.creates.length,0);
@@ -78,13 +81,13 @@ test('invalid, disabled and funding promo codes cannot create a payment or call 
 test('signed discounted settlement requires exact session, currency and amount; issued quotes survive offer disable and replay',async()=>{
  const user=await viewer(),f=stripeFixture();
  try{
-  const result=await finance.createCheckout(user.id,'activation',1,'en','LINGYING58'),p=payment('paymentId' in result?result.paymentId||'':'');config.passPromotionEnabled=false;
+  const result=await finance.createCheckout(user.id,'activation',1,'en','LINGYING58',undefined,creatorConsent),p=payment('paymentId' in result?result.paymentId||'':'');config.passPromotionEnabled=false;
   for(const change of [{amount_total:5799},{amount_total:8800},{currency:'usd'},{id:'cs_wrong'}]){const rejected=await webhook(p,change,400);assert.equal(rejected.error.code,'PAYMENT_MISMATCH');assert.equal(payment(p.id).status,'pending');}
   const ignored=await webhook(p,{livemode:true},200,true);assert.equal(ignored.ignored,true);assert.equal(payment(p.id).status,'pending');
   await Promise.all([webhook(p),webhook(p)]);
   const account=(await request('/api/auth/me',undefined,user.cookie)).data.user;assert.equal(account.publisher_active,1);assert.equal(account.wallet_micros,0);assert.equal(account.earnings_micros,0);assert.equal(account.dramio_pass.active,true);assert.ok(account.dramio_pass.purchased_at);assert.equal(account.quota_bytes,5*1024**3);
   const ledger=one("SELECT COUNT(*) AS n,MAX(description) AS description FROM ledger WHERE user_id=? AND kind='activation'",user.id)!;assert.equal(ledger.n,1);assert.match(ledger.description,/HK\$58.*LINGYING58/);
-  await assert.rejects(finance.createCheckout(user.id,'activation',8800),(error:any)=>error.code==='ALREADY_ACTIVE');
+  await assert.rejects(finance.createCheckout(user.id,'activation',8800,undefined,undefined,undefined,creatorConsent),(error:any)=>error.code==='ALREADY_ACTIVE');
  }finally{f.restore();}
 });
 
@@ -97,15 +100,15 @@ test('a forged discounted payment or promotion metadata without server quote nev
 test('regular HK$88 legacy payments and configured regular prices remain valid when the offer is enabled',async()=>{
  const legacy=await viewer(),p=rawPayment(legacy.id,8800);await webhook(p);assert.equal(one('SELECT publisher_active FROM users WHERE id=?',legacy.id)!.publisher_active,1);
  const user=await viewer(),f=stripeFixture();config.stripeActivationPriceId='price_regular_fixture';
- try{const checkout=await finance.createCheckout(user.id,'activation',5800);assert.equal(payment('paymentId' in checkout?checkout.paymentId||'':'').amount_cents,8800);assert.equal(f.creates[0].params.line_items[0].price,'price_regular_fixture');assert.equal(f.creates[0].params.metadata.promotionCode,undefined);assert.equal(one('SELECT COUNT(*) AS n FROM activation_promotion_quotes WHERE payment_id=?','paymentId' in checkout?checkout.paymentId||'':'')!.n,0);}finally{f.restore();}
+ try{const checkout=await finance.createCheckout(user.id,'activation',5800,undefined,undefined,undefined,creatorConsent);assert.equal(payment('paymentId' in checkout?checkout.paymentId||'':'').amount_cents,8800);assert.equal(f.creates[0].params.line_items[0].price,'price_regular_fixture');assert.equal(f.creates[0].params.metadata.promotionCode,undefined);assert.equal(one('SELECT COUNT(*) AS n FROM activation_promotion_quotes WHERE payment_id=?','paymentId' in checkout?checkout.paymentId||'':'')!.n,0);}finally{f.restore();}
 });
 
 test('promotion retries after provider timeout use one immutable payment and idempotency key',async()=>{
  const user=await viewer(),f=stripeFixture();
  try{
-  f.setTimeout();await assert.rejects(finance.createCheckout(user.id,'activation',1,'en','LINGYING58'),(error:any)=>error.code==='CHECKOUT_UNAVAILABLE');
+  f.setTimeout();await assert.rejects(finance.createCheckout(user.id,'activation',1,'en','LINGYING58',undefined,creatorConsent),(error:any)=>error.code==='CHECKOUT_UNAVAILABLE');
   const p=one("SELECT * FROM payments WHERE user_id=? AND kind='activation'",user.id)!;
-  const results=await Promise.all(Array.from({length:5},()=>finance.createCheckout(user.id,'activation',1,'en','LINGYING58')));
+  const results=await Promise.all(Array.from({length:5},()=>finance.createCheckout(user.id,'activation',1,'en','LINGYING58',undefined,creatorConsent)));
   assert.ok(results.every(result=>'paymentId' in result&&result.paymentId===p.id));assert.equal(f.sessions.size,1);assert.equal(new Set(f.creates.map(value=>value.key)).size,1);assert.equal(f.creates[0].key,'checkout:'+p.id);assert.equal(one('SELECT COUNT(*) AS n FROM activation_promotion_quotes WHERE payment_id=?',p.id)!.n,1);
  }finally{f.restore();}
 });
@@ -113,21 +116,21 @@ test('promotion retries after provider timeout use one immutable payment and ide
 test('different-price concurrent requests cannot open duplicate checkouts and explicit unpaid cancellation permits switching',async()=>{
  const user=await viewer(),f=stripeFixture();
  try{
-  const outcomes=await Promise.allSettled([finance.createCheckout(user.id,'activation',8800),finance.createCheckout(user.id,'activation',1,'en','LINGYING58')]);
+  const outcomes=await Promise.allSettled([finance.createCheckout(user.id,'activation',8800,undefined,undefined,undefined,creatorConsent),finance.createCheckout(user.id,'activation',1,'en','LINGYING58',undefined,creatorConsent)]);
   assert.equal(outcomes.filter(result=>result.status==='fulfilled').length,1);const conflict=outcomes.find(result=>result.status==='rejected') as PromiseRejectedResult;assert.equal(conflict.reason.code,'ACTIVATION_CHECKOUT_CONFLICT');
   const old=one("SELECT * FROM payments WHERE user_id=? AND kind='activation' AND status='pending'",user.id)!;assert.equal(conflict.reason.details.paymentId,old.id);assert.equal(f.sessions.size,1);
-  const conflictingBody=old.amount_cents===8800?{kind:'activation',promo_code:'LINGYING58'}:{kind:'activation'};
+  const conflictingBody=old.amount_cents===8800?{kind:'activation',creator_consent:creatorConsent,promo_code:'LINGYING58'}:{kind:'activation',creator_consent:creatorConsent};
   const apiConflict=await request('/api/payments/checkout',conflictingBody,user.cookie,409);assert.equal(apiConflict.data.error.details.paymentId,old.id);
   const other=await viewer();await request(`/api/payments/${old.id}/cancel`,{},other.cookie,404);
   await request(`/api/payments/${old.id}/cancel`,{},user.cookie);assert.equal(payment(old.id).status,'expired');
-  const next=await finance.createCheckout(user.id,'activation',1,'en','LINGYING58');assert.notEqual('paymentId' in next?next.paymentId||'':'',old.id);assert.equal(payment('paymentId' in next?next.paymentId||'':'').amount_cents,5800);assert.equal([...f.sessions.values()].filter(value=>value.status==='open').length,1);
+  const next=await finance.createCheckout(user.id,'activation',1,'en','LINGYING58',undefined,creatorConsent);assert.notEqual('paymentId' in next?next.paymentId||'':'',old.id);assert.equal(payment('paymentId' in next?next.paymentId||'':'').amount_cents,5800);assert.equal([...f.sessions.values()].filter(value=>value.status==='open').length,1);
  }finally{f.restore();}
 });
 
 test('explicit test-mode promotion uses isolated quote, receipt and financial tables, never real Pass or wallet state',async()=>{
  config.stripeTestMode=true;config.production=true;const user=await viewer(),f=stripeFixture();
  try{
-  const result=await finance.createCheckout(user.id,'activation',1,'en','LINGYING58'),id='paymentId' in result?result.paymentId||'':'',p=payment(id);assert.equal(paymentTable(),'test_payments');assert.equal(one('SELECT id FROM payments WHERE id=?',id),undefined);assert.equal(one('SELECT financial_mode FROM activation_promotion_quotes WHERE payment_id=?',id)!.financial_mode,'test');
+  const result=await finance.createCheckout(user.id,'activation',1,'en','LINGYING58',undefined,creatorConsent),id='paymentId' in result?result.paymentId||'':'',p=payment(id);assert.equal(paymentTable(),'test_payments');assert.equal(one('SELECT id FROM payments WHERE id=?',id),undefined);assert.equal(one('SELECT financial_mode FROM activation_promotion_quotes WHERE payment_id=?',id)!.financial_mode,'test');
   await Promise.all([webhook(p),webhook(p)]);assert.equal(one('SELECT publisher_active FROM test_accounts WHERE user_id=?',user.id)!.publisher_active,1);assert.equal(one('SELECT publisher_active FROM users WHERE id=?',user.id)!.publisher_active,0);assert.equal(ledgerTable(),'test_ledger');assert.equal(one("SELECT COUNT(*) AS n FROM ledger WHERE user_id=?",user.id)!.n,0);
   const account=(await request('/api/auth/me',undefined,user.cookie)).data.user;assert.equal(account.dramio_pass.test,true);assert.ok(account.dramio_pass.purchased_at);
   config.stripeTestMode=false;const live=(await request('/api/auth/me',undefined,user.cookie)).data.user;assert.equal(live.dramio_pass.active,false);assert.equal(live.wallet_micros,0);
@@ -167,9 +170,9 @@ test('changed quote revision cannot silently charge another price and an already
  try{
   const quoted=(await request('/api/payments/promotion/quote',{promo_code:p.code},user.cookie)).data.promotion;
   await request(`/api/admin/promotions/${p.id}`,{discount_value:1000},admin.cookie,200,'PATCH');
-  const stale=await request('/api/payments/checkout',{kind:'activation',promo_code:p.code,promo_revision:quoted.revision},user.cookie,409);assert.equal(stale.data.error.code,'PROMOTION_CHANGED');assert.equal(f.creates.length,0);assert.equal(one('SELECT COUNT(*) AS n FROM payments WHERE user_id=?',user.id)!.n,0);
+  const stale=await request('/api/payments/checkout',{kind:'activation',creator_consent:creatorConsent,promo_code:p.code,promo_revision:quoted.revision},user.cookie,409);assert.equal(stale.data.error.code,'PROMOTION_CHANGED');assert.equal(f.creates.length,0);assert.equal(one('SELECT COUNT(*) AS n FROM payments WHERE user_id=?',user.id)!.n,0);
   const fresh=(await request('/api/payments/promotion/quote',{promo_code:p.code},user.cookie)).data.promotion;assert.equal(fresh.amountHkdCents,7800);
-  const opened=await request('/api/payments/checkout',{kind:'activation',promo_code:p.code,promo_revision:fresh.revision},user.cookie),record=payment(opened.data.paymentId);assert.equal(record.amount_cents,7800);
+  const opened=await request('/api/payments/checkout',{kind:'activation',creator_consent:creatorConsent,promo_code:p.code,promo_revision:fresh.revision},user.cookie),record=payment(opened.data.paymentId);assert.equal(record.amount_cents,7800);
   await request(`/api/admin/promotions/${p.id}`,{enabled:false,discount_value:4000},admin.cookie,200,'PATCH');
   await webhook(record);await webhook(record);const account=(await request('/api/auth/me',undefined,user.cookie)).data.user;assert.equal(account.dramio_pass.active,true);assert.ok(account.dramio_pass.purchased_at);assert.equal(account.wallet_micros,0);
   const row=(await request('/api/wallet',undefined,user.cookie)).data.ledger.find((entry:any)=>entry.kind==='activation');assert.equal(row.payment_amount_cents,7800);assert.match(row.description,new RegExp(p.code));
@@ -179,13 +182,13 @@ test('changed quote revision cannot silently charge another price and an already
 test('finite promotion limits reserve pending checkouts atomically and cancellation releases one slot while paid redemption remains consumed',async()=>{
  const admin=await administrator(),a=await viewer(),b=await viewer(),p=await managed(admin,{max_redemptions:1}),f=stripeFixture();
  try{
-  const results=await Promise.allSettled([finance.createCheckout(a.id,'activation',1,'en',p.code,p.revision),finance.createCheckout(b.id,'activation',1,'en',p.code,p.revision)]);assert.equal(results.filter(result=>result.status==='fulfilled').length,1);const loser=results.find(result=>result.status==='rejected') as PromiseRejectedResult;assert.equal(loser.reason.code,'INVALID_PROMOTION');assert.equal(f.sessions.size,1);
+  const results=await Promise.allSettled([finance.createCheckout(a.id,'activation',1,'en',p.code,p.revision,creatorConsent),finance.createCheckout(b.id,'activation',1,'en',p.code,p.revision,creatorConsent)]);assert.equal(results.filter(result=>result.status==='fulfilled').length,1);const loser=results.find(result=>result.status==='rejected') as PromiseRejectedResult;assert.equal(loser.reason.code,'INVALID_PROMOTION');assert.equal(f.sessions.size,1);
   const winnerIndex=results.findIndex(result=>result.status==='fulfilled'),winner=winnerIndex===0?a:b,other=winnerIndex===0?b:a,opened=(results[winnerIndex] as PromiseFulfilledResult<any>).value,record=payment(opened.paymentId);
   const pending=promos.adminPromotions(admin.id).promotions.find(row=>row.id===p.id)!;assert.equal(pending.pending_redemptions,1);assert.equal(pending.paid_redemptions,0);
-  await assert.rejects(finance.createCheckout(other.id,'activation',1,'en',p.code,p.revision),(error:any)=>error.code==='INVALID_PROMOTION');
-  const resumed=await finance.createCheckout(winner.id,'activation',1,'en',p.code,p.revision);assert.equal('paymentId' in resumed?resumed.paymentId:'',record.id);
+  await assert.rejects(finance.createCheckout(other.id,'activation',1,'en',p.code,p.revision,creatorConsent),(error:any)=>error.code==='INVALID_PROMOTION');
+  const resumed=await finance.createCheckout(winner.id,'activation',1,'en',p.code,p.revision,creatorConsent);assert.equal('paymentId' in resumed?resumed.paymentId:'',record.id);
   await finance.cancelCheckout(winner.id,record.id);assert.equal(promos.adminPromotions(admin.id).promotions.find(row=>row.id===p.id)!.pending_redemptions,0);
-  const second=await finance.createCheckout(other.id,'activation',1,'en',p.code,p.revision),secondRecord=payment('paymentId' in second?second.paymentId||'':'');await webhook(secondRecord);
+  const second=await finance.createCheckout(other.id,'activation',1,'en',p.code,p.revision,creatorConsent),secondRecord=payment('paymentId' in second?second.paymentId||'':'');await webhook(secondRecord);
   const paid=promos.adminPromotions(admin.id).promotions.find(row=>row.id===p.id)!;assert.equal(paid.pending_redemptions,0);assert.equal(paid.paid_redemptions,1);
   await request(`/api/admin/promotions/${p.id}`,{max_redemptions:1},admin.cookie,200,'PATCH');const c=await viewer();await request('/api/payments/promotion/quote',{promo_code:p.code},c.cookie,400);
   await request(`/api/admin/promotions/${p.id}`,{max_redemptions:null},admin.cookie,200,'PATCH');assert.equal((await request('/api/payments/promotion/quote',{promo_code:p.code},c.cookie)).data.promotion.amountHkdCents,6800);
@@ -195,8 +198,8 @@ test('finite promotion limits reserve pending checkouts atomically and cancellat
 test('unlimited promotions have independent test usage and do not let test reservations consume the live limit',async()=>{
  const admin=await administrator(),a=await viewer(),b=await viewer(),p=await managed(admin,{max_redemptions:1}),f=stripeFixture();
  try{
-  config.stripeTestMode=true;const test=await finance.createCheckout(a.id,'activation',1,'en',p.code,p.revision);await webhook(payment('paymentId' in test?test.paymentId||'':''));assert.equal(promos.adminPromotions(admin.id).promotions.find(row=>row.id===p.id)!.paid_redemptions,1);
-  config.stripeTestMode=false;assert.equal(promos.adminPromotions(admin.id).promotions.find(row=>row.id===p.id)!.paid_redemptions,0);const live=await finance.createCheckout(b.id,'activation',1,'en',p.code,p.revision);assert.ok('paymentId' in live);assert.equal(one('SELECT publisher_active FROM users WHERE id=?',a.id)!.publisher_active,0);
+  config.stripeTestMode=true;const test=await finance.createCheckout(a.id,'activation',1,'en',p.code,p.revision,creatorConsent);await webhook(payment('paymentId' in test?test.paymentId||'':''));assert.equal(promos.adminPromotions(admin.id).promotions.find(row=>row.id===p.id)!.paid_redemptions,1);
+  config.stripeTestMode=false;assert.equal(promos.adminPromotions(admin.id).promotions.find(row=>row.id===p.id)!.paid_redemptions,0);const live=await finance.createCheckout(b.id,'activation',1,'en',p.code,p.revision,creatorConsent);assert.ok('paymentId' in live);assert.equal(one('SELECT publisher_active FROM users WHERE id=?',a.id)!.publisher_active,0);
  }finally{f.restore();}
 });
 
@@ -215,7 +218,7 @@ test('promotion management and its audit are atomic when recording an audit fail
 test('Stripe receipt customer email always comes from the authenticated account for Pass and funding',async()=>{
  const user=await viewer(),f=stripeFixture(),email=one('SELECT email FROM users WHERE id=?',user.id)!.email;
  try{
-  await request('/api/payments/checkout',{kind:'activation',promo_code:'LINGYING58',customer_email:'attacker@example.test'},user.cookie);assert.equal(f.creates[0].params.customer_email,email);assert.equal(f.creates[0].params.payment_intent_data.receipt_email,undefined);
+  await request('/api/payments/checkout',{kind:'activation',creator_consent:creatorConsent,promo_code:'LINGYING58',customer_email:'attacker@example.test'},user.cookie);assert.equal(f.creates[0].params.customer_email,email);assert.equal(f.creates[0].params.payment_intent_data.receipt_email,undefined);
   await request('/api/payments/checkout',{kind:'funding',amount_cents:500,customer_email:'attacker@example.test'},user.cookie);assert.equal(f.creates[1].params.customer_email,email);assert.equal(f.creates[1].params.payment_intent_data.receipt_email,undefined);
  }finally{f.restore();}
 });

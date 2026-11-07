@@ -129,3 +129,40 @@ test('client validation shares expanded vocabulary, optional compatibility and b
   assert.equal(seriesDetailsErrors({...details,themes:['unknown']}).themes,'taxonomyThemesInvalid');
   assert.equal(seriesDetailsErrors({...details,format:'unknown'}).format,'taxonomyFormatInvalid');
 });
+
+
+test('all added story themes save through create and PATCH and remain independently filterable with the other browse axes',async()=>{
+  const added=['entrepreneurship','business-rivalry','inheritance-succession','family-feud','love-triangle','redemption','friendship','self-discovery','survival','found-family'];
+  const prefix='Expanded theme coverage '+randomUUID(),beforeMoney=money();
+  const selected={language:'ja',genres:['workplace'],format:'live-action',creation_type:'ai-assisted'};
+  // A matching new-theme record in another language must not bypass AND filters.
+  publish(await create({...selected,title:prefix+' distractor',language:'ko',themes:['entrepreneurship']}));
+  for(const theme of added){
+    const title=prefix+' '+theme,id=await create({...selected,title,themes:[theme]});publish(id);
+    assert.deepEqual((await read(id)).themes,[theme]);
+    const first=await request('/api/series/'+id);assert.equal(first.status,200);assert.deepEqual(first.data.series.themes,[theme]);
+    assert.equal((await change(id,{...selected,title,themes:['revenge',theme]})).status,200);
+    assert.deepEqual((await read(id)).themes,['revenge',theme]);assert.deepEqual(JSON.parse(one('SELECT themes FROM series_classifications WHERE series_id=?',id)!.themes),['revenge',theme]);
+    const filters={q:prefix,theme,language:'ja',genre:'workplace',format:'live-action',creation:'ai-assisted'};
+    assert.deepEqual((await list(filters)).map(series=>series.id),[id]);
+    assert.equal((await list({...filters,format:'animation'})).length,0);
+  }
+  assert.deepEqual(money(),beforeMoney);
+});
+
+test('new and retained themes share the five-choice unique limit and omitted edits preserve stored metadata',async()=>{
+  const themes=['entrepreneurship','revenge','business-rivalry','baby-sweetheart','found-family'];
+  const id=await create({themes,format:'animation'}),retained=await create({themes:['billionaire-ceo','baby-sweetheart'],format:'live-action'});
+  const stored=one('SELECT * FROM series_classifications WHERE series_id=?',id),oldMetadata=one('SELECT * FROM series_classifications WHERE series_id=?',retained),beforeMoney=money(),beforeCount=one('SELECT COUNT(*) AS n FROM series')!.n;
+  for(const invalid of [[...themes,'survival'],['entrepreneurship','entrepreneurship'],['entrepreneurship','not-a-story-theme']]){
+    assert.equal((await request('/api/studio/series',{...details,themes:invalid},owner)).status,400);
+    assert.equal((await change(id,{themes:invalid})).status,400);
+    assert.deepEqual(one('SELECT * FROM series_classifications WHERE series_id=?',id),stored);
+  }
+  assert.equal(one('SELECT COUNT(*) AS n FROM series')!.n,beforeCount);
+  assert.equal((await change(id,{title:'An older editor retains the expanded theme selection'})).status,200);
+  assert.deepEqual((await read(id)).themes,themes);assert.equal((await read(id)).format,'animation');
+  db.exec(DATABASE_SCHEMA);
+  assert.deepEqual((await read(id)).themes,themes);assert.deepEqual(one('SELECT * FROM series_classifications WHERE series_id=?',retained),oldMetadata);
+  assert.deepEqual((await read(retained)).themes,['billionaire-ceo','baby-sweetheart']);assert.deepEqual(money(),beforeMoney);
+});

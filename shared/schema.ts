@@ -9,6 +9,7 @@ import {COVER_LAYOUT_SCHEMA} from './cover-layout-schema.js';
 import {SUBTITLE_LANGUAGE_SCHEMA} from './subtitle-language-schema.js';
 import {CATALOG_RETIREMENT_SCHEMA} from './catalog-retirement-schema.js';
 import {TEST_PAYOUT_SCHEMA} from './test-payout-schema.js';
+import {CREATOR_PASS_CONSENT_SCHEMA} from './creator-pass-consent-schema.js';
 
 export const DATABASE_SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -274,4 +275,5 @@ ${EPISODE_ACCESS_SCHEMA}
 ${SUBTITLE_LANGUAGE_SCHEMA}
 ${CATALOG_RETIREMENT_SCHEMA}
 ${TEST_PAYOUT_SCHEMA}
+${CREATOR_PASS_CONSENT_SCHEMA}
 `;

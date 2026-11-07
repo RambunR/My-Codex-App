@@ -1,4 +1,5 @@
 import {test,expect} from '@playwright/test';
+import {agreeToCreatorPass} from './helpers/creator-pass-consent';
 
 test('Dramio Pass purchase appears on Account and persists without another payment',async({page})=>{
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
@@ -11,7 +12,7 @@ test('Dramio Pass purchase appears on Account and persists without another payme
   const card=page.locator('.dramio-pass-card');await expect(card).toBeVisible();await expect(card).toContainText('Dramio Pass');await expect(card).toContainText('Not purchased');
   await card.getByRole('link',{name:'Get Dramio Pass',exact:true}).click();await expect(page).toHaveURL('/studio');
   await expect(page.locator('#pass-promo-code')).toHaveValue('');await expect(card).toHaveCount(0);
-  await page.getByRole('button',{name:/Get Dramio Pass.*HK\$88/}).click();
+  await agreeToCreatorPass(page);await page.getByRole('button',{name:/Get Dramio Pass.*HK\$88/}).click();
   await expect(page.getByRole('dialog')).toContainText('HK$88.00');await page.getByRole('button',{name:'Confirm test payment'}).click();
   await expect(page.getByRole('link',{name:'New series',exact:true}).first()).toBeVisible();
   await page.goto('/account');await expect(card).toContainText('Dramio Pass');await expect(card).toContainText('Active');await expect(card).toContainText('Test pass');

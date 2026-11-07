@@ -1,3 +1,4 @@
+import {LEGAL_POLICY_VERSION,CREATOR_PASS_DISCLOSURE_VERSION} from '../shared/creator-pass-consent';
 import { after,before,test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp,rm,readFile,open } from 'node:fs/promises';
@@ -7,6 +8,8 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { Server } from 'node:http';
 import {Readable} from 'node:stream';
+
+const creatorConsent={accepted:true,policy_version:LEGAL_POLICY_VERSION,disclosure_version:CREATOR_PASS_DISCLOSURE_VERSION};
 
 const dir=await mkdtemp(path.join(tmpdir(),'aidramio-api-'));
 process.env.DATA_DIR=dir;process.env.PAYMENTS_MODE='demo';process.env.NODE_ENV='test';process.env.SEED_DEMO='true';
@@ -48,7 +51,7 @@ test('authentication rejects invalid passwords, weak registration, duplicate ema
 });
 test('publisher activation costs HK$88, cannot be confirmed by another user, and settles once',async()=>{
   const before=await request('/api/studio/series',{},publisher);assert.equal(before.status,403);assert.equal(before.data.error.code,'ACTIVATION_REQUIRED');
-  const checkout=await request('/api/payments/checkout',{kind:'activation',amount_cents:500},publisher);assert.equal(checkout.data.amount_cents,8800);assert.equal(checkout.data.currency,'hkd');
+  const checkout=await request('/api/payments/checkout',{kind:'activation',creator_consent:creatorConsent,amount_cents:500},publisher);assert.equal(checkout.data.amount_cents,8800);assert.equal(checkout.data.currency,'hkd');
   assert.equal((await request(`/api/payments/${checkout.data.paymentId}/demo-confirm`,{},viewer)).status,404);
   const results=await Promise.all([request(`/api/payments/${checkout.data.paymentId}/demo-confirm`,{},publisher),request(`/api/payments/${checkout.data.paymentId}/demo-confirm`,{},publisher)]);assert.ok(results.every(r=>r.status===200));
   const me=await request('/api/auth/me',undefined,publisher);assert.equal(me.data.user.publisher_active,1);assert.equal(me.data.user.quota_bytes,5*1024**3);assert.equal(me.data.user.wallet_micros,0);

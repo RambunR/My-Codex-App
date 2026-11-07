@@ -1,3 +1,4 @@
+import {LEGAL_POLICY_VERSION,CREATOR_PASS_DISCLOSURE_VERSION} from '../shared/creator-pass-consent';
 import {after,before,beforeEach,mock,test} from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp,rm} from 'node:fs/promises';
@@ -7,6 +8,8 @@ import {createHash,randomBytes,randomUUID} from 'node:crypto';
 import type {Server} from 'node:http';
 
 // No Stripe network calls: all provider operations exercised below are mocked.
+const creatorConsent={accepted:true,policy_version:LEGAL_POLICY_VERSION,disclosure_version:CREATOR_PASS_DISCLOSURE_VERSION};
+
 const dir=await mkdtemp(path.join(tmpdir(),'lingying-live-payment-activation-'));
 process.env.DATA_DIR=dir;process.env.NODE_ENV='test';process.env.SEED_DEMO='false';
 process.env.PAYMENTS_MODE='stripe';process.env.STRIPE_TEST_MODE='false';
@@ -90,7 +93,7 @@ test('inline live Checkout retains exact USD/HKD prices, trusted linkage and cus
   });
   try{
     for(const kind of ['funding','activation'] as const){
-      const result=await request('/api/payments/checkout',kind==='funding'?{kind,amount_cents:2345}:{kind},user.cookie);
+      const result=await request('/api/payments/checkout',kind==='funding'?{kind,amount_cents:2345}:{kind,creator_consent:creatorConsent},user.cookie);
       const call=calls.at(-1),where=kind==='funding'?'wallet':'studio';
       assert.equal(call.mode,'payment');assert.deepEqual(call.payment_method_types,['card']);
       assert.equal(call.line_items.length,1);assert.equal(call.line_items[0].quantity,1);

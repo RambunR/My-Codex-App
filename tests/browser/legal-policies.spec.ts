@@ -1,6 +1,7 @@
 import {test,expect,type Page} from '@playwright/test';
 
-const version='2026-11-07';
+import {LEGAL_POLICY_VERSION} from '../../shared/creator-pass-consent';
+const version=LEGAL_POLICY_VERSION;
 const contact='contactus@hknovaxrproduction.com';
 const passRisk='Dramio Pass provides publishing access. Buying a pass does not guarantee content approval, promotion, views, sales, revenue or income. Earnings may be zero.';
 const inactiveCreator={id:'legal-pass-browser',name:'Prospective creator',email:'legal-pass@browser.test',role:'viewer',publisher_active:0,wallet_micros:0,earnings_micros:0,quota_bytes:5*1024**3,used_bytes:0,language:'en',payment_review:false,dramio_pass:{active:false,test:false,purchased_at:null}};
@@ -47,7 +48,7 @@ for(const kind of ['terms','privacy'] as const)test(`Arabic ${kind} keeps the in
 
 for(const locale of ['en','zh-TW','zh-CN'] as const)test(`${locale} inactive creators see publishing-risk disclosure and keyboard-accessible policies before paying`,async({page})=>{
   const writes=await fixture(page,locale,true);await page.goto('/studio');const card=page.locator('.activation-card'),disclosure=card.locator('.creator-pass-risk-disclosure'),activate=card.locator(':scope > button.primary');
-  await expect(disclosure).toBeVisible();await expect(disclosure).toHaveAttribute('role','note');await expect(activate).toBeEnabled();await expect(card.getByRole('checkbox')).toHaveCount(0);
+  await expect(disclosure).toBeVisible();await expect(disclosure).toHaveAttribute('role','note');await expect(activate).toBeDisabled();const consent=card.locator('input[name="creator_pass_consent"]');await expect(consent).not.toBeChecked();await consent.check();await expect(activate).toBeEnabled();await consent.uncheck();await expect(activate).toBeDisabled();
   if(locale==='en')await expect(disclosure.locator('p')).toHaveText(passRisk);
   else{await expect(disclosure.locator('p')).toContainText(locale==='zh-TW'?/不保證|不代表|不會保證/:/不保证|不代表|不会保证/);await expect(disclosure.locator('p')).toContainText(locale==='zh-TW'?'收益可能為零':'收益可能为零');}
   expect(await disclosure.evaluate((note)=>{const card=note.closest('.activation-card')!,button=Array.from(card.children).find(node=>node.matches('button.primary'))!;return!!(note.compareDocumentPosition(button)&Node.DOCUMENT_POSITION_FOLLOWING);})).toBe(true);
