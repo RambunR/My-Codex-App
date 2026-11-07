@@ -1,0 +1,13 @@
+Noto Sans SC variable webfont, Google Fonts release v41.
+Downloaded 7 November 2026. Font files are unmodified provider WOFF2 subsets.
+Each font has a true wght axis 100–900; Unicode ranges in src/chinese-fonts.css
+match the provider stylesheet and load only subsets needed by visible text.
+
+Provider stylesheet:
+https://fonts.googleapis.com/css2?display=swap&family=Noto+Sans+SC:wght@100..900
+
+Font files originally from:
+https://fonts.gstatic.com/s/notosanssc/v41/
+
+SIL Open Font License 1.1 (included as OFL.txt):
+https://github.com/google/fonts/blob/main/ofl/notosanssc/OFL.txt

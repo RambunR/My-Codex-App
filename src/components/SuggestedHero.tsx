@@ -2,7 +2,8 @@ import {useCallback,useEffect,useRef,useState,type PointerEvent as ReactPointerE
 import {Link} from 'react-router-dom';
 import {Play,Plus,ChevronDown} from 'lucide-react';
 import {type Series} from '../../shared/config';
-import {languageName,useI18n,type Key} from '../i18n';
+import {useI18n,type Key} from '../i18n';
+import {spokenLanguageName} from '../spoken-language-locales';
 import {CoverArtwork,CoverWatermark} from './CoverArtwork';
 
 const DWELL_MS=8000,FADE_MS=280;
@@ -108,7 +109,7 @@ export function SuggestedHero({suggestions,fallback}:{suggestions:Series[];fallb
     onBlurCapture={event=>{if(!(event.relatedTarget instanceof Node)||!event.currentTarget.contains(event.relatedTarget))setFocusPaused(false);}}>
     <div className="hero-art cover-artwork-frame" inert={phase!=='idle'} aria-hidden={phase!=='idle'?true:undefined}><CoverArtwork key={hero.id} src={hero.cover} alt="" fetchPriority="high" decoding="async"/><CoverWatermark/></div>
     <div ref={heroCopyRef} className={`hero-copy${heroScroll.copyOverflow?' is-scrollable':''}`} tabIndex={heroScroll.copyOverflow?0:undefined} role="group" aria-label={t('aboutSeries')} inert={phase!=='idle'} aria-hidden={phase!=='idle'?true:undefined}>
-      <div className="hero-story-meta"><div className="spotlight"><span/>{t(suggested?'suggestedByLingYing':'newReleases')}</div><div className="hero-pills"><span>{t(`genre_${hero.genres[0]}` as Key)}</span><i/><span>{languageName(hero.language)}</span><i/><span>{hero.episode_count} {t('episodes')}</span></div></div>
+      <div className="hero-story-meta"><div className="spotlight"><span/>{t(suggested?'suggestedByLingYing':'newReleases')}</div><div className="hero-pills"><span>{t(`genre_${hero.genres[0]}` as Key)}</span><i/><span>{spokenLanguageName(hero.language,locale)}</span><i/><span>{hero.episode_count} {t('episodes')}</span></div></div>
       <h2><Link to={`/series/${hero.id}`}>{hero.title}</Link></h2>
       <div className="hero-synopsis-wrap"><div ref={synopsisRef} className="hero-synopsis" tabIndex={0} role="region" aria-label={t('description')} onScroll={measureHeroScroll}><p>{hero.description}</p></div>{heroScroll.synopsisMore&&<span className="hero-synopsis-more" aria-hidden="true"><ChevronDown size={15}/></span>}</div>
       <div className="hero-buttons"><Link className="button hero-play" to={hero.first_episode_id?`/watch/${hero.id}/${hero.first_episode_id}`:`/series/${hero.id}`}><Play size={17} fill="currentColor"/>{t('watchNow')}</Link><Link className="button hero-details" to={`/series/${hero.id}`}><Plus size={19}/>{t('aboutSeries')}</Link></div>{hero.free_episodes>0&&<span className="hero-free"><span className="free-dot"/>{t('freeAccess')}</span>}

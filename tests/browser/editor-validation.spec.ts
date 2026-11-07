@@ -31,7 +31,7 @@ test('short nonempty synopsis explains the required length, preserves the form, 
   const title=`Recovered upload ${Date.now()}`;
   await page.locator('#series-title').fill('A');
   await page.locator('#series-description').fill('test');
-  await page.getByLabel('Drama language',{exact:false}).selectOption('zh-TW');
+  await page.getByLabel('Drama language',{exact:false}).selectOption('cmn');
   await expect(page.getByRole('button',{name:'Choose a folder',exact:true})).toBeDisabled();
   await page.getByRole('button',{name:'Save details',exact:true}).first().click();
   await expectLinkedError(page,'#series-title',/2.*120/);
@@ -44,7 +44,7 @@ test('short nonempty synopsis explains the required length, preserves the form, 
   await expect(page.locator('#series-description')).toBeFocused();
   await expect(page.locator('#series-title')).toHaveValue(title);
   await expect(page.locator('#series-description')).toHaveValue('test');
-  await expect(page.getByLabel('Drama language',{exact:false})).toHaveValue('zh-TW');
+  await expect(page.getByLabel('Drama language',{exact:false})).toHaveValue('cmn');
   expect(creates).toHaveLength(0);
 
   const synopsis='Ten numbered test episodes for verifying the complete folder upload.';
@@ -55,7 +55,7 @@ test('short nonempty synopsis explains the required length, preserves the form, 
   await expect(page.locator('#series-title')).toHaveValue(title);
   await expect(page.locator('#series-description')).toHaveValue(synopsis);
   expect(creates).toHaveLength(1);
-  expect(creates[0].language).toBe('zh-TW');
+  expect(creates[0].language).toBe('cmn');
 
   const folder=await mkdtemp('/tmp/aidramio-validation-upload-');
   try{

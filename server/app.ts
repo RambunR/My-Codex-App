@@ -46,11 +46,13 @@ import {initializePublisherProfiles,registerPublisherProfiles,seriesPublisher,as
 import {publisherNameSql} from './publisher-profile-sql.js';
 import {coverAspectRatioSchema,seriesCoverAspectRatio,writeSeriesCoverLayout} from './cover-layout.js';
 import {subtitleLanguagesSchema,seriesSubtitleLanguages,writeSeriesSubtitleLanguages} from './subtitle-languages.js';
+import {SPOKEN_LANGUAGES,SPOKEN_LANGUAGE_CODES} from '../shared/spoken-languages.js';
 
 const language = z.enum(LANGUAGES.map(x => x.code) as [string, ...string[]]);
+const spokenLanguage=z.enum(SPOKEN_LANGUAGE_CODES as [string,...string[]]);
 const id = (req: Request, field = 'id') => String(req.params[field] || '');
 const registration = z.object({ name: z.string().trim().min(2).max(60), email: z.email().max(254).transform(s => s.toLowerCase()), password: z.string().min(10).max(128), language: language.default('en') });
-const seriesSchema = z.object({ title: z.string().trim().min(SERIES_LIMITS.titleMin).max(SERIES_LIMITS.titleMax), description: z.string().trim().min(SERIES_LIMITS.synopsisMin).max(SERIES_LIMITS.synopsisMax), language,
+const seriesSchema = z.object({ title: z.string().trim().min(SERIES_LIMITS.titleMin).max(SERIES_LIMITS.titleMax), description: z.string().trim().min(SERIES_LIMITS.synopsisMin).max(SERIES_LIMITS.synopsisMax), language:spokenLanguage,
   genres: z.array(z.enum(GENRES)).min(SERIES_LIMITS.genresMin).max(SERIES_LIMITS.genresMax).refine(values=>new Set(values).size===values.length,'Choose each genre only once.'), creation_type: z.enum(CREATION_TYPES).default('human'),
   themes:themesSchema.optional(),format:formatSchema.optional(),publisher_profile_id:publisherProfileIdSchema,cover_aspect_ratio:coverAspectRatioSchema,subtitle_languages:subtitleLanguagesSchema,
   price_cents: z.number().int().min(SERIES_LIMITS.priceMin).max(SERIES_LIMITS.priceMax), free_episodes: z.number().int().min(SERIES_LIMITS.freeMin).max(SERIES_LIMITS.freeMax),last_episode_free:lastEpisodeFreeSchema,
@@ -179,7 +181,7 @@ export function createApp() {
   registerEmailAuth(app);
   registerPublisherProfiles(app,{catalogSelect,serializeSeries});
   app.get('/api/health', (_req,res) => res.json({ ok: true, database: !!one('SELECT 1 AS ready') }));
-  app.get('/api/config', async (_req,res) => {initializePromotions();if(config.payments==='stripe'&&stripeConfigured())await ensureStripeWebhookReady(stripe);return res.json({ brand: 'LingYing', languages: LANGUAGES, genres: GENRES,standardGenres:STANDARD_GENRES,storyThemes:STORY_THEMES,formats:SERIES_FORMATS,creationTypes:CREATION_TYPES, passPromotion:{enabled:true},creatorPassConsent:{policyVersion:LEGAL_POLICY_VERSION,disclosureVersion:CREATOR_PASS_DISCLOSURE_VERSION},paymentsMode: config.payments,paymentsReady:paymentsReady(),paymentsConfigured:stripeConfigured(),paymentSetup:stripeWebhookReadiness(),sandbox:config.sandbox,paymentsTestMode:stripeTestPayments()||config.payments==='demo',payoutsEnabled:config.payoutsEnabled&&!stripeTestPayments(),uploadsEnabled:!config.sandbox,usdToHkd: config.usdToHkd,
+  app.get('/api/config', async (_req,res) => {initializePromotions();if(config.payments==='stripe'&&stripeConfigured())await ensureStripeWebhookReady(stripe);return res.json({ brand: 'LingYing', languages: LANGUAGES, spokenLanguages:SPOKEN_LANGUAGES, genres: GENRES,standardGenres:STANDARD_GENRES,storyThemes:STORY_THEMES,formats:SERIES_FORMATS,creationTypes:CREATION_TYPES, passPromotion:{enabled:true},creatorPassConsent:{policyVersion:LEGAL_POLICY_VERSION,disclosureVersion:CREATOR_PASS_DISCLOSURE_VERSION},paymentsMode: config.payments,paymentsReady:paymentsReady(),paymentsConfigured:stripeConfigured(),paymentSetup:stripeWebhookReadiness(),sandbox:config.sandbox,paymentsTestMode:stripeTestPayments()||config.payments==='demo',payoutsEnabled:config.payoutsEnabled&&!stripeTestPayments(),uploadsEnabled:!config.sandbox,usdToHkd: config.usdToHkd,
     limits: { maxEpisodeSeconds: MAX_EPISODE_SECONDS, maxEpisodeBytes: MAX_EPISODE_BYTES, quotaBytes: DEFAULT_QUOTA_BYTES, activationHkd: 88, minimumPriceUsd: 0.1, creatorShare: 0.7, minimumPayoutUsd: WITHDRAWAL_POLICY.minimumCents/100,minWalletFundingUsd:MIN_WALLET_FUNDING_CENTS/100,maxWalletFundingUsd:MAX_WALLET_FUNDING_CENTS/100 },withdrawalPolicy:WITHDRAWAL_POLICY,walletFunding:WALLET_FUNDING_OPTIONS, demo: config.seed,episodeUpload:{mode:chunkedEpisodeUploadsEnabled()?'chunked':'multipart',chunkBytes:EPISODE_UPLOAD_CHUNK_BYTES}, runtime: (config as any).runtime || 'node', videoFormats: (config as any).videoFormats || ['mp4','mov','webm','m4v'], auth:{google:googleEnabled(),apple:appleEnabled(),email:emailAuthEnabled()} });});
   app.get('/api/auth/me', (req,res) => res.json({ user: req.user || null }));
   app.post('/api/auth/register', rateLimit('register', 12, 15 * 60_000), async (req,res) => {
@@ -204,7 +206,7 @@ export function createApp() {
     run('UPDATE users SET name=?,language=? WHERE id=?', body.name, body.language, req.user!.id); res.json({ user: getUser(req.user!.id) });
   });
   app.get('/api/series', (req,res) => {
-    const query = z.object({ q: z.string().max(120).optional(), language: language.optional(), genre: z.enum(GENRES).optional(),theme:z.enum(STORY_THEMES).optional(),format:z.enum(SERIES_FORMATS).optional(),access:z.enum(SERIES_ACCESS_FILTERS).optional(),featured:z.enum(['true']).optional(), sort: z.enum(['popular','new','saved']).optional(), saved: z.enum(['true']).optional(), creation: z.enum(CREATION_TYPES).optional() }).parse(req.query);
+    const query = z.object({ q: z.string().max(120).optional(), language: spokenLanguage.optional(), genre: z.enum(GENRES).optional(),theme:z.enum(STORY_THEMES).optional(),format:z.enum(SERIES_FORMATS).optional(),access:z.enum(SERIES_ACCESS_FILTERS).optional(),featured:z.enum(['true']).optional(), sort: z.enum(['popular','new','saved']).optional(), saved: z.enum(['true']).optional(), creation: z.enum(CREATION_TYPES).optional() }).parse(req.query);
     const conditions = ["s.status='published'",publicSeriesAllowedSql('s')]; const params: any[] = [];
     if (query.q) { conditions.push(`(s.title LIKE ? OR s.description LIKE ? OR (${publisherNameSql()}) LIKE ?)`); params.push(`%${query.q}%`,`%${query.q}%`,`%${query.q}%`); }
     if (query.language) { conditions.push('s.language=?'); params.push(query.language); }

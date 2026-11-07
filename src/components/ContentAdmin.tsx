@@ -3,7 +3,8 @@ import {Link} from 'react-router-dom';
 import {Search,Upload,FilePenLine,ShieldAlert,RotateCcw,History,ChevronLeft,ChevronRight,Star} from 'lucide-react';
 import {api,apiCrossOrigin,post,useApi} from '../api';
 import {useApp} from '../context';
-import {useI18n,languageName,type Key} from '../i18n';
+import {useI18n,type Key} from '../i18n';
+import {spokenLanguageName} from '../spoken-language-locales';
 import {Button,Empty,ErrorState,Loading,Modal} from '../ui';
 import {CoverThumbnail} from './CoverArtwork';
 import '../content-admin.css';
@@ -77,7 +78,7 @@ export function ContentAdmin(){
         const hintId=`suggestion-help-${series.id}`;
         return <article className="content-admin-row" key={series.id}>
           <CoverThumbnail src={series.cover||'/images/placeholder.svg'} crossOrigin={apiCrossOrigin(series.cover)} alt="" loading="lazy"/>
-          <div className="content-admin-series"><h3>{series.title}</h3><p>{t('contentCreator')}: {series.creator_name}</p><small>{languageName(series.language)} · {series.episode_count} {t('episodes')}</small><div className="content-admin-statuses"><span className={`status ${series.status}`}>{t(series.status as Key)}</span>{series.taken_down&&<span className="status content-admin-offline">{t('contentTakenDown')}</span>}{suggested&&<span className="status content-admin-suggested"><Star size={12} fill="currentColor" aria-hidden="true"/>{t('suggestedByLingYing')}</span>}</div>{series.taken_down&&series.moderation_reason&&<p className="content-admin-reason">{series.moderation_reason}</p>}</div>
+          <div className="content-admin-series"><h3>{series.title}</h3><p>{t('contentCreator')}: {series.creator_name}</p><small>{spokenLanguageName(series.language,locale)} · {series.episode_count} {t('episodes')}</small><div className="content-admin-statuses"><span className={`status ${series.status}`}>{t(series.status as Key)}</span>{series.taken_down&&<span className="status content-admin-offline">{t('contentTakenDown')}</span>}{suggested&&<span className="status content-admin-suggested"><Star size={12} fill="currentColor" aria-hidden="true"/>{t('suggestedByLingYing')}</span>}</div>{series.taken_down&&series.moderation_reason&&<p className="content-admin-reason">{series.moderation_reason}</p>}</div>
           <div className="content-admin-actions">
             <Button className={`button secondary small content-admin-suggestion ${suggested?'is-suggested':''}`} type="button" busy={suggestionBusy===series.id} disabled={busy||suggestionBusy!==null||list.loading||(!suggested&&!eligible)} aria-pressed={suggested} aria-busy={suggestionBusy===series.id} aria-label={`${t(suggested?'removeSuggestion':'suggestOnHome')}: ${series.title}`} aria-describedby={!suggested&&!eligible?hintId:undefined} onClick={()=>suggest(series)}>{suggestionBusy!==series.id&&<Star size={15} fill={suggested?'currentColor':'none'} aria-hidden="true"/>}{t(suggested?'removeSuggestion':'suggestOnHome')}</Button>
             <Link className="button secondary small" to={`/studio/series/${encodeURIComponent(series.id)}?from=admin`}><FilePenLine size={15}/>{t('contentEdit')}</Link><button className="button secondary small" onClick={()=>choose(series,'history')}><History size={15}/>{t('contentHistory')}</button><button className={`button small ${series.taken_down?'secondary':'content-admin-danger'}`} disabled={suggestionBusy!==null} onClick={()=>choose(series,series.taken_down?'restore':'takedown')}>{series.taken_down?<RotateCcw size={15}/>:<ShieldAlert size={15}/>} {t(series.taken_down?'contentRestore':'contentTakeDown')}</button>

@@ -26,7 +26,7 @@ Administrators select **Suggested by LingYing** series in **Admin → Content**.
 
 Media controls discourage casual image/video saving while retaining normal viewing and text interaction. These controls are not DRM; see [media saving controls and limits](docs/MEDIA_SAVING.md).
 
-Publishers can declare multiple **Subtitle languages** directly below **Drama language** in the editor, then save details. Public metadata shows the selected languages already included in the videos; selection does not generate or translate subtitles. See [subtitle declarations](docs/SUBTITLE_LANGUAGES.md).
+Publishers select **Mandarin**, **Cantonese** or another spoken language under **Drama language**, then declare multiple **Subtitle languages** below it. Traditional and Simplified Chinese remain writing options for subtitles and the interface. Existing Chinese series keep their original metadata until a creator explicitly changes it. Subtitle selection describes languages already included in the videos; it does not generate or translate subtitles. See [spoken and subtitle languages](docs/SUBTITLE_LANGUAGES.md).
 
 Agent shortcut: send **`/push`** in chat, optionally followed by a commit message, to check the changes, commit and push them to GitHub `main`, update the existing Cloudflare website, and verify the live site. **“Push and deploy”** is an equivalent plain-language request. This project convention is defined in [AGENTS.md](AGENTS.md); it does not add a built-in Codex slash-menu entry or a terminal command. Future agents working in this repository should follow those instructions.
 

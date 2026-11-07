@@ -107,6 +107,9 @@ try{
   const sitemap=await fetch(base+'/sitemap.xml');assert.equal(sitemap.status,200);assert.match(sitemap.headers.get('content-type'),/xml/);assert.match(await sitemap.text(),/<loc>https:\/\/lingyingdrama\.com\/<\/loc>/);
   console.log('PASS: homepage canonical stays scoped; favicon, crawler instructions and sitemap serve real assets instead of SPA fallback HTML.');
   const cfg=(await request('/api/config')).data;assert.equal(cfg.runtime,'cloudflare');assert.equal(cfg.paymentsMode,'demo');assert.equal(cfg.auth.google,true);
+  const spokenCodes=cfg.spokenLanguages.map(item=>item.code),interfaceCodes=cfg.languages.map(item=>item.code);
+  assert.equal(spokenCodes.length,21);assert.ok(spokenCodes.includes('cmn')&&spokenCodes.includes('yue'));assert.ok(!spokenCodes.includes('zh-TW')&&!spokenCodes.includes('zh-CN'));
+  assert.equal(interfaceCodes.length,21);assert.ok(interfaceCodes.includes('zh-TW')&&interfaceCodes.includes('zh-CN'));assert.ok(!interfaceCodes.includes('cmn')&&!interfaceCodes.includes('yue'));
   assert.deepEqual(cfg.creatorPassConsent,{policyVersion:'2026-11-08',disclosureVersion:'creator-pass-ack-v1'});
   const creatorConsent={accepted:true,policy_version:cfg.creatorPassConsent.policyVersion,disclosure_version:cfg.creatorPassConsent.disclosureVersion};
   assert.equal(cfg.limits.maxEpisodeBytes,maxEpisodeBytes);assert.equal(cfg.limits.maxEpisodeSeconds,240);assert.deepEqual(cfg.episodeUpload,{mode:'chunked',chunkBytes});
@@ -132,6 +135,8 @@ try{
   const replay=await fetch(callback,{redirect:'manual',headers:{Cookie:binding}});assert.equal(new URL(replay.headers.get('location'),base).searchParams.get('error'),'google_expired');
   console.log('PASS: Cloudflare Google authorization, private browser binding, durable OAuth state, cancellation and replay protection.');
   const series=(await request('/api/series')).data.series;assert.equal(series.length,20);
+  assert.equal(series.find(item=>item.id==='blue-hour').language,'zh-TW');assert.equal(series.find(item=>item.id==='neon-promises').language,'zh-CN');
+  for(const language of ['cmn','yue'])assert.equal((await request('/api/series?'+new URLSearchParams({language}))).data.series.length,0,'Legacy Chinese script tags must not imply a spoken variety.');
   const legacyAnimated=(await request('/api/series/tokyo-tomorrow')).data.series;
   assert.equal(legacyAnimated.format,'animation');assert.deepEqual(legacyAnimated.themes,[]);
   assert.equal(legacyAnimated.cover_aspect_ratio,'2:3');assert.ok(series.every(item=>item.cover_aspect_ratio==='2:3'),'Existing seeded cover layouts must retain their legacy ratio.');
@@ -237,7 +242,7 @@ try{
 
 
 
-  const body={title:'Cloudflare Published Drama',description:'A real upload used to validate durable financial and media storage.',language:'zh-TW',genres:['romance'],themes:['revenge','hidden-identity','entrepreneurship'],format:'animation',creation_type:'human',price_cents:501,free_episodes:1};
+  const body={title:'Cloudflare Published Drama',description:'A real upload used to validate durable financial and media storage.',language:'cmn',genres:['romance'],themes:['revenge','hidden-identity','entrepreneurship'],format:'animation',creation_type:'human',price_cents:501,free_episodes:1};
   const sid=(await request('/api/studio/series',body,publisher,201)).data.id;
   const privateClassification=(await request(`/api/studio/series/${sid}`,undefined,publisher)).data.series;
   assert.deepEqual(privateClassification.themes,body.themes);assert.equal(privateClassification.format,body.format);
@@ -248,6 +253,7 @@ try{
   await request(`/api/studio/series/${sid}`,{...body,subtitle_languages:selectedSubtitles},publisher,200,'PATCH');
   assert.deepEqual((await request(`/api/studio/series/${sid}`,undefined,publisher)).data.series.subtitle_languages,selectedSubtitles);
   await request('/api/studio/series',{...body,title:'Invalid Subtitle Language',subtitle_languages:['unknown-language']},publisher,400);
+  await request('/api/studio/series',{...body,title:'Spoken Variety Is Not a Subtitle Script',subtitle_languages:['yue']},publisher,400);
   await request('/api/studio/series',{...body,title:'Invalid Cover Layout',cover_aspect_ratio:'2:3'},publisher,400);
   const {themes:omittedThemes,format:omittedFormat,...legacyBody}=body;
   await request(`/api/studio/series/${sid}`,legacyBody,publisher,200,'PATCH');
@@ -334,6 +340,12 @@ try{
   await request(`/api/studio/series/${sid}/status`,{status:'published'},publisher);
   const newestPath='/api/series?'+new URLSearchParams({sort:'new',language:body.language,genre:body.genres[0],theme:'entrepreneurship',format:body.format,creation:body.creation_type});
   const newest=(await request(newestPath)).data.series;assert.equal(newest[0].id,sid);
+  assert.equal(newest[0].language,'cmn');
+  await request(`/api/studio/series/${sid}`,{...body,language:'yue'},publisher,200,'PATCH');
+  const cantonese=(await request(`/api/studio/series/${sid}`,undefined,publisher)).data.series;assert.equal(cantonese.language,'yue');assert.deepEqual(cantonese.subtitle_languages,selectedSubtitles);
+  assert.ok((await request('/api/series?'+new URLSearchParams({language:'yue',genre:body.genres[0]}))).data.series.some(item=>item.id===sid));assert.equal((await request(newestPath)).data.series.some(item=>item.id===sid),false);
+  await request(`/api/studio/series/${sid}`,body,publisher,200,'PATCH');
+  assert.equal((await request('/api/series?language=zh-TW')).data.series.some(item=>item.id===sid),false);assert.ok((await request('/api/series?language=zh-TW')).data.series.some(item=>item.id==='blue-hour'));
   assert.deepEqual(newest[0].themes,body.themes);assert.equal(newest[0].format,body.format);
   assert.equal((await request('/api/series?theme=revenge&format=live-action')).data.series.some(s=>s.id===sid),false);
   assert.ok((await request('/api/series?genre=animation')).data.series.some(s=>s.id===sid));
@@ -735,6 +747,7 @@ try{
   assert.deepEqual(retainedModerationAudit,suggestionAudit);
   assert.equal((await request(`/api/studio/series/${sid}`,undefined,admin)).data.series.taken_down,false);
   const retainedClassification=(await request(`/api/studio/series/${sid}`,undefined,publisher)).data.series;
+  assert.equal(retainedClassification.language,'cmn');assert.equal((await request('/api/series/blue-hour')).data.series.language,'zh-TW');assert.equal((await request('/api/series/neon-promises')).data.series.language,'zh-CN');
   assert.deepEqual(retainedClassification.themes,body.themes);assert.equal(retainedClassification.format,body.format);
   assert.ok((await request('/api/series?'+new URLSearchParams({q:body.title,theme:'entrepreneurship',language:body.language,format:body.format}))).data.series.some(item=>item.id===sid),'The added story theme stays filterable after a Cloudflare runtime restart.');
   assert.deepEqual(retainedClassification.subtitle_languages,selectedSubtitles);assert.deepEqual(retainedLikes.series.subtitle_languages,selectedSubtitles);
