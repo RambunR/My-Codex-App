@@ -14,7 +14,7 @@ const {createApp,errorHandler}=await import('../server/app');
 const {one,run,db}=await import('../server/db');
 let server:Server,base:string;
 interface Identity{id:string;cookie:string}
-let owner:Identity,otherPublisher:Identity,viewerA:Identity,viewerB:Identity;
+let owner:Identity,otherPublisher:Identity,viewerA:Identity,viewerB:Identity,admin:Identity;
 const origin='https://analytics.example.test';
 async function request(route:string,body?:unknown,cookie='',expected:number|number[]=200,method=body===undefined?'GET':'POST'){
   const response=await fetch(base+route,{method,headers:{...(cookie?{Cookie:cookie}:{}),...(body===undefined?{}:{'Content-Type':'application/json',Origin:origin})},body:body===undefined?undefined:JSON.stringify(body)});
@@ -40,6 +40,7 @@ before(async()=>{
   config.appUrl=origin;
   owner=await register('Analytics owner');otherPublisher=await register('Other publisher');viewerA=await register('First viewer');viewerB=await register('Second viewer');
   for(const identity of [owner,otherPublisher])run("UPDATE users SET role='publisher',publisher_active=1 WHERE id=?",identity.id);
+  admin=await register('Analytics admin');run("UPDATE users SET role='admin' WHERE id=?",admin.id);
 });
 beforeEach(()=>{config.production=false;config.sandbox=false;config.stripeTestMode=false;config.payments='demo';config.appUrl=origin;});
 afterEach(()=>mock.restoreAll());
@@ -83,25 +84,58 @@ test('metadata and range requests do not count as views or manufacture watching 
   await request('/api/episodes/'+episodeIds[1]+'/playback',{},'',403);
 });
 
-test('publisher previews are excluded and paid playback rechecks access before accepting watch time',async()=>{
+test('public playback counts immediately for the publisher while private and draft previews stay excluded',async()=>{
   const {seriesId,episodeIds}=fixture({free:0});
-  const preview=(await request('/api/episodes/'+episodeIds[0]+'/playback',{},owner.cookie)).data;assert.equal(preview.excluded,true);
+  const privateStream=async(route:string,cookie:string)=>{
+    const response=await fetch(base+route,{headers:{Cookie:cookie,Range:'bytes=0-15'}});
+    assert.equal(response.status,206);await response.arrayBuffer();
+  };
+  await privateStream('/api/studio/episodes/'+episodeIds[0]+'/stream',owner.cookie);
+  await privateStream('/api/admin/episodes/'+episodeIds[0]+'/stream',admin.cookie);
   assert.equal(one('SELECT COUNT(*) AS n FROM playback_sessions WHERE episode_id=?',episodeIds[0])!.n,0);
+  assert.equal(one('SELECT views FROM series WHERE id=?',seriesId)!.views,0);
+
+  const published=(await request('/api/episodes/'+episodeIds[0]+'/playback',{},owner.cookie)).data;
+  assert.equal(published.viewCounted,true);assert.equal(published.watchedMs,0);assert.equal(published.excluded,undefined);
+  assert.equal(one('SELECT views FROM series WHERE id=?',seriesId)!.views,1);
+  await privateStream('/api/studio/episodes/'+episodeIds[0]+'/stream',owner.cookie);
+  await privateStream('/api/admin/episodes/'+episodeIds[0]+'/stream',admin.cookie);
+  assert.equal(one('SELECT COUNT(*) AS n FROM playback_sessions WHERE episode_id=?',episodeIds[0])!.n,1);
+  assert.equal(one('SELECT views FROM series WHERE id=?',seriesId)!.views,1);
+
+  const draft=fixture({status:'draft',free:0});
+  await privateStream('/api/studio/episodes/'+draft.episodeIds[0]+'/stream',owner.cookie);
+  const preview=(await request('/api/episodes/'+draft.episodeIds[0]+'/playback',{},owner.cookie)).data;
+  assert.equal(preview.excluded,true);assert.equal(preview.sessionId,undefined);
+  assert.equal(one('SELECT COUNT(*) AS n FROM playback_sessions WHERE episode_id=?',draft.episodeIds[0])!.n,0);
+  assert.equal(one('SELECT views FROM series WHERE id=?',draft.seriesId)!.views,0);
+  await request('/api/episodes/'+draft.episodeIds[0]+'/playback',{},'',404);
+  await request('/api/episodes/'+draft.episodeIds[0]+'/playback',{},viewerA.cookie,404);
+});
+
+test('paid playback rechecks access before accepting watch time without erasing a valid start',async()=>{
+  const {seriesId,episodeIds}=fixture({free:0});
   await request('/api/episodes/'+episodeIds[0]+'/playback',{},viewerA.cookie,403);
+  assert.equal(one('SELECT views FROM series WHERE id=?',seriesId)!.views,0);
   const purchase=randomUUID();run('INSERT INTO purchases (id,user_id,episode_id,price_micros,creator_micros,platform_micros) VALUES (?,?,?,?,?,?)',purchase,viewerA.id,episodeIds[0],100_000,70_000,30_000);
-  const allowed=(await request('/api/episodes/'+episodeIds[0]+'/playback',{},viewerA.cookie)).data;assert(allowed.sessionId);
+  const allowed=(await request('/api/episodes/'+episodeIds[0]+'/playback',{},viewerA.cookie)).data;assert(allowed.sessionId);assert.equal(allowed.viewCounted,true);
   run('DELETE FROM purchases WHERE id=?',purchase);
   await request('/api/playback/'+allowed.sessionId,{watchedMs:3000},viewerA.cookie,403,'PUT');
-  assert.equal(one('SELECT watched_ms FROM playback_sessions WHERE id=?',allowed.sessionId)!.watched_ms,0);assert.equal(one('SELECT views FROM series WHERE id=?',seriesId)!.views,0);
+  assert.equal(one('SELECT watched_ms FROM playback_sessions WHERE id=?',allowed.sessionId)!.watched_ms,0);assert.equal(one('SELECT views FROM series WHERE id=?',seriesId)!.views,1);
   const draft=fixture({status:'draft'});await request('/api/episodes/'+draft.episodeIds[0]+'/playback',{},viewerA.cookie,404);
 });
 
 test('guest playback is browser-bound, wall-time limited, replay-safe and durable across application restart',async()=>{
   const {seriesId,episodeIds}=fixture();let now=Date.now();mock.method(Date,'now',()=>now);
-  const start=await request('/api/episodes/'+episodeIds[0]+'/playback',{});assert(start.cookie);assert.equal(start.data.watchedMs,0);assert.equal(start.data.viewCounted,false);
+  const start=await request('/api/episodes/'+episodeIds[0]+'/playback',{});assert(start.cookie);assert.equal(start.data.watchedMs,0);assert.equal(start.data.viewCounted,true);
+  assert.equal(one('SELECT views FROM series WHERE id=?',seriesId)!.views,1);
+  const immediate=(await request('/api/series/'+seriesId)).data;
+  assert.equal(immediate.series.views,1);assert.equal(immediate.episodes[0].views,1);
+  const atStart=(await request('/api/studio/series/'+seriesId+'/analytics?period=7d',undefined,owner.cookie)).data;
+  assert.equal(atStart.totals.views,1);assert.equal(atStart.totals.watchSeconds,0);assert.equal(atStart.totals.avgWatchSeconds,0);
   const playback='/api/playback/'+start.data.sessionId;
-  const instant=await request(playback,{watchedMs:0},start.cookie,200,'PUT');assert.equal(instant.data.watchedMs,0);assert.equal(instant.data.viewCounted,false);
-  now+=2000;const below=await request(playback,{watchedMs:2000},start.cookie,200,'PUT');assert.equal(below.data.watchedMs,2000);assert.equal(below.data.viewCounted,false);
+  const instant=await request(playback,{watchedMs:0},start.cookie,200,'PUT');assert.equal(instant.data.watchedMs,0);assert.equal(instant.data.viewCounted,true);
+  now+=2000;const below=await request(playback,{watchedMs:2000},start.cookie,200,'PUT');assert.equal(below.data.watchedMs,2000);assert.equal(below.data.viewCounted,true);
   now+=1000;const qualified=await request(playback,{watchedMs:3000},start.cookie,200,'PUT');assert.equal(qualified.data.watchedMs,3000);assert.equal(qualified.data.viewCounted,true);
   await request(playback,{watchedMs:3000},start.cookie,200,'PUT');assert.equal(one('SELECT views FROM series WHERE id=?',seriesId)!.views,1);
   now+=5000;const later=await request(playback,{watchedMs:8000},start.cookie,200,'PUT');assert.equal(later.data.watchedMs,8000);
@@ -112,19 +146,86 @@ test('guest playback is browser-bound, wall-time limited, replay-safe and durabl
   const resumed=await request('/api/episodes/'+episodeIds[0]+'/playback',{},start.cookie);assert.equal(resumed.data.sessionId,start.data.sessionId);assert.equal(resumed.data.watchedMs,8000);assert.equal(resumed.data.viewCounted,true);
   const publicEpisode=(await request('/api/series/'+seriesId)).data.episodes[0];assert.equal(publicEpisode.views,1);
   now+=30*60_000+1;await request(playback,{watchedMs:9000},start.cookie,409,'PUT');
-  const next=await request('/api/episodes/'+episodeIds[0]+'/playback',{},start.cookie);assert.notEqual(next.data.sessionId,start.data.sessionId);assert.equal(next.data.viewCounted,false);
+  const next=await request('/api/episodes/'+episodeIds[0]+'/playback',{},start.cookie);assert.notEqual(next.data.sessionId,start.data.sessionId);assert.equal(next.data.viewCounted,true);assert.equal(next.data.watchedMs,0);
+  assert.equal(one('SELECT views FROM series WHERE id=?',seriesId)!.views,2);
 });
 
 test('authenticated playback reuses one durable viewer window and cannot inflate a view by seeking to the end',async()=>{
   const {seriesId,episodeIds}=fixture({duration:12});let now=Date.now();mock.method(Date,'now',()=>now);
   const started=await request('/api/episodes/'+episodeIds[0]+'/playback',{},viewerA.cookie);
   const again=await request('/api/episodes/'+episodeIds[0]+'/playback',{},viewerA.cookie);assert.equal(again.data.sessionId,started.data.sessionId);
-  now+=500;const seek=await request('/api/playback/'+started.data.sessionId,{watchedMs:12_000},viewerA.cookie,200,'PUT');assert.equal(seek.data.watchedMs,500);assert.equal(seek.data.viewCounted,false);
-  now+=3500;const replay=await request('/api/playback/'+started.data.sessionId,{watchedMs:12_000},viewerA.cookie,200,'PUT');assert.equal(replay.data.watchedMs,500);assert.equal(replay.data.viewCounted,false);
+  now+=500;const seek=await request('/api/playback/'+started.data.sessionId,{watchedMs:12_000},viewerA.cookie,200,'PUT');assert.equal(seek.data.watchedMs,500);assert.equal(seek.data.viewCounted,true);
+  now+=3500;const replay=await request('/api/playback/'+started.data.sessionId,{watchedMs:12_000},viewerA.cookie,200,'PUT');assert.equal(replay.data.watchedMs,500);assert.equal(replay.data.viewCounted,true);
   now+=30_000;const capped=await request('/api/playback/'+started.data.sessionId,{watchedMs:180_000},viewerA.cookie,200,'PUT');assert.equal(capped.data.watchedMs,12_000);
   await request('/api/playback/'+started.data.sessionId,{watchedMs:180_000},viewerA.cookie,200,'PUT');assert.equal(one('SELECT views FROM series WHERE id=?',seriesId)!.views,1);
-  const distinctViewer=await request('/api/episodes/'+episodeIds[0]+'/playback',{},viewerB.cookie);assert.notEqual(distinctViewer.data.sessionId,started.data.sessionId);
-  const result=(await request('/api/studio/series/'+seriesId+'/analytics?period=7d',undefined,owner.cookie)).data;assert.equal(result.totals.views,1);assert.equal(result.totals.avgWatchSeconds,12);
+  const distinctViewer=await request('/api/episodes/'+episodeIds[0]+'/playback',{},viewerB.cookie);assert.notEqual(distinctViewer.data.sessionId,started.data.sessionId);assert.equal(distinctViewer.data.viewCounted,true);
+  const result=(await request('/api/studio/series/'+seriesId+'/analytics?period=7d',undefined,owner.cookie)).data;assert.equal(result.totals.views,2);assert.equal(result.totals.watchSeconds,12);assert.equal(result.totals.avgWatchSeconds,6);
+});
+
+test('concurrent starts reuse one view and another episode or viewer adds exactly one more',async()=>{
+  const {seriesId,episodeIds}=fixture({free:2});
+  const starts=await Promise.all(Array.from({length:6},()=>request('/api/episodes/'+episodeIds[0]+'/playback',{},viewerA.cookie)));
+  assert.equal(new Set(starts.map(value=>value.data.sessionId)).size,1);
+  assert.ok(starts.every(value=>value.data.viewCounted===true&&value.data.watchedMs===0));
+  assert.equal(one('SELECT views FROM series WHERE id=?',seriesId)!.views,1);
+  const repeated=await request('/api/episodes/'+episodeIds[0]+'/playback',{},viewerA.cookie);
+  assert.equal(repeated.data.sessionId,starts[0].data.sessionId);
+  assert.equal(one('SELECT views FROM series WHERE id=?',seriesId)!.views,1);
+  const second=await request('/api/episodes/'+episodeIds[1]+'/playback',{},viewerA.cookie);
+  const other=await request('/api/episodes/'+episodeIds[0]+'/playback',{},viewerB.cookie);
+  assert.notEqual(second.data.sessionId,starts[0].data.sessionId);assert.notEqual(other.data.sessionId,starts[0].data.sessionId);
+  const detail=(await request('/api/series/'+seriesId)).data;
+  assert.equal(detail.series.views,3);assert.deepEqual(detail.episodes.map((episode:any)=>episode.views),[2,1,0]);
+  const statistics=(await request('/api/studio/series/'+seriesId+'/analytics?period=7d',undefined,owner.cookie)).data;
+  assert.equal(statistics.totals.views,3);assert.equal(statistics.totals.watchSeconds,0);assert.equal(statistics.totals.avgWatchSeconds,0);
+  assert.equal(statistics.daily.reduce((sum:number,day:any)=>sum+day.views,0),3);
+});
+
+test('resuming an old uncounted session counts once without rewriting historical totals or watch time',async()=>{
+  const {seriesId,episodeIds}=fixture();const now=Date.now(),sessionId=randomUUID();mock.method(Date,'now',()=>now);
+  const viewerKey=createHash('sha256').update('user:'+viewerA.id).digest('hex');
+  run('UPDATE series SET views=57 WHERE id=?',seriesId);
+  run('INSERT INTO playback_sessions (id,episode_id,viewer_key,started_at_ms,last_seen_ms,watched_ms,reported_ms,counted_view) VALUES (?,?,?,?,?,?,?,0)',sessionId,episodeIds[0],viewerKey,now-1500,now-1000,500,500);
+  const resumed=(await request('/api/episodes/'+episodeIds[0]+'/playback',{},viewerA.cookie)).data;
+  assert.equal(resumed.sessionId,sessionId);assert.equal(resumed.viewCounted,true);assert.equal(resumed.watchedMs,500);assert.equal(resumed.reportedMs,500);
+  assert.equal(one('SELECT views FROM series WHERE id=?',seriesId)!.views,58);
+  assert.equal(one('SELECT qualified_at_ms FROM playback_sessions WHERE id=?',sessionId)!.qualified_at_ms,now);
+  await request('/api/episodes/'+episodeIds[0]+'/playback',{},viewerA.cookie);
+  await request('/api/playback/'+sessionId,{watchedMs:500},viewerA.cookie,200,'PUT');
+  assert.equal(one('SELECT views FROM series WHERE id=?',seriesId)!.views,58);
+  const statistics=(await request('/api/studio/series/'+seriesId+'/analytics?period=7d',undefined,owner.cookie)).data;
+  assert.equal(statistics.totals.views,1);assert.equal(statistics.totals.watchSeconds,.5);
+});
+
+test('an in-flight legacy session counts on its first credited millisecond and never becomes uncounted',async()=>{
+  const {seriesId,episodeIds}=fixture();let now=Date.now();mock.method(Date,'now',()=>now);
+  const sessionId=randomUUID(),viewerKey=createHash('sha256').update('user:'+viewerA.id).digest('hex');
+  run('INSERT INTO playback_sessions (id,episode_id,viewer_key,started_at_ms,last_seen_ms) VALUES (?,?,?,?,?)',sessionId,episodeIds[0],viewerKey,now-2000,now-1000);
+  const zero=(await request('/api/playback/'+sessionId,{watchedMs:0},viewerA.cookie,200,'PUT')).data;
+  assert.equal(zero.viewCounted,false);assert.equal(zero.watchedMs,0);assert.equal(one('SELECT views FROM series WHERE id=?',seriesId)!.views,0);
+  now+=1;
+  const first=(await request('/api/playback/'+sessionId,{watchedMs:1},viewerA.cookie,200,'PUT')).data;
+  assert.equal(first.viewCounted,true);assert.equal(first.watchedMs,1);assert.equal(one('SELECT views FROM series WHERE id=?',seriesId)!.views,1);
+  const lowered=(await request('/api/playback/'+sessionId,{watchedMs:0},viewerA.cookie,200,'PUT')).data;
+  assert.equal(lowered.viewCounted,true);assert.equal(lowered.watchedMs,1);
+  assert.equal(one('SELECT counted_view FROM playback_sessions WHERE id=?',sessionId)!.counted_view,1);
+  assert.equal(one('SELECT views FROM series WHERE id=?',seriesId)!.views,1);
+});
+
+test('hidden, taken-down and deleted series cannot create counted views or accept heartbeat time',async()=>{
+  for(const state of ['archived','taken_down','deleted']as const){
+    const {seriesId,episodeIds}=fixture();
+    const started=(await request('/api/episodes/'+episodeIds[0]+'/playback',{},viewerA.cookie)).data;
+    if(state==='archived')run("UPDATE series SET status='archived' WHERE id=?",seriesId);
+    else if(state==='taken_down')run('INSERT INTO series_moderation (series_id,taken_down,reason,actor_id) VALUES (?,1,?,?)',seriesId,'Unavailable while a report is reviewed.',admin.id);
+    else run('INSERT INTO series_deletions (series_id,creator_id,actor_id,summary_json) VALUES (?,?,?,?)',seriesId,owner.id,owner.id,'{}');
+    for(const cookie of ['',viewerA.cookie,owner.cookie])await request('/api/episodes/'+episodeIds[0]+'/playback',{},cookie,404);
+    await request('/api/playback/'+started.sessionId,{watchedMs:500},viewerA.cookie,404,'PUT');
+    assert.equal(one('SELECT views FROM series WHERE id=?',seriesId)!.views,1);
+    const stored=one('SELECT counted_view,watched_ms FROM playback_sessions WHERE id=?',started.sessionId)!;
+    assert.equal(stored.counted_view,1);assert.equal(stored.watched_ms,0);
+    assert.equal(one('SELECT COUNT(*) AS n FROM playback_sessions WHERE episode_id=?',episodeIds[0])!.n,1);
+  }
 });
 
 test('replaying a clipped cumulative heartbeat cannot reclaim discarded watch time later',async()=>{

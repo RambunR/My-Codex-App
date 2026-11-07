@@ -346,6 +346,9 @@ try{
   await upload(finalePath+'/cover',cover,'finale-cover.jpg',admin,{},'cover',200);
   const finaleEpisodes=[];
   for(const number of [1,3,9])finaleEpisodes.push(await upload(finalePath+'/episodes',video,`Finale ${number}.mp4`,admin,{title:`Finale chapter ${number}`,number}));
+  const finaleDraftPreview=(await request(`/api/episodes/${finaleEpisodes[0].id}/playback`,{},admin)).data;
+  assert.equal(finaleDraftPreview.excluded,true,'An owner draft preview must not manufacture a public view.');
+  assert.equal((await request(finalePath+'/analytics?period=7d',undefined,admin)).data.totals.views,0);
   await request(finalePath+'/status',{status:'published'},admin);
   const readFinale=async()=>(await request(`/api/series/${finaleId}`)).data;
   const finalePublic=await readFinale();assert.equal(finalePublic.series.last_episode_free,true);assert.equal(finalePublic.series.free_episode_count,1);assert.equal(finalePublic.series.access_type,'free-then-paid');
@@ -353,7 +356,24 @@ try{
   assert.equal((await request(`/api/studio/series/${sid}`,undefined,publisher)).data.series.last_episode_free,false,'Existing series remain opted out.');
   await request(`/api/episodes/${finaleEpisodes[1].id}/stream`,undefined,'',403);
   const finaleRange=await fetch(base+`/api/episodes/${finaleEpisodes[2].id}/stream`,{headers:{Range:'bytes=0-31'}});assert.equal(finaleRange.status,206);assert.equal((await finaleRange.arrayBuffer()).byteLength,32);
-  const finalePlayback=(await request(`/api/episodes/${finaleEpisodes[2].id}/playback`,{})).data;assert.ok(finalePlayback.sessionId);
+  const finalePlayback=(await request(`/api/episodes/${finaleEpisodes[2].id}/playback`,{})).data;assert.ok(finalePlayback.sessionId);assert.equal(finalePlayback.viewCounted,true);assert.equal(finalePlayback.watchedMs,0);
+  const finaleViewsBeforePrivatePreview=(await readFinale()).series.views;
+  for(const previewPath of [`/api/studio/episodes/${finaleEpisodes[0].id}/stream`,`/api/admin/episodes/${finaleEpisodes[0].id}/stream`]){
+    const preview=await fetch(base+previewPath,{headers:{Cookie:admin,Range:'bytes=0-15'}});
+    assert.equal(preview.status,206);assert.equal((await preview.arrayBuffer()).byteLength,16);
+  }
+  assert.equal((await readFinale()).series.views,finaleViewsBeforePrivatePreview,'Private Studio/admin preview streams must not count public views.');
+  const finaleOwnerPlayback=(await request(`/api/episodes/${finaleEpisodes[0].id}/playback`,{},admin)).data;
+  assert.equal(finaleOwnerPlayback.viewCounted,true,'A publisher watching a published episode publicly must count.');assert.equal(finaleOwnerPlayback.watchedMs,0);
+  const finaleOwnerReplay=(await request(`/api/episodes/${finaleEpisodes[0].id}/playback`,{},admin)).data;
+  assert.equal(finaleOwnerReplay.sessionId,finaleOwnerPlayback.sessionId);assert.equal(finaleOwnerReplay.viewCounted,true);
+  const finaleOwnerZeroTime=(await request(`/api/playback/${finaleOwnerPlayback.sessionId}`,{watchedMs:0},admin,200,'PUT')).data;
+  assert.equal(finaleOwnerZeroTime.viewCounted,true);assert.equal(finaleOwnerZeroTime.watchedMs,0);
+  const finaleNextPlayback=(await request(`/api/episodes/${finaleEpisodes[1].id}/playback`,{},admin)).data;
+  assert.notEqual(finaleNextPlayback.sessionId,finaleOwnerPlayback.sessionId);assert.equal(finaleNextPlayback.viewCounted,true);
+  const finaleStarted=await readFinale();assert.equal(finaleStarted.series.views,3);assert.deepEqual(finaleStarted.episodes.map(episode=>episode.views),[1,1,1]);
+  const finaleImmediateAnalytics=(await request(finalePath+'/analytics?period=7d',undefined,admin)).data;
+  assert.equal(finaleImmediateAnalytics.totals.views,3);assert.equal(finaleImmediateAnalytics.totals.watchSeconds,0);assert.equal(finaleImmediateAnalytics.totals.avgWatchSeconds,0);
   const finaleWalletBefore=(await request('/api/wallet',undefined,viewer)).data;
   const finaleUnlock=(await request(`/api/episodes/${finaleEpisodes[2].id}/unlock`,{},viewer)).data;assert.equal(finaleUnlock.alreadyUnlocked,true);
   assert.deepEqual((await request('/api/wallet',undefined,viewer)).data,finaleWalletBefore,'A free finale must not debit a wallet or create ledger entries.');
@@ -377,6 +397,17 @@ try{
   assert.deepEqual(publicSeries.series.subtitle_languages,selectedSubtitles);
   assert.equal(publicSeries.series.views,0,'Metadata and byte ranges must not count as views.');
   const guestPlayback=await request(`/api/episodes/${first.id}/playback`,{});assert.match(guestPlayback.cookie,/^drama_viewer=/);
+  assert.equal(guestPlayback.data.viewCounted,true,'A playback start must count immediately, without waiting for a heartbeat.');assert.equal(guestPlayback.data.watchedMs,0);
+  const immediatePublic=(await request(`/api/series/${sid}`)).data;
+  assert.equal(immediatePublic.series.views,1);assert.equal(immediatePublic.episodes.find(episode=>episode.id===first.id).views,1);
+  const immediateAnalytics=(await request(`/api/studio/series/${sid}/analytics?period=7d`,undefined,publisher)).data;
+  assert.equal(immediateAnalytics.totals.views,1);assert.equal(immediateAnalytics.totals.watchSeconds,0);assert.equal(immediateAnalytics.totals.avgWatchSeconds,0);
+  const duplicateGuestStart=(await request(`/api/episodes/${first.id}/playback`,{},guestPlayback.cookie)).data;
+  assert.equal(duplicateGuestStart.sessionId,guestPlayback.data.sessionId);assert.equal(duplicateGuestStart.viewCounted,true);
+  const zeroTime=(await request(`/api/playback/${guestPlayback.data.sessionId}`,{watchedMs:0},guestPlayback.cookie,200,'PUT')).data;
+  assert.equal(zeroTime.viewCounted,true);assert.equal(zeroTime.watchedMs,0);
+  await request(`/api/episodes/${second.id}/playback`,{},guestPlayback.cookie,403);
+  assert.equal((await request(`/api/series/${sid}`)).data.series.views,1,'Retries, zero-time heartbeats and rejected paid playback must not add another view.');
   await request(`/api/studio/series/${sid}/analytics?period=7d`,undefined,viewer,403);
   await new Promise(resolve=>setTimeout(resolve,3300));
   const qualified=(await request(`/api/playback/${guestPlayback.data.sessionId}`,{watchedMs:3200},guestPlayback.cookie,200,'PUT')).data;
@@ -391,7 +422,7 @@ try{
   assert.equal(ordinaryPublisherProfile.stats.series_count,1);assert.equal(ordinaryPublisherProfile.stats.episode_count,2);assert.equal(ordinaryPublisherProfile.stats.views,1);assert.equal(ordinaryPublisherProfile.stats.tracked_views,1);assert.equal(ordinaryPublisherProfile.stats.likes,1);assert.equal(ordinaryPublisherProfile.stats.total_watch_seconds,3.2);assert.equal(ordinaryPublisherProfile.stats.avg_watch_seconds,3.2);
   assert.equal(ordinaryPublisherProfile.series[0].id,sid);assert.equal(JSON.stringify(ordinaryPublisherProfile).includes('publisher@example.test'),false);
   await request(`/api/publishers/${p.data.user.id}`,undefined,'',404);
-  console.log('PASS: durable likes, anonymous qualified playback, exact watch time, and owner-only series/episode analytics.');
+  console.log('PASS: immediate anonymous/public publisher views, preview exclusion, durable deduplication, exact watch time, and owner-only series/episode analytics.');
 
   await Promise.all(Array.from({length:8},()=>request(`/api/episodes/${second.id}/unlock`,{},viewer)));
   assert.equal((await request('/api/auth/me',undefined,viewer)).data.user.wallet_micros,4_990_000);
@@ -688,10 +719,11 @@ try{
 
   await stop();await start(true);
   const production=(await request('/api/config')).data;assert.equal(production.paymentsMode,'disabled');assert.equal(production.runtime,'cloudflare');assert.equal(production.auth.google,false);
-  const retainedFinale=await readFinale();assert.equal(retainedFinale.series.last_episode_free,true);assert.equal(retainedFinale.series.free_episode_count,1);assert.equal(retainedFinale.episodes.find(episode=>episode.free).id,finaleEpisodes[2].id);
+  const retainedFinale=await readFinale();assert.equal(retainedFinale.series.last_episode_free,true);assert.equal(retainedFinale.series.free_episode_count,1);assert.equal(retainedFinale.episodes.find(episode=>episode.free).id,finaleEpisodes[2].id);assert.equal(retainedFinale.series.views,3);assert.deepEqual(retainedFinale.episodes.map(episode=>episode.views),[1,1,1]);
   const retainedLikes=(await request(`/api/series/${sid}`,undefined,viewer)).data;assert.equal(retainedLikes.series.likes,1);assert.equal(retainedLikes.series.liked,true);
   const retainedNewest=(await request(newestPath)).data.series;assert.equal(retainedNewest[0].id,sid);assert.equal(retainedNewest[0].published_at,publishedAt);
-  const resumedGuest=(await request(`/api/episodes/${first.id}/playback`,{},guestPlayback.cookie)).data;assert.equal(resumedGuest.sessionId,guestPlayback.data.sessionId);assert.equal(resumedGuest.viewCounted,true);
+  const resumedGuest=(await request(`/api/episodes/${first.id}/playback`,{},guestPlayback.cookie)).data;assert.equal(resumedGuest.sessionId,guestPlayback.data.sessionId);assert.equal(resumedGuest.viewCounted,true);assert.equal(resumedGuest.watchedMs,3200);
+  assert.equal((await request(`/api/series/${sid}`)).data.series.views,1,'A runtime restart must not recount a previously started view.');
   const retainedAnalytics=(await request(`/api/studio/series/${sid}/analytics?period=7d`,undefined,publisher)).data;assert.equal(retainedAnalytics.totals.views,1);assert.equal(retainedAnalytics.totals.avgWatchSeconds,3.2);assert.equal(retainedAnalytics.totals.paidViewers,2);assert.equal(retainedAnalytics.episodes.find(episode=>episode.id===second.id).paidViewers,2);
   const retainedModerationAudit=(await request(moderationPath,undefined,admin)).data.events;
   assert.deepEqual(retainedModerationAudit,suggestionAudit);

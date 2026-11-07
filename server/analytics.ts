@@ -20,18 +20,24 @@ function assertSeriesRecordable(seriesId:string){
   assert(series&&(series.status==='published'||series.status==='draft'),404,'NOT_FOUND','Series not found.');
 }
 
-// A durable window makes browser reloads, byte-range fetches and runtime restarts
-// unable to count another view for the same viewer and episode within 30 minutes.
+// The public player calls this on actual playback, not metadata loading. Count
+// the view immediately while keeping watch time at zero until it is measured.
+// A durable window deduplicates retries, resumes and reloads for 30 minutes.
 export function startPlayback(episodeId:string,viewerKey:string,now=Date.now()):PlaybackReceipt {
   validViewer(viewerKey);
   return transaction(()=>{
     const episode=one<{series_id:string}>('SELECT series_id FROM episodes WHERE id=?',episodeId);
     assert(episode,404,'NOT_FOUND','Episode not found.');assertSeriesRecordable(episode.series_id);
     const existing=one<PlaybackSession>(`SELECT ${playbackSessionFieldsSql()} FROM playback_sessions p WHERE p.episode_id=? AND p.viewer_key=? AND p.started_at_ms>? ORDER BY p.started_at_ms DESC LIMIT 1`,episodeId,viewerKey,now-SESSION_WINDOW);
-    if(existing){run('UPDATE playback_sessions SET last_seen_ms=? WHERE id=?',now,existing.id);return receipt(existing);}
+    if(existing){
+      if(!existing.counted_view)run('UPDATE series SET views=views+1 WHERE id=?',episode.series_id);
+      run('UPDATE playback_sessions SET last_seen_ms=?,counted_view=1,qualified_at_ms=COALESCE(qualified_at_ms,?) WHERE id=?',now,now,existing.id);
+      return receipt({...existing,counted_view:1});
+    }
     const id=crypto.randomUUID();
-    run('INSERT INTO playback_sessions (id,episode_id,viewer_key,started_at_ms,last_seen_ms) VALUES (?,?,?,?,?)',id,episodeId,viewerKey,now,now);
-    return{sessionId:id,watchedMs:0,reportedMs:0,viewCounted:false};
+    run('INSERT INTO playback_sessions (id,episode_id,viewer_key,started_at_ms,last_seen_ms,counted_view,qualified_at_ms) VALUES (?,?,?,?,?,1,?)',id,episodeId,viewerKey,now,now,now);
+    run('UPDATE series SET views=views+1 WHERE id=?',episode.series_id);
+    return{sessionId:id,watchedMs:0,reportedMs:0,viewCounted:true};
   });
 }
 
@@ -50,7 +56,10 @@ export function recordPlayback(sessionId:string,viewerKey:string,cumulativeWatch
     const requested=Math.max(0,cumulativeWatchedMs-Math.max(session.reported_ms,session.watched_ms));
     const increase=Math.min(requested,Math.max(0,now-session.last_seen_ms),MAX_HEARTBEAT_MS);
     const watchedMs=Math.min(Math.floor(session.duration*1000),session.watched_ms+increase);
-    const qualifies=watchedMs>=Math.min(3000,Math.floor(session.duration*1000));
+    // A zero/short heartbeat must never undo a view counted at playback start.
+    // Active sessions created before this release can qualify on their first
+    // positive measured heartbeat; historical inactive sessions are not backfilled.
+    const qualifies=session.counted_view===1||watchedMs>0;
     if(qualifies&&!session.counted_view)run('UPDATE series SET views=views+1 WHERE id=?',session.series_id);
     const reportedMs=Math.max(session.reported_ms,cumulativeWatchedMs);
     run('UPDATE playback_sessions SET watched_ms=?,reported_ms=?,last_seen_ms=?,counted_view=?,qualified_at_ms=? WHERE id=?',Math.min(LEGACY_PLAYBACK_MAX_MS,watchedMs),Math.min(LEGACY_PLAYBACK_MAX_MS,reportedMs),now,qualifies?1:0,session.qualified_at_ms??(qualifies?now:null),session.id);

@@ -251,7 +251,7 @@ export function createApp() {
   app.post('/api/episodes/:id/playback', rateLimit('playback-start',90,60_000), (req,res)=>{
     const e=episodeRow(id(req));assert(e,404,'NOT_FOUND','Episode not found.');assertSeriesAvailable(e.series_id,{viewerId:req.user?.id,allowOwnerPreview:true});
     assert(canWatch(req.user?.id,e),403,'EPISODE_LOCKED','Unlock this episode to watch.');
-    if(e.creator_id===req.user?.id){res.json({excluded:true});return;}
+    if(e.creator_id===req.user?.id&&e.status!=='published'){res.json({excluded:true});return;}
     res.json(startPlayback(e.id,playbackViewer(req,res,true)!));
   });
   app.put('/api/playback/:id', rateLimit('playback-heartbeat',180,60_000), (req,res)=>{
