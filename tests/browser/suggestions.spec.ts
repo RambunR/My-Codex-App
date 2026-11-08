@@ -1,5 +1,6 @@
 import {test,expect,type Page,type Locator} from '@playwright/test';
 import {mkdir} from 'node:fs/promises';
+import {localeMessages} from '../../src/i18n';
 
 const art='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="900"><rect width="600" height="900" fill="#302044"/><rect width="120" height="120" fill="#ef86c0"/></svg>');
 const base={description:'An original drama with a complete publisher-provided synopsis and full artwork.',language:'en',genres:['romance'],themes:[],format:'live-action',creation_type:'human',cover:art,cover_aspect_ratio:'9:16',creator_id:'suggestion-creator',creator_name:'Suggestion Studio',price_cents:30,free_episodes:1,episode_count:2,views:0,saves:0,likes:0,liked:false,status:'published',demo:0,created_at:'2026-11-04T00:00:00Z',taken_down:false};
@@ -20,6 +21,8 @@ async function publicFixture(page:Page,selected=[first,second],locale='en'){
     if(url.pathname==='/api/auth/me')return route.fulfill({json:{user:null}});
     if(url.pathname==='/api/config')return route.fulfill({json:config});
     if(url.pathname==='/api/series'){queries.push(url.search);return route.fulfill({json:{series:url.searchParams.get('featured')==='true'?selected:[popular]}});}
+    const release=[...selected,popular].find(series=>url.pathname==='/api/series/'+series.id);
+    if(release)return route.fulfill({json:{series:release,episodes:[]}});
     return route.abort();
   });
   return{queries,clean:()=>{expect(writes,'A slideshow must not make payment or playback writes').toEqual([]);expect(errors).toEqual([]);}};
@@ -28,6 +31,24 @@ async function frozenClock(page:Page){await page.clock.install({time:new Date('2
 async function settledSwitch(page:Page){await page.clock.runFor(400);await expect(page.locator('section.hero')).toHaveAttribute('data-carousel-phase','idle');}
 async function noOverflow(page:Page){await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth)).toBeLessThanOrEqual(1);}
 async function titleIs(hero:Locator,title:string){await expect(hero.locator('h2')).toHaveText(title);}
+async function phoneActions(hero:Locator,compact=false){
+  await hero.locator('.hero-buttons').scrollIntoViewIfNeeded();
+  const metrics=await hero.evaluate(element=>{
+    const box=element.getBoundingClientRect(),copy=element.querySelector('.hero-copy')!,style=getComputedStyle(copy);
+    return{left:box.left,right:box.right,top:box.top,bottom:box.bottom,width:box.width,available:copy.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight),buttons:Array.from(element.querySelectorAll('.hero-buttons a')).map(link=>{const rect=link.getBoundingClientRect();return{left:rect.left,right:rect.right,top:rect.top,bottom:rect.bottom,width:rect.width,height:rect.height,font:parseFloat(getComputedStyle(link).fontSize),clientWidth:link.clientWidth,scrollWidth:link.scrollWidth,clientHeight:link.clientHeight,scrollHeight:link.scrollHeight};})};
+  });
+  expect(metrics.buttons).toHaveLength(2);
+  for(const button of metrics.buttons){
+    expect(button.width).toBeGreaterThanOrEqual(44);expect(button.height).toBeGreaterThanOrEqual(44);expect(button.font).toBeGreaterThanOrEqual(13);
+    expect(button.scrollWidth).toBeLessThanOrEqual(button.clientWidth+1);expect(button.scrollHeight).toBeLessThanOrEqual(button.clientHeight+1);
+    expect(button.left).toBeGreaterThanOrEqual(metrics.left-1);expect(button.right).toBeLessThanOrEqual(metrics.right+1);expect(button.top).toBeGreaterThanOrEqual(metrics.top-1);expect(button.bottom).toBeLessThanOrEqual(metrics.bottom+1);
+  }
+  if(compact){
+    expect(Math.abs(metrics.buttons[0].top-metrics.buttons[1].top)).toBeLessThanOrEqual(1);
+    if(metrics.width>=340)expect(Math.max(...metrics.buttons.map(button=>button.right))-Math.min(...metrics.buttons.map(button=>button.left))).toBeLessThan(metrics.available-8);
+  }
+  await hero.locator('.hero-play').click({trial:true});await hero.locator('.hero-details').click({trial:true});
+}
 
 async function noPagination(hero:Locator){
   await expect(hero.locator('button')).toHaveCount(0);await expect(hero.locator('.hero-rotation-toggle')).toHaveCount(0);
@@ -85,10 +106,11 @@ for(const selected of [[],[first]])test(`${selected.length} selected releases re
   await frozenClock(page);const state=await publicFixture(page,selected);await page.goto('/');const hero=page.locator('section.hero');await activeRelease(hero,selected.length?first:popular);await noPagination(hero);await expect(hero.getByRole('button')).toHaveCount(0);await page.clock.runFor(30000);await activeRelease(hero,selected.length?first:popular);if(!selected.length)await expect(hero.locator('.spotlight')).toHaveText('Fresh off the reel');state.clean();
 });
 
-for(const size of [{name:'desktop',width:1440,height:900,portrait:false},{name:'narrow phone',width:320,height:568,portrait:true},{name:'short landscape',width:844,height:390,portrait:false}])test(`automatic hero fills its ${size.name} grid without a blank navigation footer and stays below 70% height`,async({page})=>{
-  await page.setViewportSize({width:size.width,height:size.height});await frozenClock(page);const state=await publicFixture(page);await page.goto('/');const hero=page.locator('section.hero');await activeRelease(hero,first);await noPagination(hero);await page.evaluate(()=>document.fonts.ready);
+for(const size of [{name:'desktop',width:1440,height:900,portrait:false,locale:'en'},{name:'narrow phone',width:320,height:568,portrait:true,locale:'en'},{name:'Traditional Chinese phone',width:390,height:844,portrait:true,locale:'zh-TW'},{name:'short landscape',width:844,height:390,portrait:false,locale:'en'}])test(`automatic hero fills its ${size.name} grid without a blank navigation footer and stays below 70% height`,async({page})=>{
+  await page.setViewportSize({width:size.width,height:size.height});await frozenClock(page);const state=await publicFixture(page,[first,second],size.locale);await page.goto('/');const hero=page.locator('section.hero');await activeRelease(hero,first);await noPagination(hero);await page.evaluate(()=>document.fonts.ready);
   const bounds=await hero.evaluate(element=>{const hero=element.getBoundingClientRect(),art=element.querySelector('.hero-art')!.getBoundingClientRect(),copy=element.querySelector('.hero-copy')!.getBoundingClientRect();return{hero:{top:hero.top,bottom:hero.bottom,height:hero.height},art:{top:art.top,bottom:art.bottom},copy:{top:copy.top,bottom:copy.bottom},rows:getComputedStyle(element).gridTemplateRows.split(' ').filter(Boolean).length};});
   expect(bounds.hero.height).toBeLessThanOrEqual(size.height*.7+1);expect(bounds.rows).toBe(size.portrait?2:1);expect(Math.abs((size.portrait?bounds.copy.bottom:bounds.art.bottom)-bounds.hero.bottom)).toBeLessThanOrEqual(2);await expect(hero.locator('.hero-art img')).toHaveCSS('object-fit','contain');await expect(hero.locator('.hero-art img')).toHaveCSS('transform','none');await noOverflow(page);state.clean();
+  if(size.portrait)await phoneActions(hero,true);
   if(size.name!=='short landscape'){await page.route('**/api/series?featured=true',route=>route.fulfill({json:{series:[{...first,cover:'/images/hero.jpg'},second]}}));await page.reload();await expect(hero.locator('.hero-art img')).toHaveAttribute('src','/images/hero.jpg');await hero.locator('.hero-art img').evaluate((image:HTMLImageElement)=>image.decode());await mkdir('/workspace/exports',{recursive:true});await hero.screenshot({path:`/workspace/exports/lingying-hero-fade-${size.portrait?'mobile':'desktop'}.png`});state.clean();}
 });
 
@@ -104,8 +126,14 @@ test.describe('Traditional Chinese touch layout',()=>{
       }
       await hero.locator('.hero-synopsis').tap();await expect(hero.locator('.hero-synopsis')).toBeFocused();await expect(hero).toHaveAttribute('data-autoplay','paused');await page.clock.runFor(20000);await activeRelease(hero,active);await page.locator('.header-language').focus();await expect(hero).toHaveAttribute('data-autoplay','running');await page.clock.runFor(8400);await activeRelease(hero,second);
       await noPagination(hero);await expect(hero.locator('.hero-art img')).toHaveCSS('object-fit','contain');expect((await hero.boundingBox())!.height).toBeLessThanOrEqual(844*.7+1);await noOverflow(page);state.clean();
+      await phoneActions(hero,true);await hero.locator('.hero-details').tap();await expect(page).toHaveURL('/series/'+second.id);await expect(page.getByRole('heading',{level:1,name:second.title,exact:true})).toBeVisible();state.clean();
     }finally{await input.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]}).catch(()=>{});await input.detach();}
   });
+});
+
+test('long German action labels remain readable and tappable on a narrow phone',async({page})=>{
+  await page.setViewportSize({width:320,height:740});await frozenClock(page);const state=await publicFixture(page,[first],'de');await page.goto('/');const hero=page.locator('section.hero');await activeRelease(hero,first);await page.evaluate(()=>document.fonts.ready);
+  await expect(hero.locator('.hero-play')).toHaveText(localeMessages.de.watchNow!);await expect(hero.locator('.hero-details')).toHaveText(localeMessages.de.aboutSeries!);await phoneActions(hero);await noOverflow(page);state.clean();
 });
 
 async function adminFixture(page:Page){

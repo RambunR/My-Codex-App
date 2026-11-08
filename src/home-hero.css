@@ -46,6 +46,18 @@
   .home-page .hero-bounded .hero-pills{font-size:11px}
   .home-page .hero-bounded .hero-synopsis-wrap{flex-basis:45px;min-height:32px}
 }
+/* Keep the story actions together without stretching short labels into cards.
+   Long translations can wrap naturally and every link keeps a touch target. */
+@media(max-width:640px), (max-width:960px) and (max-height:500px){
+  .home-page .hero-bounded .hero-buttons{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+  .home-page .hero-bounded .hero-buttons .button{flex:0 1 auto;max-width:100%;min-height:44px;padding:8px 10px;gap:6px;font-size:13px;line-height:1.4;border-radius:10px}
+  .home-page .hero-bounded .hero-buttons .button>svg{width:16px;height:16px}
+  .home-page .hero-bounded .hero-play{background:var(--brand-gradient);color:var(--bg)}
+}
+@media(max-width:360px){
+  .home-page .hero-bounded .hero-buttons{gap:6px}
+  .home-page .hero-bounded .hero-buttons .button{padding-inline:6px}
+}
 /* Fade the active artwork and copy together. Interaction cancels any pending
    swap before its links can change. */
 .home-page .hero-bounded>.hero-art,.home-page .hero-bounded>.hero-copy{opacity:1;transition:opacity 280ms ease-in-out}
