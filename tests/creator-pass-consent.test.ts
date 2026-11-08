@@ -64,7 +64,7 @@ test('config declares the required versions and API or direct service calls cann
   const publicConfig=await request('/api/config');assert.deepEqual(publicConfig.creatorPassConsent,{policyVersion:LEGAL_POLICY_VERSION,disclosureVersion:CREATOR_PASS_DISCLOSURE_VERSION});
   const user=actor(),f=provider(),before=snapshot();
   const invalid:Array<[unknown,number,string]>=[
-    [undefined,400,'CREATOR_CONSENT_REQUIRED'],[null,400,'CREATOR_CONSENT_REQUIRED'],['true',400,'CREATOR_CONSENT_REQUIRED'],[{...consent,accepted:false},400,'CREATOR_CONSENT_REQUIRED'],[{...consent,accepted:'true'},400,'CREATOR_CONSENT_REQUIRED'],[{accepted:true},400,'CREATOR_CONSENT_REQUIRED'],[{...consent,policy_version:''},400,'CREATOR_CONSENT_REQUIRED'],[{...consent,accepted_at:'2020-01-01'},400,'CREATOR_CONSENT_REQUIRED'],[{...consent,policy_version:'2026-11-07'},409,'CREATOR_POLICY_CHANGED'],[{...consent,disclosure_version:'creator-pass-old'},409,'CREATOR_POLICY_CHANGED'],
+    [undefined,400,'CREATOR_CONSENT_REQUIRED'],[null,400,'CREATOR_CONSENT_REQUIRED'],['true',400,'CREATOR_CONSENT_REQUIRED'],[{...consent,accepted:false},400,'CREATOR_CONSENT_REQUIRED'],[{...consent,accepted:'true'},400,'CREATOR_CONSENT_REQUIRED'],[{accepted:true},400,'CREATOR_CONSENT_REQUIRED'],[{...consent,policy_version:''},400,'CREATOR_CONSENT_REQUIRED'],[{...consent,accepted_at:'2020-01-01'},400,'CREATOR_CONSENT_REQUIRED'],[{...consent,policy_version:'2026-11-07'},409,'CREATOR_POLICY_CHANGED'],[{...consent,disclosure_version:'creator-pass-ack-v1'},409,'CREATOR_POLICY_CHANGED'],
   ];
   for(const[value,status,code]of invalid){
     const rejected=await request('/api/payments/checkout',{kind:'activation',creator_consent:value},user,status);assert.equal(rejected.error.code,code);
@@ -110,9 +110,11 @@ test('wallet funding requires no creator agreement and never writes creator ackn
 });
 
 test('resuming a legacy unpaid activation requires current consent but preserves its saved price, identity and creation date',async()=>{
-  const user=actor(),f=provider(),old=legacyPayment(user);f.sessions.set('legacy:'+old.id,legacySession(old));const original=one('SELECT * FROM payments WHERE id=?',old.id)!,before=proofs();
+  const user=actor(),f=provider(),old=legacyPayment(user);f.sessions.set('legacy:'+old.id,legacySession(old));
+  run("INSERT INTO creator_pass_consents (payment_id,financial_mode,user_id,policy_version,disclosure_version,language,accepted_at) VALUES (?,'default',?,?,'creator-pass-ack-v1','en','2026-11-08 08:00:00')",old.id,user.id,LEGAL_POLICY_VERSION);
+  const original=one('SELECT * FROM payments WHERE id=?',old.id)!,previous=proof(old.id),before=proofs();
   const rejected=await request('/api/payments/checkout',{kind:'activation'},user,400);assert.equal(rejected.error.code,'CREATOR_CONSENT_REQUIRED');assert.deepEqual(proofs(),before);assert.equal(f.creates.length,0);
-  const resumed=await request('/api/payments/checkout',{kind:'activation',language:'zh-CN',creator_consent:consent},user);assert.equal(resumed.paymentId,old.id);assert.equal(f.creates.length,0);const saved=one('SELECT * FROM payments WHERE id=?',old.id)!;assert.equal(saved.provider_session,original.provider_session);assert.equal(saved.created_at,original.created_at);assert.equal(saved.amount_cents,original.amount_cents);assert.equal(proof(old.id).language,'zh-CN');assert.notEqual(proof(old.id).accepted_at,original.created_at);
+  const resumed=await request('/api/payments/checkout',{kind:'activation',language:'zh-CN',creator_consent:consent},user);assert.equal(resumed.paymentId,old.id);assert.equal(f.creates.length,0);const saved=one('SELECT * FROM payments WHERE id=?',old.id)!;assert.equal(saved.provider_session,original.provider_session);assert.equal(saved.created_at,original.created_at);assert.equal(saved.amount_cents,original.amount_cents);const current=one('SELECT * FROM creator_pass_consents WHERE payment_id=? AND disclosure_version=?',old.id,CREATOR_PASS_DISCLOSURE_VERSION)!;assert.equal(current.language,'zh-CN');assert.notEqual(current.accepted_at,original.created_at);assert.deepEqual(proof(old.id),previous);assert.equal(one('SELECT COUNT(*) n FROM creator_pass_consents WHERE payment_id=?',old.id)!.n,2);
 });
 
 test('legacy payments missing a saved provider session distinguish cached unpaid consent from already paid history',async()=>{
