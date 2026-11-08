@@ -1,3 +1,4 @@
+import {seriesTitleClass} from '../series-title';
 import {useEffect,useRef,useState,type FormEvent} from 'react';
 import {Eye,EyeOff,Trash2,AlertTriangle,RefreshCw} from 'lucide-react';
 import {api,post,ApiError} from '../api';
@@ -7,7 +8,7 @@ import {Button,Loading,Modal} from '../ui';
 import {bytes} from '../../shared/config';
 import '../series-lifecycle.css';
 
-interface LifecycleSeries {id:string;title:string;status:string;taken_down?:boolean}
+interface LifecycleSeries {id:string;title:string;status:string;taken_down?:boolean;language?:string}
 interface DeletionPreview {
   series:LifecycleSeries;
   summary:{episode_count:number;views:number;likes:number;paid_unlocks:number;paid_viewers:number;real_paid_unlocks:number;test_paid_unlocks:number;real_paid_viewers:number;test_paid_viewers:number;affected_paid_viewers:number;total_watch_seconds:number;avg_watch_seconds:number;media_bytes:number;financial_mode:'test'|'live'};
@@ -74,21 +75,21 @@ export function SeriesLifecycle({series,disabled=false,onCompleted,onOpenChange}
         {action==='delete'?<>
           <p className="series-delete-warning"><AlertTriangle size={21} aria-hidden="true"/><strong>{t('seriesDeleteWarning')}</strong></p>
           {loading?<Loading/>:preview&&<>
-            <h3 className="series-delete-name">{preview.series.title}</h3>
+            <h3 className={`series-delete-name ${seriesTitleClass(series.language)||''}`}>{preview.series.title}</h3>
             <section className="series-delete-statistics" aria-label={t('seriesDeleteSnapshot')}><h3>{t('seriesDeleteSnapshot')}</h3><dl>
               <div className="series-delete-affected" data-metric="affected_paid_viewers"><dt>{t('seriesDeleteAffectedPaidViewers')}</dt><dd>{count(preview.summary.affected_paid_viewers)}</dd></div>{([['episode_count','seriesDeleteEpisodes'],['views','seriesDeleteViews'],['likes','seriesDeleteLikes'],['real_paid_viewers','seriesDeleteRealPaidViewers'],['test_paid_viewers','seriesDeleteTestPaidViewers'],['real_paid_unlocks','seriesDeleteRealUnlocks'],['test_paid_unlocks','seriesDeleteTestUnlocks']] as const).map(([key,label])=><div key={key} data-metric={key}><dt>{t(label)}</dt><dd>{count(preview.summary[key])}</dd></div>)}
               <div data-metric="total_watch_seconds"><dt>{t('seriesDeleteWatchTime')}</dt><dd><bdi>{duration(preview.summary.total_watch_seconds)}</bdi></dd></div><div data-metric="avg_watch_seconds"><dt>{t('seriesDeleteAverage')}</dt><dd><bdi>{duration(preview.summary.avg_watch_seconds)}</bdi></dd></div><div data-metric="media_bytes"><dt>{t('seriesDeleteStorage')}</dt><dd>{bytes(preview.summary.media_bytes)}</dd></div>
             </dl></section>
             <p className="series-delete-financial field-hint">{t('seriesDeleteFinancial')}</p>
             <form className="series-delete-form" onSubmit={confirm}>
-              <label className="field" htmlFor={`delete-title-${series.id}`}>{t('seriesDeleteType')}<input id={`delete-title-${series.id}`} className="series-delete-title-input" aria-label={t('seriesDeleteType')} value={titleInput} onChange={event=>setTitleInput(event.target.value)} autoComplete="off" spellCheck={false} maxLength={120} disabled={mutating||expired} required aria-describedby={`delete-confirm-name-${series.id}`}/><small id={`delete-confirm-name-${series.id}`} className="series-delete-required-name">{preview.series.title}</small></label>
+              <label className="field" htmlFor={`delete-title-${series.id}`}>{t('seriesDeleteType')}<input id={`delete-title-${series.id}`} className={`series-delete-title-input ${seriesTitleClass(series.language)||''}`} aria-label={t('seriesDeleteType')} value={titleInput} onChange={event=>setTitleInput(event.target.value)} autoComplete="off" spellCheck={false} maxLength={120} disabled={mutating||expired} required aria-describedby={`delete-confirm-name-${series.id}`}/><small id={`delete-confirm-name-${series.id}`} className={`series-delete-required-name ${seriesTitleClass(series.language)||''}`}>{preview.series.title}</small></label>
               <label className="checkbox-label series-delete-ack"><input type="checkbox" checked={acknowledged} onChange={event=>setAcknowledged(event.target.checked)} disabled={mutating||expired} required/><span>{t('seriesDeleteAcknowledge')}</span></label>
               <Button type="submit" className="button series-delete-submit wide" busy={mutating} disabled={!canDelete}><Trash2 size={16}/>{t('seriesDeleteConfirm')}</Button>
             </form>
           </>}
           {failure&&<p className="form-error" role="alert">{failure}</p>}
           {!loading&&(expired||!preview)&&<button type="button" className="button secondary wide series-delete-reload" onClick={()=>void loadPreview()} disabled={mutating}><RefreshCw size={16}/>{t('seriesDeleteReload')}</button>}
-        </>:<><h3 className="series-delete-name">{series.title}</h3><p className="muted">{t(action==='hide'?'seriesHideBody':'seriesShowBody')}</p>{failure&&<p className="form-error" role="alert">{failure}</p>}<Button type="button" className="button primary wide" busy={mutating} disabled={blocked} onClick={()=>void confirm()}>{action==='hide'?<EyeOff size={16}/>:<Eye size={16}/>} {t(action==='hide'?'seriesHideConfirm':'seriesShowConfirm')}</Button></>}
+        </>:<><h3 className={`series-delete-name ${seriesTitleClass(series.language)||''}`}>{series.title}</h3><p className="muted">{t(action==='hide'?'seriesHideBody':'seriesShowBody')}</p>{failure&&<p className="form-error" role="alert">{failure}</p>}<Button type="button" className="button primary wide" busy={mutating} disabled={blocked} onClick={()=>void confirm()}>{action==='hide'?<EyeOff size={16}/>:<Eye size={16}/>} {t(action==='hide'?'seriesHideConfirm':'seriesShowConfirm')}</Button></>}
         <button type="button" className="button ghost wide" onClick={close} disabled={mutating}>{t('cancel')}</button>
       </div>
     </Modal>

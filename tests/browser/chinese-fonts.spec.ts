@@ -3,12 +3,12 @@ import {test,expect,type Page} from '@playwright/test';
 const title='创业与友情，故事ABC123。';
 const release={id:'chinese-font-fixture',creator_name:'字体测试',title,description:'发布原创故事，探索创业与友情。观看短剧，分享创作与收入。',language:'cmn',genres:['drama'],themes:['entrepreneurship'],format:'live-action',creation_type:'human',cover:'data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="900"><rect width="600" height="900" fill="#302044"/></svg>'),price_cents:10,free_episodes:1,episode_count:1,views:0,saves:0,likes:0,status:'published',featured:1,demo:0,created_at:'2026-11-07T00:00:00Z'};
 
-async function fixture(page:Page,locale:string){
+async function fixture(page:Page,locale:string,series=release){
   const fonts=new Set<string>(),writes:string[]=[];
   page.on('request',request=>{if(request.url().includes('/fonts/noto-sans-sc/')&&request.url().endsWith('.woff2'))fonts.add(request.url());});
   await page.addInitScript(locale=>localStorage.setItem('drama-language',locale),locale);
-  await page.route('**/api/**',route=>{const request=route.request(),path=new URL(request.url()).pathname;if(request.method()!=='GET'){writes.push(request.method()+' '+path);return route.abort();}if(path==='/api/auth/me')return route.fulfill({json:{user:null}});if(path==='/api/config')return route.fulfill({json:{brand:'LingYing',paymentsMode:'disabled',demo:false,usdToHkd:7.8,limits:{}}});if(path==='/api/series')return route.fulfill({json:{series:[release],total:1}});return route.fulfill({status:404,json:{error:{message:'Unexpected typography fixture request'}}});});
-  await page.goto('/');await expect(page.locator('.hero-copy h2')).toHaveText(title);await page.evaluate(()=>document.fonts.ready);
+  await page.route('**/api/**',route=>{const request=route.request(),path=new URL(request.url()).pathname;if(request.method()!=='GET'){writes.push(request.method()+' '+path);return route.abort();}if(path==='/api/auth/me')return route.fulfill({json:{user:null}});if(path==='/api/config')return route.fulfill({json:{brand:'LingYing',paymentsMode:'disabled',demo:false,usdToHkd:7.8,limits:{}}});if(path==='/api/series')return route.fulfill({json:{series:[series],total:1}});return route.fulfill({status:404,json:{error:{message:'Unexpected typography fixture request'}}});});
+  await page.goto('/');await expect(page.locator('.hero-copy h2')).toHaveText(series.title);await page.evaluate(()=>document.fonts.ready);
   return{fonts,writes};
 }
 
@@ -28,7 +28,7 @@ test('Simplified Chinese uses one self-hosted variable family for Han, Latin and
 });
 
 for(const locale of ['en','zh-TW'])test(`${locale} retains its typography and does not download Simplified Chinese font subsets`,async({page})=>{
-  const state=await fixture(page,locale);await expect(page.locator('.hero-copy h2')).toHaveCSS('font-family',/DM Sans/);expect(state.fonts.size).toBe(0);expect(state.writes).toEqual([]);
+  const state=await fixture(page,locale,{...release,title:'An original story ABC123.',description:'A story of entrepreneurship and friendship.',creator_name:'Independent creator',language:'en'});await expect(page.locator('.hero-copy h2')).toHaveCSS('font-family',/DM Sans/);expect(state.fonts.size).toBe(0);expect(state.writes).toEqual([]);
 });
 
 test('Simplified Chinese remains readable when its font download is unavailable',async({page})=>{

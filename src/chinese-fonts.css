@@ -104,3 +104,8 @@
    Traditional Chinese retains its own platform font choices. */
 :root:lang(zh-CN){--font-zh-cn:'Noto Sans SC','PingFang SC','Microsoft YaHei UI','Microsoft YaHei','Noto Sans CJK SC',sans-serif;font-family:var(--font-zh-cn)}
 :root:lang(zh-CN) :is(.hero-copy h2,.hero-art-title,.poster-film-title>strong,.auth-art h2){font-family:var(--font-zh-cn)}
+
+/* Creator titles keep their Latin design in other interfaces, while Han uses
+   the same variable font rather than a device-dependent fallback. */
+:root:not(:lang(zh-CN)) .series-title-cjk{font-family:'DM Sans','Noto Sans SC',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+:root:not(:lang(zh-CN)) .series-title-cjk-display{font-family:'Playfair Display','Noto Sans SC',Georgia,serif}

@@ -1,3 +1,4 @@
+import {seriesTitleClass} from '../series-title';
 import {useEffect,useRef,useState,type FormEvent} from 'react';
 import {BarChart3,Clock3,Eye,Heart,RefreshCw,Users,X} from 'lucide-react';
 import {useApi} from '../api';
@@ -14,7 +15,7 @@ function duration(seconds:number){
 }
 function utcDate(value:string,locale:string){return new Intl.DateTimeFormat(locale,{month:'short',day:'numeric',year:'numeric',timeZone:'UTC'}).format(new Date(value+'T00:00:00Z'));}
 
-export function SeriesAnalytics({seriesId,onClose}:{seriesId:string;onClose?:()=>void}){
+export function SeriesAnalytics({seriesId,seriesLanguage,onClose}:{seriesId:string;seriesLanguage?:string;onClose?:()=>void}){
   const{t,locale}=useI18n();const panel=useRef<HTMLElement>(null);
   useEffect(()=>{panel.current?.scrollIntoView({block:'start',behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});},[seriesId]);
   const[period,setPeriod]=useState<Period>('30d');const[query,setQuery]=useState('period=30d');const[dateError,setDateError]=useState(false);
@@ -31,7 +32,7 @@ export function SeriesAnalytics({seriesId,onClose}:{seriesId:string;onClose?:()=
   const daily=data?.daily||[];const maxViews=Math.max(1,...daily.map(day=>day.views));
   const points=daily.map((day,index)=>`${daily.length===1?500:index/(daily.length-1)*1000},${118-day.views/maxViews*104}`).join(' ');
   return <section ref={panel} className="series-analytics panel" aria-label={t('analytics')}>
-    <div className="analytics-heading"><div><span className="eyebrow">{t('studio')}</span><h2><BarChart3 size={20}/>{t('analytics')}</h2>{data?.series&&<p>{data.series.title}</p>}</div><div className="analytics-heading-actions"><button className="icon-button" disabled={loading} onClick={refresh} aria-label={t('analyticsRefresh')}><RefreshCw size={18}/></button>{onClose&&<button className="icon-button" onClick={onClose} aria-label={t('close')}><X size={19}/></button>}</div></div>
+    <div className="analytics-heading"><div><span className="eyebrow">{t('studio')}</span><h2><BarChart3 size={20}/>{t('analytics')}</h2>{data?.series&&<p className={seriesTitleClass(seriesLanguage)}>{data.series.title}</p>}</div><div className="analytics-heading-actions"><button className="icon-button" disabled={loading} onClick={refresh} aria-label={t('analyticsRefresh')}><RefreshCw size={18}/></button>{onClose&&<button className="icon-button" onClick={onClose} aria-label={t('close')}><X size={19}/></button>}</div></div>
     <form className="analytics-filters" onSubmit={apply}><label className="field">{t('analyticsRange')}<select aria-label={t('analyticsRange')} value={period} onChange={event=>selectPeriod(event.target.value as Period)}>{(Object.keys(periodLabels) as Period[]).map(value=><option value={value} key={value}>{t(periodLabels[value])}</option>)}</select></label>{period==='custom'&&<><label className="field">{t('analyticsFrom')}<input aria-label={t('analyticsFrom')} type="date" value={from} max={to||undefined} onChange={event=>setFrom(event.target.value)} required/></label><label className="field">{t('analyticsTo')}<input aria-label={t('analyticsTo')} type="date" value={to} min={from||undefined} onChange={event=>setTo(event.target.value)} required/></label><button className="button secondary analytics-apply" type="submit">{t('analyticsApply')}</button></>}<span className="analytics-utc">{t('analyticsUtc')}</span></form>
     {dateError&&<p className="form-error" role="alert">{t('analyticsInvalidDates')}</p>}
     {loading?<Loading/>:error?<ErrorState error={error} retry={refresh}/>:data&&<>
