@@ -10,7 +10,7 @@ const deferred=()=>{let resolve!:()=>void;return{promise:new Promise<void>(done=
 async function safeFulfill(route:Route,json:unknown,status=200){await route.fulfill({status,json}).catch(()=>{});}
 async function editor(page:Page){
   const config=await(await page.request.get('/api/config')).json();
-  await page.route('**/api/config',route=>route.fulfill({json:{...config,runtime:'cloudflare',episodeUpload:{mode:'chunked',chunkBytes},limits:{...config.limits,maxEpisodeBytes:maximum,maxEpisodeSeconds:240}}}));
+  await page.route('**/api/config',route=>route.fulfill({json:{...config,runtime:'cloudflare',episodeUpload:{mode:'chunked',chunkBytes},limits:{...config.limits,maxEpisodeBytes:maximum,maxEpisodeSeconds:300}}}));
   const login=await page.request.post('/api/auth/login',{data:{email:'admin@demo.aidramio.test',password:'DemoPass123!'}});expect(login.ok()).toBe(true);const user=(await login.json()).user;
   const created=await page.request.post('/api/studio/series',{data:{...draft,title:`Chunked browser upload ${Date.now()} ${randomUUID()}`}});expect(created.status()).toBe(201);const{id}=await created.json();
   await page.goto(`/studio/series/${id}`);await expect(page.getByRole('button',{name:'Choose video files',exact:true})).toBeEnabled();return{id,user};

@@ -28,7 +28,7 @@ import { paymentTable,purchaseTable,ledgerTable,hasEpisodePurchase,usingTestPaym
 import { startPlayback,recordPlayback,readSeriesAnalytics } from './analytics.js';
 import {isSeriesDeleted,previewSeriesDeletion,deleteSeriesPermanently,cleanupSeriesMedia,queueUnreferencedSeriesMedia,assertSeriesLifecycleFinancialClear} from './series-lifecycle.js';
 import {finishInBackground,scheduleMediaCleanup} from './background.js';
-import { LANGUAGES, GENRES, MAX_EPISODE_BYTES, MAX_EPISODE_SECONDS, DEFAULT_QUOTA_BYTES,MIN_WALLET_FUNDING_CENTS,MAX_WALLET_FUNDING_CENTS } from '../shared/config.js';
+import { LANGUAGES, GENRES, MAX_EPISODE_BYTES, MAX_EPISODE_SECONDS, DEFAULT_QUOTA_BYTES,MIN_WALLET_FUNDING_CENTS,MAX_WALLET_FUNDING_CENTS,MIN_PRICE_CENTS,MAX_PRICE_CENTS } from '../shared/config.js';
 import {SERIES_LIMITS} from '../shared/series-validation.js';
 import {STANDARD_GENRES,STORY_THEMES,SERIES_FORMATS,CREATION_TYPES} from '../shared/taxonomy.js';
 import {SERIES_ACCESS_FILTERS} from '../shared/catalog-access.js';
@@ -47,6 +47,7 @@ import {initializePublisherProfiles,registerPublisherProfiles,seriesPublisher,as
 import {publisherNameSql} from './publisher-profile-sql.js';
 import {coverAspectRatioSchema,seriesCoverAspectRatio,writeSeriesCoverLayout} from './cover-layout.js';
 import {subtitleLanguagesSchema,seriesSubtitleLanguages,writeSeriesSubtitleLanguages} from './subtitle-languages.js';
+import {applyEpisodePriceCap,episodePriceCents} from './episode-pricing.js';
 import {SPOKEN_LANGUAGES,SPOKEN_LANGUAGE_CODES} from '../shared/spoken-languages.js';
 
 const language = z.enum(LANGUAGES.map(x => x.code) as [string, ...string[]]);
@@ -77,7 +78,7 @@ function serializeSeries(s: Record<string, any>, userId?: string, privateView=fa
   const { cover_key, cover_bytes,creator_id,...safe } = s;
   const {publisher,publisher_profile_id}=seriesPublisher(s);
   const genres=JSON.parse(s.genres);
-  return { ...safe,...(privateView?{creator_id}:{}),creator_name:publisher.display_name,publisher_id:publisher.id,publisher,publisher_profile_id,access_type:s.access_type===undefined?readSeriesAccessType(s.id):s.access_type,genres,...seriesClassification(s.id,genres),cover_aspect_ratio:seriesCoverAspectRatio(s.id),last_episode_free:seriesLastEpisodeFree(s.id),free_episode_count:seriesFreeEpisodeCount(s.id),subtitle_languages:seriesSubtitleLanguages(s.id),cover: cover_key?.startsWith('public:') ? cover_key.slice(7) : cover_key ? apiUrl(`/api/${privateView?'studio/series':'series'}/${s.id}/cover`) : '/images/placeholder.svg',
+  return { ...safe,price_cents:episodePriceCents(s.price_cents),...(privateView?{creator_id}:{}),creator_name:publisher.display_name,publisher_id:publisher.id,publisher,publisher_profile_id,access_type:s.access_type===undefined?readSeriesAccessType(s.id):s.access_type,genres,...seriesClassification(s.id,genres),cover_aspect_ratio:seriesCoverAspectRatio(s.id),last_episode_free:seriesLastEpisodeFree(s.id),free_episode_count:seriesFreeEpisodeCount(s.id),subtitle_languages:seriesSubtitleLanguages(s.id),cover: cover_key?.startsWith('public:') ? cover_key.slice(7) : cover_key ? apiUrl(`/api/${privateView?'studio/series':'series'}/${s.id}/cover`) : '/images/placeholder.svg',
     ...(privateView?{taken_down:moderationState(s.id).taken_down,moderation_reason:moderationState(s.id).reason}:{}),
     likes:Number(s.likes??one('SELECT COUNT(*) AS n FROM series_likes WHERE series_id=?',s.id)!.n),
     liked:!!(userId&&one('SELECT 1 FROM series_likes WHERE user_id=? AND series_id=?',userId,s.id)),
@@ -97,6 +98,7 @@ function playbackViewer(req:Request,res:Response,create=false):string|undefined 
 }
 
 export function createApp() {
+  applyEpisodePriceCap();
   ensurePlatformOwnerAccess();
   initializePublisherProfiles();
   if(one("SELECT 1 FROM series_media_deletions WHERE status='pending' LIMIT 1")||one("SELECT 1 FROM episode_upload_sessions WHERE status<>'complete' AND (status<>'cancelled' OR cleanup_pending=1) LIMIT 1"))void finishInBackground(scheduleMediaCleanup()).catch(()=>{});
@@ -183,7 +185,7 @@ export function createApp() {
   registerPublisherProfiles(app,{catalogSelect,serializeSeries});
   app.get('/api/health', (_req,res) => res.json({ ok: true, database: !!one('SELECT 1 AS ready') }));
   app.get('/api/config', async (_req,res) => {initializePromotions();if(config.payments==='stripe'&&stripeConfigured())await ensureStripeWebhookReady(stripe);return res.json({ brand: 'LingYing', languages: LANGUAGES, spokenLanguages:SPOKEN_LANGUAGES, genres: GENRES,standardGenres:STANDARD_GENRES,storyThemes:STORY_THEMES,formats:SERIES_FORMATS,creationTypes:CREATION_TYPES, passPromotion:{enabled:true},creatorPassConsent:{policyVersion:LEGAL_POLICY_VERSION,disclosureVersion:CREATOR_PASS_DISCLOSURE_VERSION},paymentMethods:{wechatPay:wechatPayEnabled()},paymentsMode: config.payments,paymentsReady:paymentsReady(),paymentsConfigured:stripeConfigured(),paymentSetup:stripeWebhookReadiness(),sandbox:config.sandbox,paymentsTestMode:stripeTestPayments()||config.payments==='demo',payoutsEnabled:config.payoutsEnabled&&!stripeTestPayments(),uploadsEnabled:!config.sandbox,usdToHkd: config.usdToHkd,
-    limits: { maxEpisodeSeconds: MAX_EPISODE_SECONDS, maxEpisodeBytes: MAX_EPISODE_BYTES, quotaBytes: DEFAULT_QUOTA_BYTES, activationHkd: 88, minimumPriceUsd: 0.1, creatorShare: 0.7, minimumPayoutUsd: WITHDRAWAL_POLICY.minimumCents/100,minWalletFundingUsd:MIN_WALLET_FUNDING_CENTS/100,maxWalletFundingUsd:MAX_WALLET_FUNDING_CENTS/100 },withdrawalPolicy:WITHDRAWAL_POLICY,walletFunding:WALLET_FUNDING_OPTIONS, demo: config.seed,episodeUpload:{mode:chunkedEpisodeUploadsEnabled()?'chunked':'multipart',chunkBytes:EPISODE_UPLOAD_CHUNK_BYTES}, runtime: (config as any).runtime || 'node', videoFormats: (config as any).videoFormats || ['mp4','mov','webm','m4v'], auth:{google:googleEnabled(),apple:appleEnabled(),email:emailAuthEnabled()} });});
+    limits: { maxEpisodeSeconds: MAX_EPISODE_SECONDS, maxEpisodeBytes: MAX_EPISODE_BYTES, quotaBytes: DEFAULT_QUOTA_BYTES, activationHkd: 88, minimumPriceUsd: MIN_PRICE_CENTS/100,maximumPriceUsd:MAX_PRICE_CENTS/100, creatorShare: 0.7, minimumPayoutUsd: WITHDRAWAL_POLICY.minimumCents/100,minWalletFundingUsd:MIN_WALLET_FUNDING_CENTS/100,maxWalletFundingUsd:MAX_WALLET_FUNDING_CENTS/100 },withdrawalPolicy:WITHDRAWAL_POLICY,walletFunding:WALLET_FUNDING_OPTIONS, demo: config.seed,episodeUpload:{mode:chunkedEpisodeUploadsEnabled()?'chunked':'multipart',chunkBytes:EPISODE_UPLOAD_CHUNK_BYTES}, runtime: (config as any).runtime || 'node', videoFormats: (config as any).videoFormats || ['mp4','mov','webm','m4v'], auth:{google:googleEnabled(),apple:appleEnabled(),email:emailAuthEnabled()} });});
   app.get('/api/auth/me', (req,res) => res.json({ user: req.user || null }));
   app.post('/api/auth/register', rateLimit('register', 12, 15 * 60_000), async (req,res) => {
     const body = registration.parse(req.body);

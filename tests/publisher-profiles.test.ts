@@ -13,6 +13,7 @@ const {createApp,errorHandler}=await import('../server/app');
 const {one,all,run,db}=await import('../server/db');
 const {DATABASE_SCHEMA}=await import('../shared/schema');
 const {setSeriesModeration}=await import('../server/moderation');
+const {writeEpisodeDuration}=await import('../server/episode-duration');
 const origin='https://publisher-profiles.example.test';
 const profileAdmin='/api/admin/publishers';
 const details={title:'Original publisher series',description:'An original short drama used to test public publisher identities.',language:'en',genres:['drama'],creation_type:'human',price_cents:10,free_episodes:1};
@@ -37,11 +38,12 @@ function legacySeries(actor:Actor,title='Legacy series '+randomUUID()){
 function publish(id:string,status='published',views=0){run("UPDATE series SET status=?,views=?,cover_key='public:/images/midnight.jpg' WHERE id=?",status,views,id);}
 function episode(seriesId:string,number:number,duration=30){
   const id=randomUUID();run('INSERT INTO episodes (id,series_id,title,number,duration,bytes,storage_key,original_name) VALUES (?,?,?,?,?,?,?,?)',id,seriesId,'Episode '+number,number,Math.min(duration,180),64,'private/'+id+'.mp4','private-export.mp4');
-  if(duration>180)run('INSERT INTO episode_durations (episode_id,seconds) VALUES (?,?)',id,duration);return id;
+  writeEpisodeDuration(id,duration);return id;
 }
 function playback(episodeId:string,watchedMs:number){
   const id=randomUUID(),now=Date.now();run('INSERT INTO playback_sessions (id,episode_id,viewer_key,started_at_ms,last_seen_ms,watched_ms,reported_ms,counted_view,qualified_at_ms) VALUES (?,?,?,?,?,?,?,?,?)',id,episodeId,createHash('sha256').update(id).digest('hex'),now-watchedMs,now,Math.min(watchedMs,180000),Math.min(watchedMs,180000),1,now);
-  if(watchedMs>180000)run('INSERT INTO playback_session_times (session_id,watched_ms,reported_ms) VALUES (?,?,?)',id,watchedMs,watchedMs);return id;
+  if(watchedMs>180000)run('INSERT INTO playback_session_times (session_id,watched_ms,reported_ms) VALUES (?,?,?)',id,Math.min(watchedMs,240000),Math.min(watchedMs,240000));
+  if(watchedMs>240000)run('INSERT INTO playback_session_times_extended (session_id,watched_ms,reported_ms) VALUES (?,?,?)',id,watchedMs,watchedMs);return id;
 }
 function financial(){return{users:all('SELECT * FROM users ORDER BY id'),testAccounts:all('SELECT * FROM test_accounts ORDER BY user_id'),sessions:all('SELECT * FROM sessions ORDER BY token_hash'),payments:all('SELECT * FROM payments ORDER BY id'),testPayments:all('SELECT * FROM test_payments ORDER BY id'),purchases:all('SELECT * FROM purchases ORDER BY id'),testPurchases:all('SELECT * FROM test_purchases ORDER BY id'),ledger:all('SELECT * FROM ledger ORDER BY id'),testLedger:all('SELECT * FROM test_ledger ORDER BY id')};}
 function assertPublic(value:unknown){
@@ -115,9 +117,9 @@ test('admin assignment changes public attribution while retaining the real creat
   const managed=(await request('/api/admin/series',undefined,admin)).data.series.find((row:any)=>row.id===id);assert.equal(managed.creator_id,admin.id);assert.equal(managed.publisher_id,profile.id);
 });
 
-test('public publisher statistics include only eligible published series and actual four-minute watch totals',async()=>{
+test('public publisher statistics include only eligible published series and actual five-minute watch totals',async()=>{
   const admin=identity('admin'),profile=await createProfile(admin),visible=await createSeries(admin,{publisher_profile_id:profile.id});publish(visible,'published',9);
-  const long=episode(visible,1,240),short=episode(visible,2,30);playback(long,240000);playback(short,30000);
+  const long=episode(visible,1,300),short=episode(visible,2,30);playback(long,300000);playback(short,30000);
   run('INSERT INTO series_likes (user_id,series_id) VALUES (?,?)',viewer.id,visible);run('INSERT INTO series_likes (user_id,series_id) VALUES (?,?)',ordinary.id,visible);
   for(const status of ['draft','archived','takedown','deleted']){
     const hidden=await createSeries(admin,{publisher_profile_id:profile.id});publish(hidden,status==='draft'||status==='archived'?status:'published',1000);playback(episode(hidden,1),30000);run('INSERT INTO series_likes (user_id,series_id) VALUES (?,?)',viewer.id,hidden);
@@ -127,7 +129,7 @@ test('public publisher statistics include only eligible published series and act
   const another=await createSeries(admin);publish(another,'published',9999);playback(episode(another,1),30000);
   for(const actor of [undefined,admin,ordinary]){
     const data=(await request(publicPath(profile.id),undefined,actor)).data;
-    assert.deepEqual(data.series.map((s:any)=>s.id),[visible]);assert.deepEqual(data.stats,{series_count:1,episode_count:2,views:9,tracked_views:2,likes:2,total_watch_seconds:270,avg_watch_seconds:135});assertPublic(data);
+    assert.deepEqual(data.series.map((s:any)=>s.id),[visible]);assert.deepEqual(data.stats,{series_count:1,episode_count:2,views:9,tracked_views:2,likes:2,total_watch_seconds:330,avg_watch_seconds:165});assertPublic(data);
     assert.deepEqual(Object.keys(data.publisher).sort(),['display_name','id','is_official','managed','registered_at']);
   }
 });

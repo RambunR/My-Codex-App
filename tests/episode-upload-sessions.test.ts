@@ -133,14 +133,14 @@ test('concurrent completion cannot create duplicate episodes or release a commit
   assert.equal(used(f),bytes.length);assert.equal(one('SELECT COUNT(*) AS n FROM episodes WHERE series_id=?',f.series)!.n,1);const episode=one('SELECT * FROM episodes WHERE id=?',result.data.id)!;assert.deepEqual(await readFile(physical(episode.storage_key)),bytes);
 });
 
-test('duration is checked again at finalization and an over-four-minute file never becomes an episode',async()=>{
-  const f=fixture(),{session}=await uploadSmall(f);validationDuration=241;
+test('duration is checked again at finalization and an over-five-minute file never becomes an episode',async()=>{
+  const f=fixture(),{session}=await uploadSmall(f);validationDuration=300.001;
   const response=await request(completeRoute(f,session.id),{},f.owner,422);assert.equal(response.data.error.code,'VIDEO_TOO_LONG');assert.equal(used(f),0);assert.equal(one('SELECT COUNT(*) AS n FROM episodes WHERE series_id=?',f.series)!.n,0);
   await request(f.route+'/'+session.id,undefined,f.owner,200,'DELETE');
-  const next=await uploadSmall(f);validationDuration=240;const accepted=await request(completeRoute(f,next.session.id),{},f.owner,201);assert.equal(accepted.data.duration,240);
+  const next=await uploadSmall(f);validationDuration=300;const accepted=await request(completeRoute(f,next.session.id),{},f.owner,201);assert.equal(accepted.data.duration,300);
   assert.ok(Number(one('SELECT duration FROM episodes WHERE id=?',accepted.data.id)!.duration)<=180,'Existing episode CHECK constraints remain valid.');
-  const studio=(await request('/api/studio/series/'+f.series,undefined,f.owner)).data;assert.equal(studio.episodes.find((episode:any)=>episode.id===accepted.data.id).duration,240);
-  const publicDetails=(await request('/api/series/'+f.series,undefined,f.owner)).data;assert.equal(publicDetails.episodes.find((episode:any)=>episode.id===accepted.data.id).duration,240);
+  const studio=(await request('/api/studio/series/'+f.series,undefined,f.owner)).data;assert.equal(studio.episodes.find((episode:any)=>episode.id===accepted.data.id).duration,300);
+  const publicDetails=(await request('/api/series/'+f.series,undefined,f.owner)).data;assert.equal(publicDetails.episodes.find((episode:any)=>episode.id===accepted.data.id).duration,300);
 });
 
 test('moderation and financial holds are rechecked after session creation',async()=>{
@@ -230,7 +230,7 @@ test('a role removed while chunked media validates cannot commit beyond the reta
 });
 
 test('unlimited administrator chunked uploads retain duration validation and financial hold guards',async()=>{
-  const f=fixture();run("UPDATE users SET role='admin',quota_bytes=0 WHERE id=?",f.owner.id);const{session}=await uploadSmall(f);validationDuration=241;
+  const f=fixture();run("UPDATE users SET role='admin',quota_bytes=0 WHERE id=?",f.owner.id);const{session}=await uploadSmall(f);validationDuration=301;
   const invalid=await request(completeRoute(f,session.id),{},f.owner,422);assert.equal(invalid.data.error.code,'VIDEO_TOO_LONG');assert.equal(used(f),0);
   const hold=randomUUID();run('INSERT INTO payment_risk_cases (id,table_group,livemode,kind,provider_object_id,user_id,status) VALUES (?,?,?,?,?,?,?)',hold,'default',0,'dispute','unlimited-chunk-hold-'+hold,f.owner.id,'open');
   try{await request(f.route,input(17,2),f.owner,423);}finally{run("UPDATE payment_risk_cases SET status='resolved' WHERE id=?",hold);}

@@ -28,12 +28,13 @@ export type {CoverAspectRatio,UploadCoverAspectRatio} from './cover-layout.js';
 import type {CoverAspectRatio} from './cover-layout.js';
 import type {SeriesAccessType} from './catalog-access.js';
 export type {SeriesAccessType} from './catalog-access.js';
-export const MAX_EPISODE_SECONDS = 240;
+export const MAX_EPISODE_SECONDS = 300;
 export const MAX_EPISODE_BYTES = 200 * 1024 * 1024;
 export const DEFAULT_QUOTA_BYTES = 10 * 1024 * 1024 * 1024;
 export const USD_MICROS = 1_000_000;
 export const ACTIVATION_HKD_CENTS = 8800;
 export const MIN_PRICE_CENTS = 10;
+export const MAX_PRICE_CENTS = 100;
 export const MIN_WALLET_FUNDING_CENTS = 500;
 // Documented eight-digit USD PaymentIntent amount supported by this integration.
 export const MAX_WALLET_FUNDING_CENTS = 99_999_999;

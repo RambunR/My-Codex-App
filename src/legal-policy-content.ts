@@ -28,11 +28,13 @@ const en:LegalPolicyCopy={
         'Before opening a new Pass checkout, review these Terms, acknowledge the Privacy Policy and expressly confirm that results are not guaranteed using the required checkbox. We record the accepted versions, language, time and related payment as evidence of that acknowledgement. This acknowledgement does not provide consent to unrelated marketing.',
         'Dramio Pass is a one-time payment for access to the creator publishing features described at purchase, subject to these Terms, account eligibility, content review and technical limits. The regular price is HK$88; a valid promotion may change the amount shown at checkout. Actual billing is in HKD. Other-currency displays are indicative estimates. The Pass is not a purchase of viewers, advertising, investment returns or employment.',
         'Buying a Pass, uploading content or being featured does not guarantee approval, distribution, recommendations, any minimum view count, followers, paid unlocks, sales, revenue, income or recovery of production and Pass costs. Earnings may be zero. Results depend on audience demand, content, pricing, lawful availability and other factors. Examples, estimates, promotional language and another creator’s results are not promises of your results.',
-        'Regular publishers currently receive a 10 GiB storage allowance. Administrator-owned media may have different access. The current episode limits are 4 minutes and 200 MiB per input file; covers are subject to separate limits. Any storage increase or additional service must be separately approved and quoted. A Pass does not exempt content from moderation or provide an unconditional right to permanent hosting.',
+        'Regular publishers currently receive a 10 GiB storage allowance. Administrator-owned media may have different access. The current episode limits are 5 minutes and 200 MiB per input file; covers are subject to separate limits. Any storage increase or additional service must be separately approved and quoted. A Pass does not exempt content from moderation or provide an unconditional right to permanent hosting.',
       ]},
       {id:'content-rights',title:'3. Your content and permission to operate the service',paragraphs:[
         'You retain the rights you lawfully hold in your content. You confirm that you have all permissions needed to upload, store, display, stream and monetise it, including video, music, scripts, artwork, trademarks, performances, personal data, voices and likenesses. An AI-generated or AI-assisted label does not establish ownership, clear third-party rights or excuse infringement. Describe the production method and language accurately.',
         'You grant the Company a non-exclusive, worldwide permission to host, copy, technically process, format, display and stream submitted content as needed to operate, secure and promote its availability on LingYing, including through service providers. This does not transfer ownership or authorise unrelated exploitation of your work. Removing content ends future public use where practicable, while limited copies and records may remain for existing transactions, legal duties, disputes, security, backups or removal processing.',
+        "For operating and marketing LingYing, you also grant the Company a non-exclusive, worldwide, royalty-free licence to use, reproduce, adapt for length or format, display and distribute short videos that you upload and publish on LingYing, in full or as excerpts, together with their covers, thumbnails, titles and public creator or publisher display name, on LingYing’s official social-media accounts and promotional channels. We may exercise this promotional permission without separate prior notification, approval or additional licence payment.",
+        "This permission is limited to operating and promoting LingYing and the available works. You confirm that you have the rights needed for these off-platform uses and retain ownership. Service providers and social-media platforms may process the material only as needed to support these authorised uses. It does not authorise unrelated resale or exploitation, alter revenue otherwise due under these Terms, waive rights that cannot legally be waived, or guarantee any promotion, views or income. Removal ends future promotional use where practicable; we will review rights or privacy complaints about posts under our control, but cannot guarantee recall of copies independently shared or cached by third parties.",
       ]},
       {id:'acceptable-use',title:'4. Acceptable use and prohibited content',paragraphs:['Do not use LingYing to violate law, another person’s rights or the service’s security. In particular, do not upload or engage in:'],items:[
         'Copyright or trademark infringement, stolen or unauthorised media, impersonation, misleading ownership claims or misuse of a person’s voice or likeness.',
@@ -50,7 +52,7 @@ const en:LegalPolicyCopy={
         'We may restrict the material while reviewing the complaint and seek information from the uploader. The uploader may provide evidence of a licence, ownership, consent or another lawful basis. We will consider relevant evidence and applicable law; restoration is not guaranteed. Necessary complaint information may be shared for a fair response, with appropriate protection of personal data. This procedure does not replace any statutory notice process or court remedy.',
       ],contact:true},
       {id:'purchases-refunds',title:'7. Prices, wallet credit, episode access and refunds',paragraphs:[
-        'Review the price, currency, promotion and service description before confirming payment. Wallet credit and episode prices are accounted for in USD; wallet credit is for purchases on LingYing and is not a cash-withdrawal facility. A price change does not retrospectively change a completed purchase. Applicable tax, exchange or payment-provider charges are governed by the information shown for the transaction and applicable law.',
+        'Review the price, currency, promotion and service description before confirming payment. Creators may set a paid episode price from US$0.10 to US$1.00 per episode. Wallet credit and episode prices are accounted for in USD; wallet credit is for purchases on LingYing and is not a cash-withdrawal facility. Price changes, including a reduction to comply with the current maximum, apply to future unlocks and do not rewrite completed purchase receipts, their original amounts or existing entitlements. Applicable tax, exchange or payment-provider charges are governed by the information shown for the transaction and applicable law.',
         'A Pass fee buys publishing access rather than a particular commercial outcome. Disappointing views or earnings alone do not create a promised-results refund entitlement. This does not exclude a refund or other remedy required by law, including where a paid service was not supplied or was misdescribed. Contact us with the receipt or payment reference and the problem so we can review an appropriate remedy. Do not send full card details.',
         'There is no blanket waiver of refund, chargeback or other consumer rights. Failed, duplicate, unauthorised or disputed payments and loss of paid access are reviewed on their facts. A content removal or account closure does not automatically create or automatically defeat a refund claim.',
       ],contact:true},
@@ -103,6 +105,7 @@ const en:LegalPolicyCopy={
     ]},
     {id:'public-information',title:'6. Public content and who can see other records',paragraphs:[
       'Published series, covers, descriptions, public creator or publisher names, declared content languages, public profile dates, and displayed views or likes may be visible to other visitors and search engines. Consider what you disclose before uploading. Do not place private personal information in public fields unless you have an appropriate lawful basis and understand that others may copy it.',
+      "Under the promotional permission in the Terms, we may share your published shorts, full videos or excerpts, covers, thumbnails, titles and public creator or publisher display name on LingYing’s official social-media accounts and promotional channels without a separate advance notification or approval. Those posts are public, and social-media platforms may process them under their own terms and privacy policies. This permission does not authorise public disclosure of private drafts, account email addresses, identity documents or payment records. Applicable privacy rights and any legally required separate consent remain protected.",
       'Creators receive aggregate views, viewing time, likes, paid unlocks and distinct paid-user counts relating to their work, including daily or episode-level summaries. They do not receive individual viewers’ names, emails, passwords, payment-card details or individual viewing histories through those reports. Authorised administrators may access account, content, financial, storage, support and moderation records as needed for service administration and reviews.',
     ]},
     {id:'retention',title:'7. Retention, content removal and account closure',paragraphs:[
@@ -142,11 +145,13 @@ const zhTW:LegalPolicyCopy={
       '開啟新的通行證結帳前，請閱讀本條款、知悉私隱政策，並透過必填確認方格明確確認成果不獲保證。我們會記錄所接受的版本、語言、時間及相關付款，作為該項確認的紀錄。這不構成對無關直接促銷的同意。',
       'Dramio Pass 是使用購買時所描述之創作者發布功能的一次性付款，並受本條款、帳戶資格、內容審核及技術限制約束。標準價格為一次港幣88元；有效優惠可能改變結帳顯示的金額。實際以港幣收費，其他貨幣顯示僅供估算。通行證並非購買觀眾、廣告、投資回報或僱傭關係。',
       '購買通行證、上傳內容或獲平台推薦，均不保證審核通過、分發、推薦曝光、最低觀看次數、追蹤者、付費解鎖、銷售、營收、收入，亦不保證收回製作費或通行證成本。收益可能為零。成果取決於觀眾需求、內容、定價、合法可用性及其他因素。示例、估算、宣傳用語及其他創作者的成果，均非對您成果的承諾。',
-      '一般發布者目前獲10 GiB儲存額度，管理員自有媒體的權限可能不同。目前每集輸入檔案上限為4分鐘及200 MiB，封面另有上限。增加儲存額度或其他服務須另行批准及報價。通行證不豁免內容審核，也不提供無條件永久託管的權利。',
+      '一般發布者目前獲10 GiB儲存額度，管理員自有媒體的權限可能不同。目前每集輸入檔案上限為5分鐘及200 MiB，封面另有上限。增加儲存額度或其他服務須另行批准及報價。通行證不豁免內容審核，也不提供無條件永久託管的權利。',
     ]},
     {id:'content-rights',title:'3. 您的內容及平台營運授權',paragraphs:[
       '您保留依法享有的內容權利，並確認已取得上傳、儲存、展示、串流及營利所需的一切許可，包括影片、音樂、劇本、美術、商標、演出、個人資料、聲音及肖像。標示為AI生成或AI輔助，不等於已確立擁有權、清除第三方權利或免除侵權責任。請準確描述製作方式及語言。',
       '您授予公司非獨家、全球性的許可，讓公司及其服務供應商在營運、保障 LingYing 及宣傳內容在平台上可用所需的範圍內，託管、複製、技術處理、轉換格式、展示及串流所提交內容。這不轉移擁有權，也不授權與服務無關的利用。移除內容後，未來公開使用會在可行情況下停止，但為現有交易、法律義務、爭議、安全、備份或移除程序所需的有限副本及紀錄可能保留。',
+      "為營運及宣傳 LingYing，您另授予公司非獨家、全球性、免版稅的許可，在 LingYing 的官方社交媒體帳戶及推廣渠道，使用、複製、按長度或格式調整、展示及分發您上傳並已在 LingYing 發布的短片（完整影片或節錄），以及相關封面、縮圖、標題及公開創作者或發布者顯示名稱。公司可行使此宣傳許可，毋須另行事先通知、取得批准或支付額外授權費。",
+      "此許可僅限營運及推廣 LingYing 和可供觀看的作品。您確認擁有上述站外用途所需的權利，並保留擁有權。服務供應商及社交媒體平台只可在支援上述獲授權用途所需的範圍內處理素材。此許可不授權無關的轉售或利用、不改變本條款下原本應付的營收、不豁免依法不得放棄的權利，亦不保證獲得任何宣傳、觀看或收入。移除內容後，未來推廣會在可行情況下停止；我們會覆核涉及由我們控制之帖文的權利或私隱投訴，但不能保證收回第三方自行分享或快取的副本。",
     ]},
     {id:'acceptable-use',title:'4. 可接受使用及禁止內容',paragraphs:['不得利用 LingYing 違反法律、侵犯他人權利或破壞服務安全，尤其不得上傳或從事：'],items:[
       '侵犯版權或商標、盜用或未經授權的媒體、冒充他人、虛報擁有權，或濫用他人聲音及肖像。',
@@ -164,7 +169,7 @@ const zhTW:LegalPolicyCopy={
       '覆核期間，我們可限制有關內容，並向上傳者查詢。上傳者可提供授權、擁有權、同意或其他合法依據的證據。我們會考慮相關證據及適用法律，但不保證恢復內容。為公平回應投訴，必要資料可能在適當保障個人資料的情況下與相關人士分享。本程序不取代任何法定通知程序或法院救濟。',
     ],contact:true},
     {id:'purchases-refunds',title:'7. 價格、錢包、集數存取及退款',paragraphs:[
-      '確認付款前，請查閱價格、貨幣、優惠及服務描述。錢包額度及集數價格以美元記帳；錢包僅供在 LingYing 購物，不提供現金提領功能。價格變動不會追溯改變已完成交易。適用稅項、匯兌或支付服務商費用，以交易所展示的資料及適用法律為準。',
+      '確認付款前，請查閱價格、貨幣、優惠及服務描述。創作者可將付費集數價格設定為每集US$0.10至US$1.00。錢包額度及集數價格以美元記帳；錢包僅供在 LingYing 購物，不提供現金提領功能。價格變動（包括為符合現行上限而降價）只適用於之後的解鎖，不會改寫已完成購買的收據、原有金額或既有權益。適用稅項、匯兌或支付服務商費用，以交易所展示的資料及適用法律為準。',
       '通行證費用購買的是發布權限，而非指定商業成果。觀看或收益未如理想，本身不會產生「保證成果」的退款權利。但本條款不排除法律要求的退款或其他救濟，包括已付款服務未獲提供或描述失實。請提供收據或付款編號及問題，讓我們覆核適當處理方式；請勿提供完整卡號。',
       '本條款不概括豁免退款、拒付或其他消費者權利。失敗、重複、未經授權或有爭議的付款，以及喪失已付款存取權，均按實際情況覆核。內容下架或帳戶結束，不會自動成立或自動否定退款申請。',
     ],contact:true},
@@ -217,6 +222,7 @@ const zhTW:LegalPolicyCopy={
     ]},
     {id:'public-information',title:'6. 公開資料及其他紀錄的存取',paragraphs:[
       '已發布劇集、封面、描述、公開創作者或發布者名稱、聲明的內容語言、公開檔案日期，以及顯示的觀看及讚好數字，可能被其他訪客及搜尋引擎查看。上傳前請考慮披露內容。除非具備適當合法依據，並了解他人可能複製，否則不要將私人個人資料放入公開欄位。',
+      "按使用條款的宣傳許可，我們可在 LingYing 的官方社交媒體帳戶及推廣渠道分享您已發布的短片、完整影片或節錄、封面、縮圖、標題及公開創作者或發布者顯示名稱，毋須另行事先通知或取得批准。這些帖文屬公開資料，社交媒體平台可能按自身條款及私隱政策處理。此許可不授權公開披露私人草稿、帳戶電郵、身份證明文件或付款紀錄。適用私隱權利及法律要求的獨立同意仍受保障。",
       '創作者會取得與自己作品相關的整體觀看、觀看時間、讚好、付費解鎖及不同付費用戶人數，包括每日或每集摘要。這些報表不提供個別觀眾姓名、電郵、密碼、付款卡資料或個人觀看歷史。獲授權管理員可按服務管理及覆核需要，存取帳戶、內容、財務、儲存、支援及審核紀錄。',
     ]},
     {id:'retention',title:'7. 保留、內容移除及結束帳戶',paragraphs:[
@@ -256,11 +262,13 @@ const zhCN:LegalPolicyCopy={
       '开启新的通行证结账前，请阅读本条款、知悉隐私政策，并通过必填确认框明确确认成果不获保证。我们会记录所接受的版本、语言、时间及相关付款，作为该项确认的记录。这不构成对无关直接营销的同意。',
       'Dramio Pass 是使用购买时所描述的创作者发布功能的一次性付款，并受本条款、账户资格、内容审核及技术限制约束。标准价格为一次港币88元；有效优惠可能改变结账显示的金额。实际以港币收费，其他货币显示仅供估算。通行证并非购买观众、广告、投资回报或雇佣关系。',
       '购买通行证、上传内容或获平台推荐，均不保证审核通过、分发、推荐曝光、最低观看次数、关注者、付费解锁、销售、营收、收入，也不保证收回制作费或通行证成本。收益可能为零。成果取决于观众需求、内容、定价、合法可用性及其他因素。示例、估算、宣传用语及其他创作者的成果，均非对您成果的承诺。',
-      '一般发布者目前获10 GiB存储额度，管理员自有媒体的权限可能不同。目前每集输入文件上限为4分钟及200 MiB，封面另有上限。增加存储额度或其他服务须另行批准及报价。通行证不豁免内容审核，也不提供无条件永久托管的权利。',
+      '一般发布者目前获10 GiB存储额度，管理员自有媒体的权限可能不同。目前每集输入文件上限为5分钟及200 MiB，封面另有上限。增加存储额度或其他服务须另行批准及报价。通行证不豁免内容审核，也不提供无条件永久托管的权利。',
     ]},
     {id:'content-rights',title:'3. 您的内容及平台运营授权',paragraphs:[
       '您保留依法享有的内容权利，并确认已取得上传、存储、展示、串流及营利所需的一切许可，包括视频、音乐、剧本、美术、商标、表演、个人资料、声音及肖像。标示为AI生成或AI辅助，不等于已确立所有权、清除第三方权利或免除侵权责任。请准确描述制作方式及语言。',
       '您授予公司非独家、全球性的许可，让公司及其服务供应商在运营、保障 LingYing 及宣传内容在平台上可用所需的范围内，托管、复制、技术处理、转换格式、展示及串流所提交内容。这不转移所有权，也不授权与服务无关的利用。移除内容后，未来公开使用会在可行情况下停止，但为现有交易、法律义务、争议、安全、备份或移除程序所需的有限副本及记录可能保留。',
+      "为运营及宣传 LingYing，您另授予公司非独家、全球性、免版税的许可，在 LingYing 的官方社交媒体账户及推广渠道，使用、复制、按长度或格式调整、展示及分发您上传并已在 LingYing 发布的短片（完整视频或节录），以及相关封面、缩略图、标题及公开创作者或发布者显示名称。公司可行使此宣传许可，无须另行事先通知、取得批准或支付额外授权费。",
+      "此许可仅限运营及推广 LingYing 和可供观看的作品。您确认拥有上述站外用途所需的权利，并保留所有权。服务供应商及社交媒体平台只可在支持上述获授权用途所需的范围内处理素材。此许可不授权无关的转售或利用、不改变本条款下原本应付的营收、不豁免依法不得放弃的权利，也不保证获得任何宣传、观看或收入。移除内容后，未来推广会在可行情况下停止；我们会复核涉及由我们控制之帖文的权利或隐私投诉，但不能保证收回第三方自行分享或缓存的副本。",
     ]},
     {id:'acceptable-use',title:'4. 可接受使用及禁止内容',paragraphs:['不得利用 LingYing 违反法律、侵犯他人权利或破坏服务安全，尤其不得上传或从事：'],items:[
       '侵犯版权或商标、盗用或未经授权的媒体、冒充他人、虚报所有权，或滥用他人声音及肖像。',
@@ -278,7 +286,7 @@ const zhCN:LegalPolicyCopy={
       '复核期间，我们可限制有关内容，并向上传者查询。上传者可提供授权、所有权、同意或其他合法依据的证据。我们会考虑相关证据及适用法律，但不保证恢复内容。为公平回应投诉，必要资料可能在适当保护个人资料的情况下与相关人士分享。本程序不取代任何法定通知程序或法院救济。',
     ],contact:true},
     {id:'purchases-refunds',title:'7. 价格、钱包、集数访问及退款',paragraphs:[
-      '确认付款前，请查阅价格、货币、优惠及服务描述。钱包额度及集数价格以美元记账；钱包仅供在 LingYing 购物，不提供现金提现功能。价格变动不会追溯改变已完成交易。适用税项、汇兑或支付服务商费用，以交易所展示的资料及适用法律为准。',
+      '确认付款前，请查阅价格、货币、优惠及服务描述。创作者可将付费集数价格设定为每集US$0.10至US$1.00。钱包额度及集数价格以美元记账；钱包仅供在 LingYing 购物，不提供现金提现功能。价格变动（包括为符合现行上限而降价）只适用于之后的解锁，不会改写已完成购买的收据、原有金额或既有权益。适用税项、汇兑或支付服务商费用，以交易所展示的资料及适用法律为准。',
       '通行证费用购买的是发布权限，而非指定商业成果。观看或收益未如理想，本身不会产生“保证成果”的退款权利。但本条款不排除法律要求的退款或其他救济，包括已付款服务未获提供或描述失实。请提供收据或付款编号及问题，让我们复核适当处理方式；请勿提供完整卡号。',
       '本条款不概括豁免退款、拒付或其他消费者权利。失败、重复、未经授权或有争议的付款，以及丧失已付款访问权，均按实际情况复核。内容下架或账户结束，不会自动成立或自动否定退款申请。',
     ],contact:true},
@@ -331,6 +339,7 @@ const zhCN:LegalPolicyCopy={
     ]},
     {id:'public-information',title:'6. 公开资料及其他记录的访问',paragraphs:[
       '已发布剧集、封面、描述、公开创作者或发布者名称、声明的内容语言、公开档案日期，以及显示的观看及点赞数字，可能被其他访客及搜索引擎查看。上传前请考虑披露内容。除非具备适当合法依据，并了解他人可能复制，否则不要将私人个人资料放入公开字段。',
+      "按使用条款的宣传许可，我们可在 LingYing 的官方社交媒体账户及推广渠道分享您已发布的短片、完整视频或节录、封面、缩略图、标题及公开创作者或发布者显示名称，无须另行事先通知或取得批准。这些帖文属公开资料，社交媒体平台可能按自身条款及隐私政策处理。此许可不授权公开披露私人草稿、账户电邮、身份证明文件或付款记录。适用隐私权利及法律要求的独立同意仍受保护。",
       '创作者会取得与自己作品相关的整体观看、观看时间、点赞、付费解锁及不同付费用户人数，包括每日或每集摘要。这些报表不提供个别观众姓名、电邮、密码、付款卡资料或个人观看历史。获授权管理员可按服务管理及复核需要，访问账户、内容、财务、存储、支持及审核记录。',
     ]},
     {id:'retention',title:'7. 保留、内容移除及结束账户',paragraphs:[

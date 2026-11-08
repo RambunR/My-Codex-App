@@ -18,7 +18,7 @@ async function fixture(page:Page,{mode='chunked',hold='part',episode=1,holdClean
   await page.route('**/api/**',async route=>{
     const req=route.request(),url=new URL(req.url()),path=url.pathname,method=req.method();
     if(path==='/api/auth/me'){await fulfill(route,{user});return;}
-    if(path==='/api/config'){await fulfill(route,{brand:'LingYing',paymentsMode:'disabled',paymentsReady:false,payoutsEnabled:false,uploadsEnabled:true,usdToHkd:7.8,demo:false,runtime:mode==='chunked'?'cloudflare':'node',videoFormats:['mp4','mov'],episodeUpload:{mode,chunkBytes},limits:{maxEpisodeBytes:200*MiB,maxEpisodeSeconds:240,quotaBytes:5*1024**3,activationHkd:88}});return;}
+    if(path==='/api/config'){await fulfill(route,{brand:'LingYing',paymentsMode:'disabled',paymentsReady:false,payoutsEnabled:false,uploadsEnabled:true,usdToHkd:7.8,demo:false,runtime:mode==='chunked'?'cloudflare':'node',videoFormats:['mp4','mov'],episodeUpload:{mode,chunkBytes},limits:{maxEpisodeBytes:200*MiB,maxEpisodeSeconds:300,quotaBytes:5*1024**3,activationHkd:88}});return;}
     if(path==='/api/studio'){await fulfill(route,{user,series:[series(firstId),series(otherId)],stats:{sales:0,lifetime_micros:0},withdrawals:[],storageRequests:[]});return;}
     if(path==='/api/series'){await fulfill(route,{series:[]});return;}
     if(path===editorPath(firstId).replace('/studio','/api/studio')||path===editorPath(otherId).replace('/studio','/api/studio')){

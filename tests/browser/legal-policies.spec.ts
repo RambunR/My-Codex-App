@@ -35,8 +35,15 @@ for(const locale of ['en','zh-TW','zh-CN'] as const)for(const kind of ['terms','
   for(const id of ids){await expect(policy.locator('.legal-section#'+id+' h2')).toHaveCount(1);await expect(policy.locator(`.legal-toc a[href="#${id}"]`)).toHaveCount(1);}
   if(kind==='terms'){
     await expect(policy.locator('#creator-pass')).toContainText('10 GiB');
+    await expect(policy.locator('#creator-pass')).toContainText(locale==='en'?'5 minutes':locale==='zh-TW'?'5分鐘':'5分钟');
+    await expect(policy.locator('#creator-pass')).toContainText('200 MiB');
+    for(const price of ['US$0.10','US$1.00'])await expect(policy.locator('#purchases-refunds')).toContainText(price);
+    const promotion=locale==='en'?['non-exclusive, worldwide, royalty-free','official social-media','without separate prior notification, approval or additional licence payment','retain ownership','guarantee any promotion, views or income']:locale==='zh-TW'?['非獨家、全球性、免版稅','官方社交媒體','毋須另行事先通知、取得批准或支付額外授權費','保留擁有權','不保證獲得任何宣傳、觀看或收入']:['非独家、全球性、免版税','官方社交媒体','无须另行事先通知、取得批准或支付额外授权费','保留所有权','不保证获得任何宣传、观看或收入'];
+    for(const clause of promotion)await expect(policy.locator('#content-rights')).toContainText(clause);
     await expect(policy.locator('#copyright-reports')).toContainText(contact);await expect(policy.locator('#disputes')).toContainText(locale==='en'?/internal/i:/內部|内部/);await expect(policy.locator('#disputes')).toContainText(locale==='en'?/courts?|regulators?/i:/法院|法庭|監管|监管/);
     await expect(policy).toContainText(locale==='en'?/mandatory|non-waivable|statutory/i:/強制|强制|法定|不可放棄|不可放弃/);
+  }else{
+    for(const clause of locale==='en'?['official social-media','without a separate advance notification or approval','does not authorise public disclosure of private drafts']:locale==='zh-TW'?['官方社交媒體','毋須另行事先通知或取得批准','不授權公開披露私人草稿']:['官方社交媒体','无须另行事先通知或取得批准','不授权公开披露私人草稿'])await expect(policy.locator('#public-information')).toContainText(clause);
   }
   const target=kind==='terms'?'creator-pass':'privacy-rights',tocLink=policy.locator(`.legal-toc a[href="#${target}"]`);await tocLink.focus();await expect(tocLink).toBeFocused();await page.keyboard.press('Enter');await expect(page).toHaveURL(url=>url.pathname==='/'+kind&&url.hash==='#'+target);await expect(policy.locator('#'+target+' h2')).toBeInViewport();await noOverflow(page);expect(writes).toEqual([]);
 });

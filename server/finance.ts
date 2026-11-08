@@ -1,3 +1,4 @@
+import {episodePriceCents} from './episode-pricing.js';
 import type {CheckoutChoice} from '../shared/wechat-pay.js';
 import {wechatPayEnabled,requestedWechatQuote,bindWechatQuote,storeCheckoutMethod,checkoutMethod,verifyWechatSession} from './wechat-pay.js';
 import {episodeFreeSql} from './episode-access.js';
@@ -84,9 +85,10 @@ export function unlockEpisode(userId: string, episodeId: string) {
     if (episode.free || episode.creator_id === userId) return { alreadyUnlocked: true };
     if (hasEpisodePurchase(userId,episodeId)) return { alreadyUnlocked: true };
     const user = financeAccount(userId);
-    const price = episode.price_cents * 10000;
+    const cents=episodePriceCents(episode.price_cents);
+    const price = cents * 10000;
     assert(user && user.wallet_micros >= price, 402, 'INSUFFICIENT_FUNDS', 'Add funds to your wallet to unlock this episode.');
-    const creator = episode.price_cents * 7000; const platform = episode.price_cents * 3000; const id = crypto.randomUUID();
+    const creator = cents * 7000; const platform = cents * 3000; const id = crypto.randomUUID();
     const publisher=financeAccount(episode.creator_id);
     assert(publisher&&canAdd(publisher.earnings_micros,creator),409,'BALANCE_LIMIT','The publisher cannot receive this purchase right now. Your wallet was not charged.');
     run(`UPDATE ${accountTable()} SET wallet_micros=wallet_micros-? WHERE ${accountIdColumn()}=?`, price, userId);

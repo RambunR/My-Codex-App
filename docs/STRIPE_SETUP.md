@@ -33,9 +33,9 @@ Stripe also offers a **paid custom Checkout-domain feature** for putting the Str
 
 ## Payment rules and financial separation
 
-- Dramio Pass costs **HK$88 once**, separately from USD wallet funding. It is not a subscription and adds no wallet credit. Test activation permits publisher uploads under the normal **5 GiB**, **240-second** and **200 MiB** limits.
+- Dramio Pass costs **HK$88 once**, separately from USD wallet funding. It is not a subscription and adds no wallet credit. Test activation permits publisher uploads under the normal **10 GiB**, **300-second** and **200 MiB** limits.
 - Wallet deposits start at **US$5**, with custom amounts up to two decimal places. The technical ceiling is US$999,999.99, subject to Stripe/account acceptance limits.
-- Episode prices start at **US$0.10**. Publishers choose initial free episodes. A paid test unlock deducts its server price once and records **70% publisher / 30% platform** earnings.
+- Paid episode prices range from **US$0.10 to US$1.00**. Publishers choose initial free episodes. A paid test unlock deducts its server price once and records **70% publisher / 30% platform** earnings.
 - Test balances, pass ownership, payments, purchases and ledgers use `test_accounts`, `test_payments`, `test_purchases` and `test_ledger` in the same database, linked to existing user IDs. Real financial records and entitlements remain separate and unchanged.
 - Test funds/earnings/passes never become real-money records when live mode is enabled. Existing real entitlements remain honored during testing. Test earnings cannot be paid out.
 
@@ -44,7 +44,7 @@ Stripe also offers a **paid custom Checkout-domain feature** for putting the Str
 1. On the existing website, select `STRIPE_TEST_MODE=true` using the saved dedicated test pair, reload, sign in, and confirm the test-payment notice. Open a fresh Checkout; an old live Checkout remains live. Google/Apple callback configuration is independent and does not change for this switch.
 2. Open **Wallet**, enter US$5 or a custom amount such as US$23.45, and press **Add funds**. Confirm Stripe displays its Sandbox/Test context before submitting payment.
 3. Use **4242 4242 4242 4242**, a future expiry such as **12/30**, CVC **123**, and a valid-format postal code if requested. Use no real card. Return to Wallet and verify the exact test credit; reload and confirm it was not duplicated.
-4. For Dramio Pass, open **Creator studio → Get Dramio Pass · HK$88** and complete its separate test Checkout. Account should show **Active / Test pass** with 5 GiB storage; the USD wallet balance must stay unchanged.
+4. For Dramio Pass, open **Creator studio → Get Dramio Pass · HK$88** and complete its separate test Checkout. Account should show **Active / Test pass** with 10 GiB storage; the USD wallet balance must stay unchanged.
 5. With a publisher test account, upload compatible episodes and set free episodes/pricing. Use another viewer test account for paid unlocks. A US$0.10 unlock from a US$5 wallet leaves US$4.90, with US$0.07 publisher and US$0.03 platform test earnings. Reopening must not charge again.
 6. Separately inspect Stripe's **Event deliveries** for the matching successful Checkout event. Verify direct HTTP 200 delivery, not only an application success redirect or reconciliation response.
 

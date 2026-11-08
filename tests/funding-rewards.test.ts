@@ -217,15 +217,15 @@ test('a won dispute reverses a gift-only debit and reopens a sibling with uncove
   risk.resolvePaymentReview(refunded.id,admin.id,{decision:'reconciled',wallet_debit_cents:500,note});assert.equal(balance(actor),0);
 });
 
-test('gift credit can unlock an episode costing more than the cash deposit without creating withdrawal earnings',async()=>{
+test('a gift-funded wallet unlocks an episode with an exact fractional-cent split without making the gift withdrawable',async()=>{
   const actor=identity(),creator=identity('publisher'),p=await checkout(actor,5000);await deliver(event(p));
   const seriesId=randomUUID(),episodeId=randomUUID();
-  run("INSERT INTO series (id,creator_id,title,description,language,genres,status,price_cents,free_episodes) VALUES (?,?,?,?,?,?,'published',5100,0)",seriesId,creator.id,'Gift unlock fixture','An original episode verifying promotional wallet credit.','en','["drama"]');
+  run("INSERT INTO series (id,creator_id,title,description,language,genres,status,price_cents,free_episodes) VALUES (?,?,?,?,?,?,'published',51,0)",seriesId,creator.id,'Gift unlock fixture','An original episode verifying promotional wallet credit.','en','["drama"]');
   run('INSERT INTO episodes (id,series_id,title,number,duration,bytes,storage_key) VALUES (?,?,?,?,?,?,?)',episodeId,seriesId,'Paid episode',1,10,1,'fixture/not-streamed.mp4');
   const purchase=(await request('/api/episodes/'+episodeId+'/unlock',{},actor.cookie)).data;
-  assert.equal(purchase.paid_micros,51_000_000);assert.equal(purchase.creator_micros,35_700_000);assert.equal(purchase.platform_micros,15_300_000);assert.equal(balance(actor),4_000_000);
+  assert.equal(purchase.paid_micros,510_000);assert.equal(purchase.creator_micros,357_000);assert.equal(purchase.platform_micros,153_000);assert.equal(balance(actor),54_490_000);
   assert.equal(one('SELECT earnings_micros FROM users WHERE id=?',actor.id)!.earnings_micros,0);
-  assert.equal(one('SELECT earnings_micros FROM users WHERE id=?',creator.id)!.earnings_micros,35_700_000);
+  assert.equal(one('SELECT earnings_micros FROM users WHERE id=?',creator.id)!.earnings_micros,357_000);
   await request('/api/studio/withdrawals',{amount_cents:300},actor.cookie,403);
   assert.equal(one('SELECT COUNT(*) AS n FROM withdrawals WHERE user_id=?',actor.id)!.n,0);
 });

@@ -63,7 +63,8 @@ export function recordPlayback(sessionId:string,viewerKey:string,cumulativeWatch
     if(qualifies&&!session.counted_view)run('UPDATE series SET views=views+1 WHERE id=?',session.series_id);
     const reportedMs=Math.max(session.reported_ms,cumulativeWatchedMs);
     run('UPDATE playback_sessions SET watched_ms=?,reported_ms=?,last_seen_ms=?,counted_view=?,qualified_at_ms=? WHERE id=?',Math.min(LEGACY_PLAYBACK_MAX_MS,watchedMs),Math.min(LEGACY_PLAYBACK_MAX_MS,reportedMs),now,qualifies?1:0,session.qualified_at_ms??(qualifies?now:null),session.id);
-    if(watchedMs>LEGACY_PLAYBACK_MAX_MS||reportedMs>LEGACY_PLAYBACK_MAX_MS)run('INSERT INTO playback_session_times (session_id,watched_ms,reported_ms) VALUES (?,?,?) ON CONFLICT(session_id) DO UPDATE SET watched_ms=excluded.watched_ms,reported_ms=excluded.reported_ms',session.id,watchedMs,reportedMs);
+    if(watchedMs>LEGACY_PLAYBACK_MAX_MS||reportedMs>LEGACY_PLAYBACK_MAX_MS)run('INSERT INTO playback_session_times (session_id,watched_ms,reported_ms) VALUES (?,?,?) ON CONFLICT(session_id) DO UPDATE SET watched_ms=excluded.watched_ms,reported_ms=excluded.reported_ms',session.id,Math.min(240000,watchedMs),Math.min(240000,reportedMs));
+    if(watchedMs>240000||reportedMs>240000)run('INSERT INTO playback_session_times_extended (session_id,watched_ms,reported_ms) VALUES (?,?,?) ON CONFLICT(session_id) DO UPDATE SET watched_ms=excluded.watched_ms,reported_ms=excluded.reported_ms',session.id,watchedMs,reportedMs);
     return{sessionId:session.id,watchedMs,reportedMs,viewCounted:qualifies};
   });
 }

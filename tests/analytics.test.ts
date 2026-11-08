@@ -259,7 +259,7 @@ test('four-minute playback preserves actual totals and summaries beyond the lega
   now+=5000;
   const replay=(await request(route,{watchedMs:240_000},viewerA.cookie,200,'PUT')).data;
   assert.equal(replay.watchedMs,240_000);assert.equal(one('SELECT views FROM series WHERE id=?',seriesId)!.views,1);
-  await request(route,{watchedMs:240_001},viewerA.cookie,400,'PUT');
+  await request(route,{watchedMs:300_001},viewerA.cookie,400,'PUT');
   const resumed=(await request('/api/episodes/'+episodeIds[0]+'/playback',{},viewerA.cookie)).data;
   assert.equal(resumed.sessionId,started.sessionId);assert.equal(resumed.watchedMs,240_000);assert.equal(resumed.reportedMs,240_000);
   const analytics=(await request('/api/studio/series/'+seriesId+'/analytics?period=7d',undefined,owner.cookie)).data;

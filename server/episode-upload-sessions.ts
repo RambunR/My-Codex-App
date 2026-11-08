@@ -11,7 +11,7 @@ import {config} from './config.js';
 import {scheduleMediaCleanup} from './background.js';
 import {episodeUploadStorage,type EpisodeUploadStorage} from './chunked-storage.js';
 import {MAX_EPISODE_BYTES,MAX_EPISODE_SECONDS} from '../shared/config.js';
-import {legacyEpisodeDuration,writeEpisodeDuration} from './episode-duration.js';
+import {episodeDurationSql,legacyEpisodeDuration,writeEpisodeDuration} from './episode-duration.js';
 
 export const EPISODE_UPLOAD_CHUNK_BYTES=5*1024*1024;
 const LIFETIME=60*60_000;
@@ -56,7 +56,7 @@ export async function cleanupExpiredEpisodeUploads(limit=10,now=Date.now(),stora
   if(pending?.next!==null&&pending?.next!==undefined)await scheduleMediaCleanup(Math.max(1000,Number(pending.next)-now));
 }
 function response(session:Row){
-  const episode=one('SELECT e.id,COALESCE(d.seconds,e.duration) AS duration,e.bytes FROM episodes e LEFT JOIN episode_durations d ON d.episode_id=e.id WHERE e.id=?',session.episode_id);assert(episode,404,'NOT_FOUND','Uploaded episode no longer exists.');
+  const episode=one(`SELECT e.id,${episodeDurationSql()} AS duration,e.bytes FROM episodes e WHERE e.id=?`,session.episode_id);assert(episode,404,'NOT_FOUND','Uploaded episode no longer exists.');
   return{...episode,user:getUser(session.actor_id),owner_storage:getOwnerStorage(session.creator_id)};
 }
 let rawRequests=0;

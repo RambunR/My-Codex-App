@@ -6,7 +6,7 @@ LingYing separates four independent choices in Creator Studio, Explore and serie
 | --- | --- | --- | --- |
 | Genre | The kind of drama | Romance, Thriller, Comedy, Medical Drama | 1–3 of 29 standard genres |
 | Story themes | Plot and character themes | Revenge, Secret Baby, Entrepreneurship (創業), Found Family | Optional, up to 5 of 26 themes |
-| Format | How the series looks | Live-action, Animation, Anime/Donghua, Motion Comics | One format; may remain unspecified |
+| Format | How the series looks | Live-action, Animation, Donghua, Motion Comics | One format; may remain unspecified |
 | Production method | How it was made | Human-created, AI-assisted, AI-generated | One method |
 
 For example, an uploader can choose **Thriller → Revenge → Animation → AI-assisted**. Animation and human-created are compatible: human-created describes production, rather than limiting the series to live-action.
@@ -42,8 +42,10 @@ These are additional choices in creator/admin classification controls, public se
 
 The additive `series_classifications` table stores themes and nullable format without changing existing series, media or financial records. Reading an existing series does not write or reclassify it. Legacy series tagged with the old Animation genre expose an inferred animation format; other existing series keep an unknown format. A saved explicit null remains null even if an old Animation genre is retained.
 
-Old Animation genre labels remain in the API vocabulary and appear in the editor when already selected. Creators can remove the old genre label themselves. Existing `?genre=animation` bookmarks continue to find old animation-tagged series and new animated formats. The new `?format=animation` selects the general animation format; Anime/Donghua and Motion Comics have their own exact format filters.
+Old Animation genre labels remain in the API vocabulary and appear in the editor when already selected. Creators can remove the old genre label themselves. Existing `?genre=animation` bookmarks continue to find old animation-tagged series and new animated formats. The new `?format=animation` selects the general animation format; Donghua and Motion Comics have their own exact format filters.
 
 `GET /api/config` exposes `standardGenres`, `storyThemes`, `formats` and `creationTypes`; the existing `genres` field retains the legacy Animation ID. Series responses add `themes: string[]` and `format: string | null`. Public list queries accept `theme` and `format` along with the existing filters. IDs are stable and independent of translated display labels; see [the canonical vocabulary](../shared/taxonomy.ts).
 
 Creator create/edit requests accept optional `themes` and `format`. Omitting either field during edits preserves its previous value; sending `themes: []` or `format: null` explicitly clears that field. Unknown IDs, duplicates, oversized arrays and invalid filter values are rejected. Administrative edits and their classification changes are recorded in the existing metadata audit transaction; takedown, ownership, payment-review and storage protections remain in place.
+
+The Donghua display label replaces the former combined label in all 21 interface languages. The stored `anime-donghua` ID remains unchanged, so existing classifications and exact format bookmarks keep working without retagging content.

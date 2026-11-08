@@ -86,9 +86,12 @@ test('series metadata validates price and language and enforces ownership',async
   // Saving a draft long before it goes live must not bury its eventual release.
   run('UPDATE series SET created_at=? WHERE id=?','2000-01-01 00:00:00',seriesId);
 });
-test('server rejects episodes longer than 240 seconds and videos over 200 MiB',async()=>{
-  const long=path.join(dir,'long.mp4');execFileSync('ffmpeg',['-v','error','-f','lavfi','-i','color=c=black:s=16x16:r=1','-t','241','-c:v','libx264','-y',long]);
+test('server rejects episodes longer than 300 seconds and videos over 200 MiB',async()=>{
+  const long=path.join(dir,'long.mp4');execFileSync('ffmpeg',['-v','error','-f','lavfi','-i','color=c=black:s=16x16:r=1','-t','301','-c:v','libx264','-y',long]);
   const duration=await upload(`/api/studio/series/${seriesId}/episodes`,await readFile(long),'episode.mp4',publisher,{title:'Too long',number:'1',duration:'12'});assert.equal(duration.status,422);assert.equal(duration.data.error.code,'VIDEO_TOO_LONG');
+  const longAudio=path.join(dir,'long-audio.mp4');execFileSync('ffmpeg',['-v','error','-f','lavfi','-i','color=c=black:s=16x16:r=1:d=1','-f','lavfi','-i','anullsrc=r=8000:cl=mono','-t','301','-c:v','libx264','-c:a','aac','-movflags','+faststart','-y',longAudio]);
+  const misleading=await readFile(longAudio),movie=misleading.indexOf('mvhd');assert.ok(movie>=0);assert.equal(misleading[movie+4],0);misleading.writeUInt32BE(misleading.readUInt32BE(movie+16),movie+20);
+  const audio=await upload(`/api/studio/series/${seriesId}/episodes`,misleading,'misleading-movie-header.mp4',publisher,{title:'Overlong audio despite a one-second movie header',number:'1'});assert.equal(audio.status,422);assert.equal(audio.data.error.code,'VIDEO_TOO_LONG');
   // Exercise the exact input boundary without materializing several 200 MiB
   // FormData/Blob copies in the test process.
   const boundary='lingying-oversize-input',block=Buffer.alloc(1024*1024);
@@ -101,27 +104,28 @@ test('server rejects episodes longer than 240 seconds and videos over 200 MiB',a
   assert.equal(oversize.status,413);assert.equal((await oversize.json()).error.code,'FILE_TOO_LARGE');
   assert.equal(one('SELECT COUNT(*) AS n FROM episodes WHERE series_id=?',seriesId)!.n,0);
 });
-test('the Node multipart upload accepts exactly 200 MiB and preserves an exact four-minute episode duration',async()=>{
+test('the Node multipart upload accepts exactly 200 MiB and preserves an exact five-minute episode duration',async()=>{
   const created=await request('/api/studio/series',{title:'Exact upload boundaries',description:'A generated local video verifies both inclusive upload boundaries.',language:'en',genres:['drama'],creation_type:'human',price_cents:10,free_episodes:1},publisher);assert.equal(created.status,201);
-  const target=path.join(dir,'exact-boundary.mp4'),source=await readFile(path.resolve('tests/fixtures/cloudflare-media/boundary-video-audio-240.mp4')),fileBytes=200*1024*1024;
+  const generated=path.join(dir,'five-minute-source.mp4');execFileSync('ffmpeg',['-v','error','-f','lavfi','-i','color=c=black:s=16x16:r=1','-t','300','-c:v','libx264','-pix_fmt','yuv420p','-y',generated]);
+  const target=path.join(dir,'exact-boundary.mp4'),source=await readFile(generated),fileBytes=200*1024*1024;
   const free=Buffer.alloc(8);free.writeUInt32BE(fileBytes-source.length);free.write('free',4,'ascii');
   const file=await open(target,'w');try{await file.write(source);await file.write(free);await file.truncate(fileBytes);}finally{await file.close();}
   const boundary='lingying-exact-upload-boundaries';
   const body=Readable.from((async function*(){
-    yield Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="title"\r\n\r\nFour-minute boundary\r\n--${boundary}\r\nContent-Disposition: form-data; name="number"\r\n\r\n1\r\n--${boundary}\r\nContent-Disposition: form-data; name="video"; filename="boundary.mp4"\r\nContent-Type: video/mp4\r\n\r\n`);
+    yield Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="title"\r\n\r\nFive-minute boundary\r\n--${boundary}\r\nContent-Disposition: form-data; name="number"\r\n\r\n1\r\n--${boundary}\r\nContent-Disposition: form-data; name="video"; filename="boundary.mp4"\r\nContent-Type: video/mp4\r\n\r\n`);
     for await(const chunk of createReadStream(target))yield chunk;
     yield Buffer.from(`\r\n--${boundary}--\r\n`);
   })());
   const response=await fetch(base+`/api/studio/series/${created.data.id}/episodes`,{method:'POST',headers:{Cookie:publisher,'Content-Type':`multipart/form-data; boundary=${boundary}`},body,duplex:'half'} as any),result=await response.json();
-  assert.equal(response.status,201,JSON.stringify(result));assert.equal(result.duration,240);assert.ok(result.bytes>0);
-  const stored=await request(`/api/studio/series/${created.data.id}`,undefined,publisher);assert.equal(stored.data.episodes.length,1);assert.equal(stored.data.episodes[0].duration,240);
+  assert.equal(response.status,201,JSON.stringify(result));assert.equal(result.duration,300);assert.ok(result.bytes>0);
+  const stored=await request(`/api/studio/series/${created.data.id}`,undefined,publisher);assert.equal(stored.data.episodes.length,1);assert.equal(stored.data.episodes[0].duration,300);
 });
 test('quota, real video processing, cover upload, publishing and episode edits work together',async()=>{
   const sample=await readFile(path.join(dir,'objects','demo','preview.mp4'));
   run('UPDATE users SET quota_bytes=20 WHERE id=?',publisherId);
   const quota=await upload(`/api/studio/series/${seriesId}/episodes`,sample,'01 Opening.mp4',publisher,{title:'Opening',number:'1'});assert.equal(quota.status,413);assert.equal(quota.data.error.code,'QUOTA_EXCEEDED');
   run('UPDATE users SET quota_bytes=? WHERE id=?',10*1024**3,publisherId);
-  const video=await upload(`/api/studio/series/${seriesId}/episodes`,sample,'01 Opening.mp4',publisher,{title:'Opening',number:'1'});assert.equal(video.status,201,JSON.stringify(video.data));uploadedId=video.data.id;assert.ok(video.data.duration<=240);assert.ok(video.data.bytes>0);
+  const video=await upload(`/api/studio/series/${seriesId}/episodes`,sample,'01 Opening.mp4',publisher,{title:'Opening',number:'1'});assert.equal(video.status,201,JSON.stringify(video.data));uploadedId=video.data.id;assert.ok(video.data.duration<=300);assert.ok(video.data.bytes>0);
   assert.equal((await upload(`/api/studio/series/${seriesId}/cover`,Buffer.from('not an image'),'bad.png',publisher,{},'cover')).status,422);
   const image=await readFile(path.resolve('public/images/midnight.jpg'));const cover=await upload(`/api/studio/series/${seriesId}/cover`,image,'poster.jpg',publisher,{},'cover');assert.equal(cover.status,200);
   const usage=one('SELECT used_bytes FROM users WHERE id=?',publisherId)!.used_bytes;assert.ok(usage>video.data.bytes);

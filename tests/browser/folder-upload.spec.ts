@@ -30,7 +30,7 @@ test('a nested Unicode folder uploads only MP4 files in natural folder order and
     const selected=await page.evaluate(()=>((window as any).__selectedFolderPaths||[]) as string[]);expect(selected.length).toBeGreaterThanOrEqual(8);await expect(page.locator('.folder-selection-summary')).toContainText(`${selected.length-3} other files ignored.`);
     await expect.poll(()=>writes.length).toBe(1);await expect(page.getByRole('button',{name:'Choose a folder',exact:true})).toBeDisabled();await expect(page.getByRole('button',{name:'Choose video files',exact:true})).toBeDisabled();await expect(page.locator('.editor-heading-actions').getByRole('button',{name:'Save details',exact:true})).toBeDisabled();await expect(page.getByRole('button',{name:'Publish series',exact:true})).toBeDisabled();
     const guideButton=page.locator('.upload-guide-trigger');await guideButton.click();const guide=page.getByRole('dialog',{name:'How to upload your series',exact:true});
-    await expect(guide).toContainText('4 minutes');await expect(guide).toContainText('200 MiB');await expect(guide.locator('.upload-guide-diagram>li')).toHaveCount(4);
+    await expect(guide).toContainText('5 minutes');await expect(guide).toContainText('200 MiB');await expect(guide.locator('.upload-guide-diagram>li')).toHaveCount(4);
     await expect(guide).toContainText('My_Series_1.mp4');await expect(guide).toContainText('My_Series_2.mp4');await expect(guide).toContainText('My_Series_10.mp4');
     await expect(guide).toContainText('select all episodes and rename them together');expect(writes).toHaveLength(1);
     await page.keyboard.press('Escape');await expect(guide).toHaveCount(0);await expect(guideButton).toBeFocused();release();

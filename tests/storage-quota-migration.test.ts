@@ -123,7 +123,7 @@ test('approving pre-upgrade 6 or 10 GiB requests preserves the new floor, higher
 });
 
 test('configuration, authenticated accounts, Studio and media-owner payloads expose the migrated allowance and retained admin unlimited access',async()=>{
-  const publicConfig=await request('/api/config');assert.equal(publicConfig.limits.quotaBytes,baseline);assert.equal(publicConfig.limits.maxEpisodeBytes,200*1024**2);assert.equal(publicConfig.limits.maxEpisodeSeconds,240);
+  const publicConfig=await request('/api/config');assert.equal(publicConfig.limits.quotaBytes,baseline);assert.equal(publicConfig.limits.maxEpisodeBytes,200*1024**2);assert.equal(publicConfig.limits.maxEpisodeSeconds,300);
   for(const actor of [owner,viewer,admin,custom]){
     const expected=actor.id===custom.id?20*GiB:baseline,me=(await request('/api/auth/me',actor)).user,studio=await request('/api/studio',actor);assert.equal(me.quota_bytes,expected);assert.equal(studio.user.quota_bytes,expected);assert.equal(me.storage_unlimited,actor.id===admin.id);assert.equal(studio.user.storage_unlimited,actor.id===admin.id);assert.equal(me.used_bytes,one('SELECT used_bytes FROM users WHERE id=?',actor.id)!.used_bytes);
   }

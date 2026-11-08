@@ -13,7 +13,7 @@ import {DEMO_PREVIEW_BYTES} from '../cloudflare/preview-meta';
 
 const fixture=await readFile(new URL('./fixtures/cloudflare-media/long-audio-movie-duration.mp4',import.meta.url));
 const directory=await mkdtemp(path.join(tmpdir(),'lingying-media-regression-'));
-let silentVideo:Buffer,shortAudio:Buffer,base:string,server:Server;
+let silentVideo:Buffer,shortAudio:Buffer,fiveMinuteAudio:Buffer,overLimitVideo:Buffer,overLimitAudio:Buffer,base:string,server:Server;
 const publicOrigin='https://lingying.example.test';
 const sample=Buffer.from('0123456789abcdefghijklmnopqrstuvwxyz');
 const assetRequests:Array<{method:string;range:string|null;path:string}>=[];
@@ -40,13 +40,16 @@ function bindVideo(bytes:Buffer,previewBytes=sample){
 }
 
 before(async()=>{
-  for(const [filename,audio] of [['video.mp4',false],['audio.mp4',true]] as const){
-    const args=['-hide_banner','-loglevel','error','-f','lavfi','-i','color=c=black:s=64x64:r=1:d=1'];
+  for(const [filename,audio,videoSeconds,totalSeconds] of [['video.mp4',false,1,1],['audio.mp4',true,1,1],['five-minutes.mp4',true,300,300],['too-long-video.mp4',false,301,301],['too-long-audio.mp4',true,1,301]] as const){
+    const args=['-hide_banner','-loglevel','error','-f','lavfi','-i',`color=c=black:s=64x64:r=1:d=${videoSeconds}`];
     if(audio)args.push('-f','lavfi','-i','anullsrc=r=8000:cl=mono');
-    args.push('-t','1','-c:v','libx264','-pix_fmt','yuv420p');if(audio)args.push('-c:a','aac');else args.push('-an');
+    args.push('-t',String(totalSeconds),'-c:v','libx264','-pix_fmt','yuv420p');if(audio)args.push('-c:a','aac');else args.push('-an');
     args.push('-movflags','+faststart','-y',path.join(directory,filename));execFileSync('ffmpeg',args);
   }
-  silentVideo=await readFile(path.join(directory,'video.mp4'));shortAudio=await readFile(path.join(directory,'audio.mp4'));
+  silentVideo=await readFile(path.join(directory,'video.mp4'));shortAudio=await readFile(path.join(directory,'audio.mp4'));fiveMinuteAudio=await readFile(path.join(directory,'five-minutes.mp4'));overLimitVideo=await readFile(path.join(directory,'too-long-video.mp4'));overLimitAudio=await readFile(path.join(directory,'too-long-audio.mp4'));
+  // Keep actual 301-second AAC samples and track metadata, but make the movie
+  // header claim one second, as in the retained historical 241-second fixture.
+  const movie=overLimitAudio.indexOf('mvhd');assert.ok(movie>=0);assert.equal(overLimitAudio[movie+4],0);overLimitAudio.writeUInt32BE(overLimitAudio.readUInt32BE(movie+16),movie+20);
   const app=express();app.use((_req,res,next)=>{res.setHeader('Access-Control-Allow-Origin',publicOrigin);res.setHeader('Access-Control-Allow-Credentials','true');res.vary('Origin');next();});
   app.get('/stream',(req,res,next)=>{void serveObject('demo/preview.mp4',req,res,'video/mp4').catch(next);});
   app.use((error:AppError,_req:express.Request,res:express.Response,_next:express.NextFunction)=>res.status(error.status||500).json({error:{code:error.code}}));
@@ -58,10 +61,12 @@ async function rejected(bytes:Buffer,code:string){bindVideo(bytes);await assert.
 function replaceAtomType(bytes:Buffer,type:string,index=0){const result=Buffer.from(bytes);let offset=-1;for(let n=0;n<=index;n++)offset=result.indexOf(type,offset+1,'ascii');assert(offset>=0,`${type} fixture metadata is missing`);result.write('free',offset,'ascii');return result;}
 
 // This is actual playable H.264/AAC media, not metadata synthesized to match the parser.
-test('Cloudflare rejects long AAC audio when the movie and video tracks declare one second',async()=>{await rejected(fixture,'VIDEO_TOO_LONG');});
-test('Cloudflare rejects an ordinary over-limit H.264 video',async()=>{await rejected(await readFile(new URL('./fixtures/cloudflare-media/long-video.mp4',import.meta.url)),'VIDEO_TOO_LONG');});
+test('Cloudflare rejects 301-second AAC audio when the movie and video tracks declare one second',async()=>{await rejected(overLimitAudio,'VIDEO_TOO_LONG');});
+test('Cloudflare rejects an ordinary 301-second H.264 video',async()=>{await rejected(overLimitVideo,'VIDEO_TOO_LONG');});
+test('Cloudflare accepts historical 241-second video and audio exports under the five-minute allowance',async()=>{for(const bytes of [fixture,await readFile(new URL('./fixtures/cloudflare-media/long-video.mp4',import.meta.url))]){bindVideo(bytes);assert.equal((await prepareVideo('tmp/fixture')).duration,241);}});
 test('Cloudflare accepts a legitimate 180-second H.264/AAC export with encoder priming',async()=>{const bytes=await readFile(new URL('./fixtures/cloudflare-media/boundary-video-audio-180.mp4',import.meta.url));bindVideo(bytes);assert.equal((await prepareVideo('tmp/fixture')).duration,180);});
-test('Cloudflare accepts a legitimate 240-second H.264/AAC export at the new duration boundary',async()=>{const bytes=await readFile(new URL('./fixtures/cloudflare-media/boundary-video-audio-240.mp4',import.meta.url));bindVideo(bytes);assert.equal((await prepareVideo('tmp/fixture')).duration,240);});
+test('Cloudflare accepts a retained legitimate 240-second H.264/AAC export',async()=>{const bytes=await readFile(new URL('./fixtures/cloudflare-media/boundary-video-audio-240.mp4',import.meta.url));bindVideo(bytes);assert.equal((await prepareVideo('tmp/fixture')).duration,240);});
+test('Cloudflare accepts an exact 300-second H.264/AAC export including encoder priming',async()=>{bindVideo(fiveMinuteAudio);assert.equal((await prepareVideo('tmp/fixture')).duration,300);});
 test('Cloudflare accepts a valid short H.264 video without audio and valid short H.264/AAC',async()=>{
   for(const bytes of [silentVideo,shortAudio]){bindVideo(bytes);const result=await prepareVideo('tmp/fixture');assert(result.duration>0&&result.duration<=2);assert.equal(result.bytes,bytes.length);}
 });

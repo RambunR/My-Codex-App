@@ -26,7 +26,8 @@ const s3 = bucket ? new S3Client({ region: process.env.S3_REGION || 'auto', endp
 export async function probeVideo(file: string) {
   const { stdout } = await exec(config.ffprobe, ['-v', 'error', '-protocol_whitelist','file,pipe','-format_whitelist','mov,matroska,webm','-show_entries', 'format=duration:stream=codec_type,width,height,duration', '-of', 'json', file], { timeout: 20000, maxBuffer: 1024 * 1024 }).catch(()=>{throw new AppError(422,'INVALID_VIDEO','Please choose a valid MP4, MOV, or WebM video.');});
   const metadata = JSON.parse(stdout); const video = metadata.streams?.find((s: any) => s.codec_type === 'video');
-  const duration = Number(metadata.format?.duration || video?.duration);
+  const durations=[Number(metadata.format?.duration),...(metadata.streams||[]).filter((stream:any)=>stream.codec_type==='video'||stream.codec_type==='audio').map((stream:any)=>Number(stream.duration))].filter(value=>Number.isFinite(value)&&value>0);
+  const duration = Math.max(...durations);
   assert(video && Number.isFinite(duration) && duration > 0, 422, 'INVALID_VIDEO', 'This file does not contain a readable video.');
   assert(duration <= MAX_EPISODE_SECONDS, 422, 'VIDEO_TOO_LONG', `Episodes must be ${MAX_EPISODE_SECONDS/60} minutes or less.`);
   assert(video.width <= 7680 && video.height <= 7680, 422, 'INVALID_VIDEO', 'Video dimensions are too large.');

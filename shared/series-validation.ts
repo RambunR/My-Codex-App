@@ -1,8 +1,8 @@
-import {GENRES,MIN_PRICE_CENTS} from './config.js';
+import {GENRES,MIN_PRICE_CENTS,MAX_PRICE_CENTS} from './config.js';
 import {isStoredSpokenLanguageCode} from './spoken-languages.js';
 import {STORY_THEMES,SERIES_FORMATS,CREATION_TYPES,MAX_STORY_THEMES} from './taxonomy.js';
 
-export const SERIES_LIMITS={titleMin:2,titleMax:120,synopsisMin:10,synopsisMax:4000,genresMin:1,genresMax:3,priceMin:MIN_PRICE_CENTS,priceMax:10000,freeMin:0,freeMax:1000} as const;
+export const SERIES_LIMITS={titleMin:2,titleMax:120,synopsisMin:10,synopsisMax:4000,genresMin:1,genresMax:3,priceMin:MIN_PRICE_CENTS,priceMax:MAX_PRICE_CENTS,freeMin:0,freeMax:1000} as const;
 export interface SeriesDetailsInput {
   title:string;description:string;language:string;genres:string[];creation_type:string;
   price_cents:number|null;free_episodes:number|null;

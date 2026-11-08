@@ -53,13 +53,13 @@ test('invalid and overlong episodes show server errors while the next valid file
   const folder=await mkdtemp(path.join(tmpdir(),'lingying-rejected-upload-batch-'));
   try{
     await writeFile(path.join(folder,'01_broken.mp4'),'This is a malformed file, not an MP4 container.');
-    await copyFile(path.resolve('tests/fixtures/cloudflare-media/long-video.mp4'),path.join(folder,'02_overlong.mp4'));
+    execFileSync('ffmpeg',['-v','error','-f','lavfi','-i','color=c=black:s=64x64:r=1','-t','301','-an','-c:v','libx264','-preset','ultrafast','-pix_fmt','yuv420p','-movflags','+faststart','-y',path.join(folder,'02_overlong.mp4')]);
     await tinyVideo(path.join(folder,'03_valid.mp4'));
     await chooseFolder(page,folder);await expect(page.locator('.queue-row')).toHaveCount(3);
     await expect(page.getByRole('button',{name:'Choose a folder',exact:true})).toBeEnabled({timeout:60000});
     expect(writes).toHaveLength(3);
     await expect(page.locator('.queue-row').nth(0)).toContainText('Please choose a valid MP4, MOV, or WebM video.');
-    await expect(page.locator('.queue-row').nth(1)).toContainText('Episodes must be 4 minutes or less.');
+    await expect(page.locator('.queue-row').nth(1)).toContainText('Episodes must be 5 minutes or less.');
     await expect(page.locator('.queue-row').nth(2)).toContainText('Uploaded');
     expect(await Promise.all(responses)).toEqual([{status:422,code:'INVALID_VIDEO'},{status:422,code:'VIDEO_TOO_LONG'},{status:201,code:undefined}]);
     const result=await(await page.request.get(`/api/studio/series/${id}`)).json();expect(result.episodes).toHaveLength(1);expect(result.episodes[0].number).toBe(1);expect(result.episodes[0].title).toBe('03 valid');

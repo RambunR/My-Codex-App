@@ -114,10 +114,11 @@ try{
   const spokenCodes=cfg.spokenLanguages.map(item=>item.code),interfaceCodes=cfg.languages.map(item=>item.code);
   assert.equal(spokenCodes.length,21);assert.ok(spokenCodes.includes('cmn')&&spokenCodes.includes('yue'));assert.ok(!spokenCodes.includes('zh-TW')&&!spokenCodes.includes('zh-CN'));
   assert.equal(interfaceCodes.length,21);assert.ok(interfaceCodes.includes('zh-TW')&&interfaceCodes.includes('zh-CN'));assert.ok(!interfaceCodes.includes('cmn')&&!interfaceCodes.includes('yue'));
-  assert.deepEqual(cfg.creatorPassConsent,{policyVersion:'2026-11-08.1',disclosureVersion:'creator-pass-ack-v2'});
+  assert.deepEqual(cfg.creatorPassConsent,{policyVersion:'2026-11-08.2',disclosureVersion:'creator-pass-ack-v2'});
   const creatorConsent={accepted:true,policy_version:cfg.creatorPassConsent.policyVersion,disclosure_version:cfg.creatorPassConsent.disclosureVersion};
   assert.equal(cfg.limits.quotaBytes,10*1024**3);
-  assert.equal(cfg.limits.maxEpisodeBytes,maxEpisodeBytes);assert.equal(cfg.limits.maxEpisodeSeconds,240);assert.deepEqual(cfg.episodeUpload,{mode:'chunked',chunkBytes});
+  assert.equal(cfg.limits.minimumPriceUsd,0.1);assert.equal(cfg.limits.maximumPriceUsd,1);
+  assert.equal(cfg.limits.maxEpisodeBytes,maxEpisodeBytes);assert.equal(cfg.limits.maxEpisodeSeconds,300);assert.deepEqual(cfg.episodeUpload,{mode:'chunked',chunkBytes});
   assert.deepEqual(cfg.walletFunding.presetAmountsCents,[1000,2500,5000,10000]);assert.deepEqual(cfg.walletFunding.rewards,[{amountCents:5000,bonusCents:500},{amountCents:10000,bonusCents:1500}]);
   assert.ok(cfg.standardGenres.includes('romantic-comedy'));assert.ok(cfg.standardGenres.includes('medical'));
   assert.ok(cfg.storyThemes.includes('revenge'));assert.deepEqual(cfg.formats,['live-action','animation','anime-donghua','motion-comic']);
@@ -247,8 +248,10 @@ try{
 
 
 
-  const body={title:'Cloudflare Published Drama',description:'A real upload used to validate durable financial and media storage.',language:'cmn',genres:['romance'],themes:['revenge','hidden-identity','entrepreneurship'],format:'animation',creation_type:'human',price_cents:501,free_episodes:1};
+  const body={title:'Cloudflare Published Drama',description:'A real upload used to validate durable financial and media storage.',language:'cmn',genres:['romance'],themes:['revenge','hidden-identity','entrepreneurship'],format:'animation',creation_type:'human',price_cents:51,free_episodes:1};
+  await request('/api/studio/series',{...body,price_cents:101},publisher,400);
   const sid=(await request('/api/studio/series',body,publisher,201)).data.id;
+  await request(`/api/studio/series/${sid}`,{...body,price_cents:101},publisher,400,'PATCH');
   const privateClassification=(await request(`/api/studio/series/${sid}`,undefined,publisher)).data.series;
   assert.deepEqual(privateClassification.themes,body.themes);assert.equal(privateClassification.format,body.format);
   assert.equal(privateClassification.cover_aspect_ratio,'9:16','New series default to a portrait layout.');
@@ -335,10 +338,10 @@ try{
   await upload(`/api/studio/series/${sid}/cover`,cover,'cover.jpg',publisher,{},'cover',200);
   const first=await upload(`/api/studio/series/${sid}/episodes`,video,'Episode 01.mp4',publisher,{title:'First episode',number:1});
   const second=await upload(`/api/studio/series/${sid}/episodes`,video,'Episode 02.mp4',publisher,{title:'Second episode',number:2});
-  assert.equal(first.bytes,video.length);assert.ok(first.duration>0&&first.duration<=240);
+  assert.equal(first.bytes,video.length);assert.ok(first.duration>0&&first.duration<=300);
   const used=(await request('/api/auth/me',undefined,publisher)).data.user.used_bytes;assert.equal(used,video.length*2+cover.length);
   const longfile=path.join(dir,'long.mp4');
-  execFileSync('ffmpeg',['-hide_banner','-loglevel','error','-f','lavfi','-i','color=c=black:s=16x16:r=1:d=241','-c:v','libx264','-pix_fmt','yuv420p','-movflags','+faststart',longfile]);
+  execFileSync('ffmpeg',['-hide_banner','-loglevel','error','-f','lavfi','-i','color=c=black:s=16x16:r=1:d=301','-c:v','libx264','-pix_fmt','yuv420p','-movflags','+faststart',longfile]);
   const rejected=await upload(`/api/studio/series/${sid}/episodes`,await readFile(longfile),'long.mp4',publisher,{title:'Too long',number:3},'video',422);assert.equal(rejected.error.code,'VIDEO_TOO_LONG');
   const large=(await request(`/api/studio/series/${sid}/episode-uploads`,{title:'Too large',number:3,filename:'oversized.mp4',size:maxEpisodeBytes+1},publisher,413)).data;assert.equal(large.error.code,'FILE_TOO_LARGE');
   assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.used_bytes,used);
@@ -360,7 +363,7 @@ try{
   const image=await fetch(base+`/api/series/${sid}/cover`);assert.equal(image.headers.get('content-type'),'image/jpeg');assert.deepEqual(Buffer.from(await image.arrayBuffer()),cover);
   const free=await fetch(base+`/api/episodes/${first.id}/stream`,{headers:{Range:'bytes=0-31'}});assert.equal(free.status,206);assert.equal((await free.arrayBuffer()).byteLength,32);
   await request(`/api/episodes/${second.id}/stream`,undefined,'',403);
-  console.log('PASS: R2 covers and videos, quota accounting, publication, byte ranges, 241-second and over-200 MiB rejection.');
+  console.log('PASS: R2 covers and videos, quota accounting, publication, byte ranges, 301-second and over-200 MiB rejection.');
 
   // A separate local series verifies optional finale pricing without changing
   // the paid episodes, sales totals or engagement assertions below.
@@ -448,9 +451,9 @@ try{
   console.log('PASS: immediate anonymous/public publisher views, preview exclusion, durable deduplication, exact watch time, and owner-only series/episode analytics.');
 
   await Promise.all(Array.from({length:8},()=>request(`/api/episodes/${second.id}/unlock`,{},viewer)));
-  assert.equal((await request('/api/auth/me',undefined,viewer)).data.user.wallet_micros,4_990_000);
-  const studio=(await request('/api/studio',undefined,publisher)).data;assert.equal(studio.user.earnings_micros,3_507_000);assert.equal(studio.stats.sales,1);
-  const report=(await request('/api/admin',undefined,admin)).data;assert.equal(report.stats.sales.platform_micros,1_503_000);
+  assert.equal((await request('/api/auth/me',undefined,viewer)).data.user.wallet_micros,9_490_000);
+  const studio=(await request('/api/studio',undefined,publisher)).data;assert.equal(studio.user.earnings_micros,357_000);assert.equal(studio.stats.sales,1);
+  const report=(await request('/api/admin',undefined,admin)).data;assert.equal(report.stats.sales.platform_micros,153_000);
   const paid=await fetch(base+`/api/episodes/${second.id}/stream`,{headers:{Cookie:viewer,Range:'bytes=0-15'}});assert.equal(paid.status,206);assert.equal((await paid.arrayBuffer()).byteLength,16);
   await request('/api/studio/withdrawals',{amount_cents:100},publisher,400);
   await request('/api/studio/withdrawals',{amount_cents:999},publisher,400);
@@ -460,15 +463,23 @@ try{
   const payoutBuyer=(await request('/api/auth/register',{name:'Payout smoke viewer',email:'payout-smoke@example.test',password},'',201)).cookie;
   const payoutFunding=(await request('/api/payments/checkout',{kind:'funding',amount_cents:2000},payoutBuyer)).data;
   await request(`/api/payments/${payoutFunding.paymentId}/demo-confirm`,{},payoutBuyer);
-  const payoutSeries=(await request(`/api/studio/series/${sid}`,undefined,publisher)).data.series;
-  const payoutPricing={title:payoutSeries.title,description:payoutSeries.description,language:payoutSeries.language,genres:payoutSeries.genres,free_episodes:payoutSeries.free_episodes,creation_type:payoutSeries.creation_type};
-  await request(`/api/studio/series/${sid}`,{...payoutPricing,price_cents:2000},publisher,200,'PATCH');
   await request(`/api/episodes/${second.id}/unlock`,{},payoutBuyer);
-  await request(`/api/studio/series/${sid}`,{...payoutPricing,price_cents:payoutSeries.price_cents},publisher,200,'PATCH');
-  const withdrawal=(await request('/api/studio/withdrawals',{amount_cents:1700,note:'Local test only'},publisher,201)).data;
-  const terms=(await request('/api/studio',undefined,publisher)).data.withdrawals.find(row=>row.id===withdrawal.id);
-  assert.equal(terms.amount_micros,17_000_000);assert.equal(terms.fee_micros,0);assert.equal(terms.payout_micros,17_000_000);
-  assert.equal(withdrawal.user.earnings_micros,507_000);
+  // Every paid episode stays within the global US$1 maximum. A separate local
+  // publisher earns the minimum through distinct real unlocks, preserving the
+  // primary publisher's media/analytics fixtures and historical sale counts.
+  const payoutCreator=(await request('/api/auth/register',{name:'Payout smoke creator',email:'payout-creator@example.test',password},'',201)).cookie;
+  const payoutPass=(await request('/api/payments/checkout',{kind:'activation',creator_consent:creatorConsent},payoutCreator)).data;
+  await request(`/api/payments/${payoutPass.paymentId}/demo-confirm`,{},payoutCreator);
+  const payoutDetails={...body,title:'Payout minimum validation drama',language:'en',genres:['comedy'],price_cents:100,free_episodes:0};
+  const payoutSeriesId=(await request('/api/studio/series',payoutDetails,payoutCreator,201)).data.id,payoutPath=`/api/studio/series/${payoutSeriesId}`,payoutEpisodes=[];
+  await upload(payoutPath+'/cover',cover,'payout-cover.jpg',payoutCreator,{},'cover',200);
+  for(let number=1;number<=15;number++)payoutEpisodes.push(await upload(payoutPath+'/episodes',video,`payout-${number}.mp4`,payoutCreator,{title:`Payout validation ${number}`,number}));
+  await request(payoutPath+'/status',{status:'published'},payoutCreator);
+  for(const episode of payoutEpisodes){const paid=(await request(`/api/episodes/${episode.id}/unlock`,{},payoutBuyer)).data;assert.equal(paid.paid_micros,1_000_000);assert.equal(paid.creator_micros,700_000);assert.equal(paid.platform_micros,300_000);}
+  const withdrawal=(await request('/api/studio/withdrawals',{amount_cents:1000,note:'Local test only'},payoutCreator,201)).data;
+  const terms=(await request('/api/studio',undefined,payoutCreator)).data.withdrawals.find(row=>row.id===withdrawal.id);
+  assert.equal(terms.amount_micros,10_000_000);assert.equal(terms.fee_micros,0);assert.equal(terms.payout_micros,10_000_000);
+  assert.equal(withdrawal.user.earnings_micros,500_000);
   await request(`/api/admin/withdrawals/${withdrawal.id}`,{approve:true},admin);
   await request(`/api/admin/withdrawals/${withdrawal.id}`,{approve:true},admin,409);
   await request('/api/studio/storage-requests',{requested_gb:20,reason:'More storage for additional drama episodes.'},publisher,201);
@@ -610,17 +621,19 @@ try{
   const disposableId=(await request('/api/studio/series',deletionBody,publisher,201)).data.id;
   const disposablePath=`/api/studio/series/${disposableId}`;
   await upload(disposablePath+'/cover',cover,'disposable-cover.jpg',publisher,{},'cover',200);
-  // Stream an exact 200 MiB, 240-second valid MP4 as forty small requests.
-  // A free box pads the real H.264/AAC fixture without a huge Git fixture or
+  // Stream an exact 200 MiB, 300-second valid MP4 as forty small requests.
+  // A free box pads the real H.264 fixture without a huge Git fixture or
   // materializing the whole file. Restart after three parts proves persistence.
-  const boundaryVideo=await readFile('tests/fixtures/cloudflare-media/boundary-video-audio-240.mp4'),freeBox=Buffer.alloc(8);
+  const boundaryPath=path.join(dir,'boundary-300.mp4');
+  execFileSync('ffmpeg',['-hide_banner','-loglevel','error','-f','lavfi','-i','color=c=black:s=16x16:r=1:d=300','-c:v','libx264','-threads','1','-pix_fmt','yuv420p','-movflags','+faststart',boundaryPath]);
+  const boundaryVideo=await readFile(boundaryPath),freeBox=Buffer.alloc(8);
   freeBox.writeUInt32BE(maxEpisodeBytes-boundaryVideo.length,0);freeBox.write('free',4,'ascii');
   const prefix=Buffer.concat([boundaryVideo,freeBox]);
   const largePart=(offset,length)=>{const bytes=Buffer.alloc(length,0x5b);if(offset<prefix.length)prefix.copy(bytes,0,offset,Math.min(prefix.length,offset+length));return bytes;};
   const largeUpload=await chunkedEpisode(disposablePath+'/episode-uploads',maxEpisodeBytes,largePart,'001_He Said I Wasn’t Smart Enough for Cambri_001.mp4',publisher,{title:'Disposable paid episode',number:1},{restartAfterPart:3});
   const disposableEpisode=largeUpload.episode;
-  assert.equal(disposableEpisode.bytes,maxEpisodeBytes);assert.equal(disposableEpisode.duration,240);
-  assert.equal((await request(disposablePath,undefined,publisher)).data.episodes[0].duration,240);
+  assert.equal(disposableEpisode.bytes,maxEpisodeBytes);assert.equal(disposableEpisode.duration,300);
+  assert.equal((await request(disposablePath,undefined,publisher)).data.episodes[0].duration,300);
   const uploadedTail=await fetch(base+`/api/studio/episodes/${disposableEpisode.id}/stream`,{headers:{Cookie:publisher,Range:'bytes=-32'}});
   assert.equal(uploadedTail.status,206);assert.deepEqual(Buffer.from(await uploadedTail.arrayBuffer()),Buffer.alloc(32,0x5b));
   const uploadedComplete=await fetch(base+`/api/studio/episodes/${disposableEpisode.id}/stream`,{headers:{Cookie:publisher}});
@@ -628,15 +641,17 @@ try{
   const receivedHash=createHash('sha256');let receivedBytes=0;for await(const bytes of uploadedComplete.body){receivedBytes+=bytes.length;receivedHash.update(bytes);}
   assert.equal(receivedBytes,maxEpisodeBytes);assert.equal(receivedHash.digest('hex'),largeUpload.sha256);
   await request(disposablePath+'/status',{status:'published'},publisher);
-  assert.equal((await request(`/api/series/${disposableId}`,undefined,publisher)).data.episodes[0].duration,240);
+  assert.equal((await request(`/api/series/${disposableId}`,undefined,publisher)).data.episodes[0].duration,300);
+  await request(`/api/episodes/${disposableEpisode.id}/progress`,{seconds:300},publisher);
+  await request(`/api/episodes/${disposableEpisode.id}/progress`,{seconds:300.001},publisher,400);
   const disposableBytes=cover.length+maxEpisodeBytes;
   assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.used_bytes,used+disposableBytes);
   await request(`/api/series/${disposableId}/like`,{liked:true},viewer,200,'PUT');
   await request(`/api/series/${disposableId}/save`,{},viewer);
   await request(`/api/episodes/${disposableEpisode.id}/unlock`,{},viewer);
   await request(`/api/episodes/${disposableEpisode.id}/progress`,{seconds:1},viewer);
-  assert.equal((await request('/api/auth/me',undefined,viewer)).data.user.wallet_micros,4_890_000);
-  assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.earnings_micros,577_000);
+  assert.equal((await request('/api/auth/me',undefined,viewer)).data.user.wallet_micros,9_390_000);
+  assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.earnings_micros,784_000);
   const beforeDeletionFinance=await moderationFinance();
   await request(disposablePath+'/lifecycle',undefined,'',401);
   await request(disposablePath+'/lifecycle',undefined,viewer,403);
@@ -691,7 +706,7 @@ try{
   await request(`/api/episodes/${disposableEpisode.id}/unlock`,{},viewer,404);
   await request(disposablePath,deletionConfirmation(),publisher,404,'DELETE');
   assert.equal((await request('/api/studio',undefined,publisher)).data.stats.sales,3,'Deletion must retain historical creator sales.');
-  console.log('PASS: exact 200 MiB / 240-second upload uses forty 5 MiB requests, survives restart, replays completion once, and preserves full-file SHA-256 and exact quota.');
+  console.log('PASS: exact 200 MiB / 300-second upload uses forty 5 MiB requests, survives restart, replays completion once, and preserves full-file SHA-256 and exact quota.');
   console.log('PASS: permanent paid-series deletion enforces private fresh confirmations, removes R2 media and quota exactly, denies restoration, and retains financial receipts and historical sales.');
 
   const giftCookie=(await request('/api/auth/register',{name:'Local funding gift viewer',email:'funding-gift@example.test',password,language:'en'},'',201)).cookie;
@@ -786,8 +801,13 @@ try{
   console.log('PASS: edited managed profiles, public IDs, real engagement totals and series attribution survive Cloudflare restarts and payment-mode changes.');
   assert.ok((await request(newestPath)).data.series.some(s=>s.id===sid));
   await request('/api/auth/google/start',undefined,'',503);
-  assert.equal((await request('/api/auth/me',undefined,viewer)).data.user.wallet_micros,4_890_000);
-  assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.earnings_micros,577_000);
+  assert.equal((await request('/api/auth/me',undefined,viewer)).data.user.wallet_micros,9_390_000);
+  assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.earnings_micros,784_000);
+  const retainedPayoutCreator=(await request('/api/auth/me',undefined,payoutCreator)).data.user;
+  assert.equal(retainedPayoutCreator.earnings_micros,500_000);assert.equal(retainedPayoutCreator.wallet_micros,0);assert.equal(retainedPayoutCreator.publisher_active,1);
+  assert.equal((await request('/api/auth/me',undefined,payoutBuyer)).data.user.wallet_micros,4_490_000);
+  const retainedWithdrawal=(await request('/api/studio',undefined,payoutCreator)).data.withdrawals.find(row=>row.id===withdrawal.id);
+  assert.equal(retainedWithdrawal.status,'paid');assert.equal(retainedWithdrawal.amount_micros,10_000_000);assert.equal(retainedWithdrawal.fee_micros,0);assert.equal(retainedWithdrawal.payout_micros,10_000_000);
   assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.used_bytes,used);
   await assertDisposableDeleted();
   const retainedPass=(await request('/api/auth/me',undefined,publisher)).data.user.dramio_pass;assert.equal(retainedPass.active,true);assert.equal(retainedPass.purchased_at,activated.dramio_pass.purchased_at);

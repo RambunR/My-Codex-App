@@ -102,7 +102,7 @@ test('rapid theme, format and existing filter changes merge into the latest URL 
   for(const example of ['revenge','motion-comic','medical','ai-assisted','ja'])await expect(axisSelect(page,example)).toHaveValue('');await expect(page.locator('main').getByRole('searchbox')).toHaveValue('');await expect(page.getByLabel('Sort by',{exact:true})).toHaveValue('popular');
 });
 
-for(const[locale,width,entrepreneurshipLabel]of [['en',320,'Entrepreneurship'],['zh-TW',320,'創業'],['zh-CN',320,'创业'],['ar',320,'ريادة الأعمال']] as const)test(`classification filters are translated and fit a ${width}px ${locale} phone`,async({page})=>{
+for(const[locale,width,entrepreneurshipLabel,donghuaLabel]of [['en',320,'Entrepreneurship','Donghua'],['zh-TW',320,'創業','中國動畫'],['zh-CN',320,'创业','中国动画'],['ar',320,'ريادة الأعمال','دونغهوا']] as const)test(`classification filters are translated and fit a ${width}px ${locale} phone`,async({page})=>{
   await page.setViewportSize({width,height:844});await page.addInitScript(value=>localStorage.setItem('drama-language',value),locale);
   await page.route('**/api/series?**',route=>route.fulfill({json:{series:[publicFixture]}}));
   await page.goto('/browse?genre=psychological&theme=against-all-odds&format=motion-comic&creation=human');await expect(page.locator('html')).toHaveAttribute('lang',locale);await expect(page.locator('html')).toHaveAttribute('dir',locale==='ar'?'rtl':'ltr');
@@ -111,6 +111,7 @@ for(const[locale,width,entrepreneurshipLabel]of [['en',320,'Entrepreneurship'],[
   expect(await themes.locator('option').evaluateAll(options=>options.slice(-10).map(option=>(option as HTMLOptionElement).value))).toEqual([...addedThemes]);
   for(const id of addedThemes)await expect(themes.locator(`option[value="${id}"]`)).not.toHaveText('');
   await expect(themes.locator('option[value="entrepreneurship"]')).toHaveText(entrepreneurshipLabel);
+  await expect(formats.locator('option[value="anime-donghua"]')).toHaveText(donghuaLabel);
   for(const select of [genres,themes,formats]){await usableSelect(select);expect(await select.getAttribute('aria-label')).toBeTruthy();expect(await select.textContent()).not.toMatch(/(?:genre_|theme_|format_|taxonomy)/);}
   if(locale!=='en'){expect(await formats.locator('option[value="live-action"]').textContent()).not.toBe('Live-action');expect(await themes.locator('option[value="revenge"]').textContent()).not.toBe('Revenge');}
   await noOverflow(page);await themes.selectOption('entrepreneurship');await formats.selectOption('anime-donghua');await expect(page).toHaveURL(url=>url.searchParams.get('format')==='anime-donghua'&&url.searchParams.get('theme')==='entrepreneurship'&&url.searchParams.get('genre')==='psychological'&&url.searchParams.get('creation')==='human');await noOverflow(page);

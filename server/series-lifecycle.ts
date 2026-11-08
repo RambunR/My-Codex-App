@@ -96,6 +96,7 @@ export async function deleteSeriesPermanently(actorId:string,seriesId:string,inp
     run('DELETE FROM saves WHERE series_id=?',seriesId);run('DELETE FROM series_likes WHERE series_id=?',seriesId);
     run('DELETE FROM series_classifications WHERE series_id=?',seriesId);run('DELETE FROM series_publications WHERE series_id=?',seriesId);
     run('DELETE FROM episode_durations WHERE episode_id IN (SELECT id FROM episodes WHERE series_id=?)',seriesId);
+    run('DELETE FROM episode_durations_extended WHERE episode_id IN (SELECT id FROM episodes WHERE series_id=?)',seriesId);
     run('DELETE FROM episodes WHERE series_id=? AND NOT EXISTS (SELECT 1 FROM purchases p WHERE p.episode_id=episodes.id) AND NOT EXISTS (SELECT 1 FROM test_purchases p WHERE p.episode_id=episodes.id)',seriesId);
     run("UPDATE episodes SET title='Deleted episode',duration=1,bytes=1,storage_key='',original_name='' WHERE series_id=?",seriesId);
     run("UPDATE series SET title='Deleted series',description='',language='en',genres='[]',creation_type='human',price_cents=10,free_episodes=0,cover_key='',cover_bytes=0,status='archived',views=0,featured=0,demo=0,updated_at=datetime('now') WHERE id=?",seriesId);
