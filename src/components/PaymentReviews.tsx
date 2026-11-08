@@ -10,7 +10,7 @@ interface PaymentReview {
   id:string;status:'open'|'resolved';mode:'test'|'live';
   user_id:string|null;payment_id:string|null;user_name?:string;user_email?:string;email?:string;
   payment_kind:'funding'|'activation';kind:'refund'|'dispute';
-  amount_cents:number;currency:string;remaining_cents:number;
+  amount_cents:number;currency:string;reconciliation_currency?:string;remaining_cents:number;
   funding_bonus_cents?:number;
   wallet_debit_cents:number;platform_loss_cents:number;
   provider_status:string;charge_id?:string;payment_intent?:string;
@@ -25,7 +25,7 @@ export function PaymentReviews(){
   const [selected,setSelected]=useState<PaymentReview|null>(null);
   const [decision,setDecision]=useState<Decision>('reconciled');const [debit,setDebit]=useState('0.00');
   const [note,setNote]=useState('');const [confirmed,setConfirmed]=useState(false);const [busy,setBusy]=useState(false);const [failure,setFailure]=useState('');
-  const funding=selected?.payment_kind==='funding'&&selected.currency==='usd';
+  const funding=selected?.payment_kind==='funding'&&(selected.reconciliation_currency||selected.currency)==='usd';
   const debitCents=decision==='provider_reversed'||!funding?0:decision==='reconciled'?selected!.remaining_cents:parseUsdCents(debit);
   const validDebit=debitCents!==null&&debitCents>=0&&debitCents<=(selected?.remaining_cents??0);
   const mapped=!!(selected?.user_id&&selected.payment_id);
@@ -44,11 +44,12 @@ export function PaymentReviews(){
   if(error)return <ErrorState error={error} retry={refresh}/>;
   return <section className="panel payment-reviews-panel"><h2>{t('paymentReviews')}</h2>
     {data?.reviews.length?<div className="request-list">{data.reviews.map(review=><div className="payment-review-row" key={review.id}>
-      <div><strong>{review.user_name||review.user_id||review.id}</strong>{(review.user_email||review.email)&&<small>{review.user_email||review.email}</small>}<p>{t(review.kind==='refund'?'reviewRefund':'reviewDispute')} · {review.mode.toUpperCase()} · {amount(review.amount_cents,review.currency)}</p><small>{t('reviewRemaining')}: {amount(review.remaining_cents,review.currency)}</small>{!review.user_id&&<p className="form-error">{t('reviewUnmapped')}</p>}</div>
+      <div><strong>{review.user_name||review.user_id||review.id}</strong>{(review.user_email||review.email)&&<small>{review.user_email||review.email}</small>}<p>{t(review.kind==='refund'?'reviewRefund':'reviewDispute')} · {review.mode.toUpperCase()} · {amount(review.amount_cents,review.currency)}</p><small>{t('reviewRemaining')}: {amount(review.remaining_cents,review.reconciliation_currency||review.currency)}</small>{!review.user_id&&<p className="form-error">{t('reviewUnmapped')}</p>}</div>
       <div><span className="status">{t(review.status==='open'?'reviewOpen':'reviewResolved')}</span><p>{review.provider_status}</p>{review.status==='open'&&<button className="button secondary small" onClick={()=>select(review)}>{t('paymentReviews')}</button>}{review.status==='resolved'&&review.note&&<p>{review.note}</p>}</div>
     </div>)}</div>:<p className="muted">{t('noPaymentReviews')}</p>}
     <Modal open={!!selected} onClose={()=>!busy&&setSelected(null)} title={t('resolvePaymentReview')}>
-      {selected&&<><p>{t('reviewResolutionBody')}</p><p><strong>{selected.user_name||selected.user_id||selected.id}</strong> · {selected.mode.toUpperCase()}</p><div className="balance-row"><span>{t('reviewRemaining')}</span><strong>{amount(selected.remaining_cents,selected.currency)}</strong></div>
+      {selected&&<><p>{t('reviewResolutionBody')}</p><p><strong>{selected.user_name||selected.user_id||selected.id}</strong> · {selected.mode.toUpperCase()}</p><div className="balance-row"><span>{t('reviewRemaining')}</span><strong>{amount(selected.remaining_cents,selected.reconciliation_currency||selected.currency)}</strong></div>
+      {funding&&selected.currency==='hkd'&&<p className="field-hint">{t('wechatReviewFx')}</p>}
       {!!selected.funding_bonus_cents&&<p className="field-hint">{t('reviewFundingGift').replace('{bonus}',amount(selected.funding_bonus_cents,'usd'))}</p>}
       {!mapped?<p className="form-error" role="alert">{t('reviewUnmapped')}</p>:conflicting?<p className="form-error" role="alert">{t('reviewAwaitingProvider')}</p>:<form onSubmit={submit}>
         <label className="field" htmlFor="payment-review-decision">{t('reviewDecision')}<select id="payment-review-decision" aria-label={t('reviewDecision')} value={decision} onChange={event=>changeDecision(event.target.value as Decision)} disabled={busy}>{canReverse?<option value="provider_reversed">{t('reviewProviderReversed')}</option>:<><option value="reconciled">{t('reviewRecover')}</option><option value="platform_loss">{t('reviewPlatformLoss')}</option></>}</select></label>

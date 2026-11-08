@@ -1,3 +1,4 @@
+import {wechatPayEnabled,createWechatFundingQuote} from './wechat-pay.js';
 import {episodeFreeSql,lastEpisodeFreeSchema,seriesLastEpisodeFree,writeSeriesLastEpisodeFree,seriesFreeEpisodeCount} from './episode-access.js';
 import {getOwnerStorage,withinStorageQuota} from './storage-quota.js';
 import { upload, coverUpload } from './uploads.js';
@@ -181,7 +182,7 @@ export function createApp() {
   registerEmailAuth(app);
   registerPublisherProfiles(app,{catalogSelect,serializeSeries});
   app.get('/api/health', (_req,res) => res.json({ ok: true, database: !!one('SELECT 1 AS ready') }));
-  app.get('/api/config', async (_req,res) => {initializePromotions();if(config.payments==='stripe'&&stripeConfigured())await ensureStripeWebhookReady(stripe);return res.json({ brand: 'LingYing', languages: LANGUAGES, spokenLanguages:SPOKEN_LANGUAGES, genres: GENRES,standardGenres:STANDARD_GENRES,storyThemes:STORY_THEMES,formats:SERIES_FORMATS,creationTypes:CREATION_TYPES, passPromotion:{enabled:true},creatorPassConsent:{policyVersion:LEGAL_POLICY_VERSION,disclosureVersion:CREATOR_PASS_DISCLOSURE_VERSION},paymentsMode: config.payments,paymentsReady:paymentsReady(),paymentsConfigured:stripeConfigured(),paymentSetup:stripeWebhookReadiness(),sandbox:config.sandbox,paymentsTestMode:stripeTestPayments()||config.payments==='demo',payoutsEnabled:config.payoutsEnabled&&!stripeTestPayments(),uploadsEnabled:!config.sandbox,usdToHkd: config.usdToHkd,
+  app.get('/api/config', async (_req,res) => {initializePromotions();if(config.payments==='stripe'&&stripeConfigured())await ensureStripeWebhookReady(stripe);return res.json({ brand: 'LingYing', languages: LANGUAGES, spokenLanguages:SPOKEN_LANGUAGES, genres: GENRES,standardGenres:STANDARD_GENRES,storyThemes:STORY_THEMES,formats:SERIES_FORMATS,creationTypes:CREATION_TYPES, passPromotion:{enabled:true},creatorPassConsent:{policyVersion:LEGAL_POLICY_VERSION,disclosureVersion:CREATOR_PASS_DISCLOSURE_VERSION},paymentMethods:{wechatPay:wechatPayEnabled()},paymentsMode: config.payments,paymentsReady:paymentsReady(),paymentsConfigured:stripeConfigured(),paymentSetup:stripeWebhookReadiness(),sandbox:config.sandbox,paymentsTestMode:stripeTestPayments()||config.payments==='demo',payoutsEnabled:config.payoutsEnabled&&!stripeTestPayments(),uploadsEnabled:!config.sandbox,usdToHkd: config.usdToHkd,
     limits: { maxEpisodeSeconds: MAX_EPISODE_SECONDS, maxEpisodeBytes: MAX_EPISODE_BYTES, quotaBytes: DEFAULT_QUOTA_BYTES, activationHkd: 88, minimumPriceUsd: 0.1, creatorShare: 0.7, minimumPayoutUsd: WITHDRAWAL_POLICY.minimumCents/100,minWalletFundingUsd:MIN_WALLET_FUNDING_CENTS/100,maxWalletFundingUsd:MAX_WALLET_FUNDING_CENTS/100 },withdrawalPolicy:WITHDRAWAL_POLICY,walletFunding:WALLET_FUNDING_OPTIONS, demo: config.seed,episodeUpload:{mode:chunkedEpisodeUploadsEnabled()?'chunked':'multipart',chunkBytes:EPISODE_UPLOAD_CHUNK_BYTES}, runtime: (config as any).runtime || 'node', videoFormats: (config as any).videoFormats || ['mp4','mov','webm','m4v'], auth:{google:googleEnabled(),apple:appleEnabled(),email:emailAuthEnabled()} });});
   app.get('/api/auth/me', (req,res) => res.json({ user: req.user || null }));
   app.post('/api/auth/register', rateLimit('register', 12, 15 * 60_000), async (req,res) => {
@@ -284,10 +285,14 @@ export function createApp() {
     const{code,amountHkdCents,regularAmountHkdCents,currency,revision}=quote;
     res.setHeader('Cache-Control','private, no-store');res.json({promotion:{code,amountHkdCents,regularAmountHkdCents,currency,revision}});
   });
+  app.post('/api/payments/wechat/quote',requireAuth,rateLimit('wechat-quote',30,60_000),(req,res)=>{
+    const body=z.object({amount_cents:z.number().int().min(MIN_WALLET_FUNDING_CENTS).max(MAX_WALLET_FUNDING_CENTS)}).strict().parse(req.body);
+    assertPaymentAccountClear(req.user!.id);res.setHeader('Cache-Control','private, no-store');res.json({quote:createWechatFundingQuote(req.user!.id,body.amount_cents)});
+  });
   app.post('/api/payments/checkout', requireAuth, rateLimit('checkout',20,60_000), async (req,res) => {
     const consent=req.body?.kind==='activation'?requireCreatorPassConsent(req.body.creator_consent):undefined;
-    const body=z.discriminatedUnion('kind',[z.object({kind:z.literal('activation'),promo_code:z.string().trim().min(1).max(64).optional(),promo_revision:z.number().int().positive().max(1000000000).optional(),creator_consent:z.object({accepted:z.literal(true),policy_version:z.string().min(1).max(64),disclosure_version:z.string().min(1).max(64)}).strict()}),z.object({kind:z.literal('funding'),amount_cents:z.number().int().min(MIN_WALLET_FUNDING_CENTS).max(MAX_WALLET_FUNDING_CENTS),promo_code:z.never().optional(),promo_revision:z.never().optional()})]).and(z.object({language:language.optional()})).parse(req.body);
-    res.json(await createCheckout(req.user!.id,body.kind,body.kind==='funding'?body.amount_cents:8800,body.language,body.promo_code,body.promo_revision,consent));
+    const body=z.discriminatedUnion('kind',[z.object({kind:z.literal('activation'),promo_code:z.string().trim().min(1).max(64).optional(),promo_revision:z.number().int().positive().max(1000000000).optional(),creator_consent:z.object({accepted:z.literal(true),policy_version:z.string().min(1).max(64),disclosure_version:z.string().min(1).max(64)}).strict()}),z.object({kind:z.literal('funding'),amount_cents:z.number().int().min(MIN_WALLET_FUNDING_CENTS).max(MAX_WALLET_FUNDING_CENTS),promo_code:z.never().optional(),promo_revision:z.never().optional()})]).and(z.object({language:language.optional(),payment_method:z.enum(['card','wechat_pay']).default('card'),funding_quote_id:z.string().uuid().optional()})).parse(req.body);
+    res.json(await createCheckout(req.user!.id,body.kind,body.kind==='funding'?body.amount_cents:8800,body.language,body.promo_code,body.promo_revision,consent,{method:body.payment_method,fundingQuoteId:body.funding_quote_id}));
   });
   app.post('/api/payments/:id/cancel',requireAuth,rateLimit('checkout-cancel',30,60_000),async(req,res)=>{
     res.json(await cancelCheckout(req.user!.id,id(req)));

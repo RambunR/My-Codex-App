@@ -1,3 +1,5 @@
+import type {CheckoutMethod as Method,WechatFundingQuote} from '../../shared/wechat-pay';
+import {CheckoutMethod} from '../components/CheckoutMethod';
 import { useEffect,useState,type FormEvent } from 'react';
 import { Link,useLocation,useNavigate,useSearchParams } from 'react-router-dom';
 import { ArrowUpRight,ArrowRight,Eye,EyeOff,Mail,LockKeyhole,Sparkles,Wallet,Plus,ArrowDownLeft,ArrowUpRight as ArrowOut,Check,ShieldCheck,Clapperboard,Globe2,LogOut,Download,UserRound,ChevronDown,Film,Gift } from 'lucide-react';
@@ -107,6 +109,11 @@ function WalletContent(){
   const maximum=Number.isFinite(config.limits.maxWalletFundingUsd)?Math.min(Math.round(config.limits.maxWalletFundingUsd*100),MAX_WALLET_FUNDING_CENTS):MAX_WALLET_FUNDING_CENTS;
   const amountCents=parseUsdCents(amount);const validAmount=amountCents!==null&&amountCents>=minimum&&amountCents<=maximum;
   const paymentsAvailable=config.paymentsMode!=='disabled'&&config.paymentsReady!==false&&!user?.payment_review;
+  const[method,setMethod]=useState<Method>('card');const[wechatQuote,setWechatQuote]=useState<WechatFundingQuote|null>(null);const[quoteError,setQuoteError]=useState('');const[quoteRevision,setQuoteRevision]=useState(0);
+  const wechatAvailable=config.paymentMethods?.wechatPay===true&&config.paymentsMode==='stripe';const useWechat=wechatAvailable&&method==='wechat_pay';
+  const freshQuote=useWechat&&wechatQuote?.amountUsdCents===amountCents&&wechatQuote.expiresAt>Date.now()?wechatQuote:null;
+  useEffect(()=>{setWechatQuote(null);setQuoteError('');if(!useWechat||!validAmount||!paymentsAvailable)return;let active=true;const controller=new AbortController();const timer=setTimeout(()=>{api<{quote:WechatFundingQuote}>('/api/payments/wechat/quote',{method:'POST',body:JSON.stringify({amount_cents:amountCents}),signal:controller.signal}).then(result=>{if(active)setWechatQuote(result.quote);}).catch(error=>{if(active)setQuoteError(error.message);});},300);return()=>{active=false;clearTimeout(timer);controller.abort();};},[useWechat,amountCents,validAmount,paymentsAvailable,user?.id,quoteRevision]);
+  useEffect(()=>{if(!wechatQuote)return;const timer=setTimeout(()=>setQuoteError(t('wechatRefresh')),Math.max(0,wechatQuote.expiresAt-Date.now()));return()=>clearTimeout(timer);},[wechatQuote]);
   const fundingMessage=(key:'walletFundingHint'|'walletFundingRange')=>t(key).replace('{minimum}',usd(minimum*10000)).replace('{maximum}',usd(maximum*10000));
   const amountError=!amount.trim()?'':amountCents===null?(Number(amount)>maximum/100?fundingMessage('walletFundingRange'):t('walletFundingInvalid')):!validAmount?fundingMessage('walletFundingRange'):'';
   const presets=[...new Set(config.walletFunding?.presetAmountsCents||[1000,2500,5000,10000])].filter(value=>Number.isSafeInteger(value)&&value>=1000&&value>=minimum&&value<=maximum);
@@ -117,7 +124,7 @@ function WalletContent(){
   const amountDescription=['wallet-amount-hint',amountError?'wallet-amount-error':'',selectedQuote?'wallet-reward-note':''].filter(Boolean).join(' ');
   useEffect(()=>{const session=params.get('session_id');if(params.get('checkout')==='cancelled'){toast(t('paymentCancelled'));setParams({}, {replace:true});}if(params.get('checkout')==='success'&&session){setBusy(true);post('/api/payments/reconcile',{session_id:session}).then(async d=>{await refreshUser();refresh();toast(t(d.paid?'paymentSuccess':'paymentProcessing'));}).catch(e=>toast(e.message,true)).finally(()=>{setBusy(false);setParams({}, {replace:true});});}},[params.get('session_id')]);
   useEffect(()=>refresh(),[user?.wallet_micros,user?.publisher_active]);
-  const topUp=async()=>{if(!validAmount||!paymentsAvailable||busy)return;setBusy(true);try{await checkout('funding',amountCents!);}catch(e){toast((e as Error).message,true);}finally{setBusy(false);}};
+  const topUp=async()=>{if(!validAmount||!paymentsAvailable||busy||useWechat&&!freshQuote)return;setBusy(true);try{await checkout('funding',amountCents!,undefined,undefined,undefined,wechatAvailable?{method:useWechat?'wechat_pay':'card',...(freshQuote?{fundingQuoteId:freshQuote.id}:{})}:undefined);}catch(e){if(e instanceof ApiError&&['WECHAT_QUOTE_EXPIRED','WECHAT_QUOTE_USED'].includes(e.code)){setWechatQuote(null);setQuoteRevision(value=>value+1);toast(t('wechatRefresh'),true);}else toast((e as Error).message,true);}finally{setBusy(false);}};
   const kind=(s:string):Key=>({funding:'addFunds',funding_bonus:'walletRewardLedgerTitle',unlock:'unlock',earning:'earnings',activation:'dramioPass',withdrawal:'requestPayout',withdrawal_refund:'requestPayout'}[s] as Key)||'transactionHistory';
   return <div className="page wallet-page">
     <PageTitle eyebrow={t('account')} title={t('wallet')} description={t('walletBody')}/><PaymentReviewNotice/>
@@ -132,8 +139,10 @@ function WalletContent(){
         </button>;})}</div>
         <label className="field">{t('amount')} (USD)<div className="money-input"><span>US$</span><input type="text" inputMode="decimal" autoComplete="off" value={amount} onChange={e=>setAmount(e.target.value)} aria-label={t('amount')} aria-describedby={amountDescription} aria-invalid={!!amountError} placeholder="10.00" maxLength={20}/></div></label>
         {amountError&&<p id="wallet-amount-error" className="form-error" role="alert">{amountError}</p>}
+        {wechatAvailable&&<CheckoutMethod value={method} onChange={setMethod} disabled={busy||!paymentsAvailable}/>}
+        {useWechat&&<div className="wechat-quote" aria-live="polite">{freshQuote?<><strong>{t('wechatCharge').replace('{amount}',`HK$${(freshQuote.amountHkdCents/100).toFixed(2)}`)}</strong><p>{t('wechatCredit').replace('{amount}',(freshQuote.amountUsdCents/100).toFixed(2))}</p><p>{t('wechatRate').replace('{rate}',String(freshQuote.rateMicros/1_000_000))}</p><p>{t('wechatConversion')}</p></>:quoteError?<><p className="form-error" role="alert">{quoteError}</p><button type="button" className="button secondary small" disabled={busy} onClick={()=>setQuoteRevision(value=>value+1)}>{t('retry')}</button></>:validAmount?<p>{t('loading')}</p>:null}</div>}
         {selectedQuote&&<FundingReward quote={selectedQuote} noteId="wallet-reward-note"/>}
-        <Button className="button primary wide" busy={busy} disabled={!validAmount||!paymentsAvailable} onClick={topUp}><Plus size={17}/>{t('addFunds')}{amountCents!==null&&<> · {usd(amountCents*10000)}</>}</Button>
+        <Button className="button primary wide" busy={busy} disabled={!validAmount||!paymentsAvailable||useWechat&&!freshQuote} onClick={topUp}><Plus size={17}/>{t('addFunds')}{amountCents!==null&&<> · {useWechat&&freshQuote?`HK$${(freshQuote.amountHkdCents/100).toFixed(2)}`:usd(amountCents*10000)}</>}</Button>
         {(config.paymentsMode==='demo'||config.paymentsTestMode)&&<p className="payment-disclosure"><ShieldCheck size={14}/>{t(config.paymentsTestMode?'stripeTestPaymentBody':'testPaymentBody')}</p>}
         {!paymentsAvailable&&!user?.payment_review&&<p className="form-error">{t('paymentUnavailable')}</p>}
       </section>

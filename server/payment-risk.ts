@@ -1,3 +1,4 @@
+import {wechatRefundUsdCents} from '../shared/wechat-pay.js';
 import {randomUUID} from 'node:crypto';
 import {config} from './config.js';
 import {one,all,run,transaction} from './db.js';
@@ -55,12 +56,14 @@ function cashRemaining(c:Row){
   const p=payment(c.payment_id);if(!p)return c.amount_cents;
   if(p.kind==='activation'&&c.pass_revoked)return 0;
   const others=one('SELECT COALESCE(SUM(wallet_debit_cents+platform_loss_cents),0) AS n FROM payment_risk_cases WHERE table_group=? AND livemode=? AND payment_id=? AND id<>?',c.table_group,c.livemode,c.payment_id,c.id)!.n;
-  return Math.max(0,Math.min(c.amount_cents,Math.max(0,p.amount_cents-others))-c.wallet_debit_cents-c.platform_loss_cents);
+  const principal=p.kind==='funding'?fundingCreditForPayment(p,c.table_group).amountCents:p.amount_cents;
+  const exposure=p.kind==='funding'&&p.currency==='hkd'?wechatRefundUsdCents(c.amount_cents,p.amount_cents,principal):c.amount_cents;
+  return Math.max(0,Math.min(exposure,Math.max(0,principal-others))-c.wallet_debit_cents-c.platform_loss_cents);
 }
 function giftAllocation(c:Row){return one<{bonus_debit_cents:number;bonus_loss_cents:number}>('SELECT bonus_debit_cents,bonus_loss_cents FROM funding_bonus_review_allocations WHERE case_id=?',c.id)||{bonus_debit_cents:0,bonus_loss_cents:0};}
 function originalGift(c:Row){
   const p=c.payment_id?payment(c.payment_id):undefined;
-  return p?.kind==='funding'&&p.currency==='usd'&&p.status==='paid'?fundingCreditForPayment(p,c.table_group).bonusCents:0;
+  return p?.kind==='funding'&&(p.currency==='usd'||p.currency==='hkd')&&p.status==='paid'?fundingCreditForPayment(p,c.table_group).bonusCents:0;
 }
 function giftRemaining(c:Row){
   if(c.amount_cents<=0||c.kind==='dispute'&&c.provider_status==='won')return 0;
@@ -116,7 +119,7 @@ export function assertPaymentAccountClear(userId:string){assert(!paymentAccountR
 export function assertPaymentPayoutsClear(){const p=partition();assert(!one("SELECT 1 FROM payment_risk_cases WHERE table_group=? AND livemode=? AND status='open' LIMIT 1",p.group,p.live),423,'PAYMENT_REVIEW_REQUIRED','Creator payouts are paused while payment reviews remain unresolved.');}
 
 export interface PaymentReviewCase extends Row {id:string;status:'open'|'resolved';mode:'test'|'live';payment_id:string|null;user_id:string|null;payment_kind:'funding'|'activation'|null;remaining_cents:number;mapped:boolean;provider_reversed_available:boolean;alreadyResolved?:boolean}
-function view(c:Row):PaymentReviewCase{const p=c.payment_id?payment(c.payment_id):undefined,a=giftAllocation(c);return{...c,id:c.id,status:c.status,payment_id:c.payment_id,user_id:c.user_id,mode:c.livemode?'live':'test',payment_kind:p?.kind||null,remaining_cents:remaining(c),funding_bonus_cents:originalGift(c),bonus_debit_cents:a.bonus_debit_cents,bonus_loss_cents:a.bonus_loss_cents,wallet_debit_cents:c.wallet_debit_cents+a.bonus_debit_cents,platform_loss_cents:c.platform_loss_cents+a.bonus_loss_cents,mapped:!!(c.payment_id&&c.user_id),provider_reversed_available:c.kind==='dispute'&&c.provider_status==='won'};}
+function view(c:Row):PaymentReviewCase{const p=c.payment_id?payment(c.payment_id):undefined,a=giftAllocation(c);return{...c,id:c.id,status:c.status,payment_id:c.payment_id,user_id:c.user_id,mode:c.livemode?'live':'test',payment_kind:p?.kind||null,reconciliation_currency:p?.kind==='funding'?'usd':c.currency,remaining_cents:remaining(c),funding_bonus_cents:originalGift(c),bonus_debit_cents:a.bonus_debit_cents,bonus_loss_cents:a.bonus_loss_cents,wallet_debit_cents:c.wallet_debit_cents+a.bonus_debit_cents,platform_loss_cents:c.platform_loss_cents+a.bonus_loss_cents,mapped:!!(c.payment_id&&c.user_id),provider_reversed_available:c.kind==='dispute'&&c.provider_status==='won'};}
 export function adminPaymentReviews(){const p=partition();return all("SELECT c.*,u.name AS user_name,u.email AS user_email FROM payment_risk_cases c LEFT JOIN users u ON u.id=c.user_id WHERE c.table_group=? AND c.livemode=? ORDER BY CASE c.status WHEN 'open' THEN 0 ELSE 1 END,c.updated_at DESC,c.id LIMIT 200",p.group,p.live).map(view);}
 
 export function resolvePaymentReview(id:string,actorId:string,input:PaymentReviewDecision){
@@ -147,7 +150,7 @@ export function resolvePaymentReview(id:string,actorId:string,input:PaymentRevie
       const cashDue=cashRemaining(c),giftDue=giftRemaining(c),due=cashDue+giftDue;assert(debit<=due,400,'INVALID_AMOUNT','The debit exceeds the remaining review amount.');
       let cashDebit=debit,cashLoss=0;
       if(p.kind==='funding'){
-        assert(p.currency==='usd',409,'CURRENCY_REVIEW_REQUIRED','Only USD wallet funding can be adjusted from the wallet.');
+        fundingCreditForPayment(p,c.table_group); // Validates the original USD credit and, for HKD, its immutable FX quote.
         assert(input.decision==='platform_loss'||debit===due,400,'REVIEW_AMOUNT_REQUIRED','Reconcile the full remaining amount or explicitly record the unrecovered platform loss.');
         assert(account.wallet_micros>=debit*10000,409,'INSUFFICIENT_FUNDS','The wallet cannot cover this debit. Reduce it and explicitly accept the remaining platform loss.');
         walletDelta=-debit*10000;if(debit)run(`UPDATE ${accountTable()} SET wallet_micros=wallet_micros-? WHERE ${accountIdColumn()}=?`,debit*10000,c.user_id);

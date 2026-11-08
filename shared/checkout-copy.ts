@@ -137,13 +137,14 @@ const rewardDescriptions:Record<Locale,string>={
   "ta": "{amount} செலுத்தி, {bonus} பரிசுத் தொகை உட்பட மொத்தம் {total} பணப்பைத் தொகை பெறுங்கள்."
 };
 
-export function checkoutCopy(locale:string,amountCents:number,bonusCents=0):CheckoutCopy{
+export function checkoutCopy(locale:string,amountCents:number,bonusCents=0,charge?:{amountCents:number;currency:'hkd'}):CheckoutCopy{
   if(!Number.isSafeInteger(amountCents)||amountCents<0)throw new RangeError('Wallet credit must be a nonnegative safe integer number of USD cents.');
   if(!Number.isSafeInteger(bonusCents)||bonusCents<0||!Number.isSafeInteger(amountCents+bonusCents)||bonusCents>0&&amountCents===0)throw new RangeError('Gift credit must be a nonnegative safe integer number of USD cents.');
+  if(charge&&(!Number.isSafeInteger(charge.amountCents)||charge.amountCents<=0||charge.currency!=='hkd'))throw new RangeError('Invalid HKD charge.');
   const language=Object.hasOwn(messages,locale)?locale as Locale:'en';
   const copy=messages[language];
   const dollars=(cents:number)=>`US$${Math.floor(cents/100)}.${String(cents%100).padStart(2,'0')}`;
   if(!bonusCents)return{description:copy.description.replace('{amount}',dollars(amountCents)),submit:copy.submit,afterSubmit:copy.afterSubmit};
-  const description=rewardDescriptions[language].replace('{amount}',dollars(amountCents)).replace('{bonus}',dollars(bonusCents)).replace('{total}',dollars(amountCents+bonusCents));
+  const description=rewardDescriptions[language].replace('{amount}',charge?`HK$${(charge.amountCents/100).toFixed(2)}`:dollars(amountCents)).replace('{bonus}',dollars(bonusCents)).replace('{total}',dollars(amountCents+bonusCents));
   return{description,submit:description+' '+copy.submit,afterSubmit:copy.afterSubmit};
 }

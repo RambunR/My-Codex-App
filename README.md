@@ -10,6 +10,8 @@ The [Terms of Use](https://lingyingdrama.com/terms) and [Privacy Policy](https:/
 
 **Local Pass prices:** Dramio Pass shows an approximate price in the visitor's detected country currency (for example, NT$ in Taiwan), alongside the actual HKD billing amount. Discounted prices and the Account card use the same display quote. See [local currency display](docs/LOCAL_CURRENCY_DISPLAY.md) for rate freshness, fallbacks and the unchanged HKD settlement boundary.
 
+**WeChat Pay:** customers can select mainland WeChat Pay for Dramio Pass and wallet top-ups. HK$78 buys US$10 wallet credit at the approved rate; cards retain USD top-ups. See [WeChat Pay setup and accounting](docs/WECHAT_PAY.md).
+
 **Wallet funding gifts:** quick amounts are US$10, US$25, US$50 and US$100. New US$50 payments receive US$5 gift credit, and US$100 receives US$15, after verified payment. See [funding gifts and accounting](docs/WALLET_FUNDING_GIFTS.md).
 
 **Dramio Pass promo codes:** administrators can create, edit, enable or disable fixed-HKD and percentage discounts with unlimited or capped usage in [Admin → Promo codes](https://lingyingdrama.com/admin?tab=promotions). Codes are shared externally and entered in a blank field; public pages do not advertise or prefill them. See [promotion controls](docs/CREATOR_LAUNCH_PROMOTION.md) and [registration email / Stripe receipt setup](docs/EMAIL_AUTH.md). Creator earnings depend on paid unlocks; withdrawals remain paused.

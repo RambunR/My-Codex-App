@@ -1,3 +1,5 @@
+import type {CheckoutChoice} from '../shared/wechat-pay.js';
+import {wechatPayEnabled,requestedWechatQuote,bindWechatQuote,storeCheckoutMethod,checkoutMethod,verifyWechatSession} from './wechat-pay.js';
 import {episodeFreeSql} from './episode-access.js';
 import crypto from 'node:crypto';
 import Stripe from 'stripe';
@@ -47,13 +49,14 @@ export function settlePayment(paymentId: string, expected?: { amount: number; cu
     if(payment.provider==='stripe')assert(expected&&stripeConfigured()&&stripeModeMatches(expected.livemode)&&(!config.production||config.sandbox||usingTestPaymentState()||expected.livemode===true),400,'PAYMENT_MODE_MISMATCH','Payment mode does not match this application.');
     if(config.production)assert(payment.provider==='stripe',400,'PAYMENT_MODE_MISMATCH','Test payments cannot fund production accounts.');
     if (expected) assert(payment.provider_session === expected.session && payment.amount_cents === expected.amount && payment.currency === expected.currency, 400, 'PAYMENT_MISMATCH', 'Payment details do not match.');
+    verifyWechatSession(payment,expected?.sessionObject);
     if(expected?.sessionObject)recordPaymentLink(payment.id,expected.sessionObject);
     if (payment.status === 'paid') return false;
     assert(payment.status === 'pending', 409, 'PAYMENT_CLOSED', 'This payment is no longer pending.');
     if (payment.kind === 'funding') {
-      assert(payment.currency==='usd'&&Number.isSafeInteger(payment.amount_cents)&&payment.amount_cents>=MIN_WALLET_FUNDING_CENTS&&payment.amount_cents<=MAX_WALLET_FUNDING_CENTS,400,'PAYMENT_MISMATCH','Wallet deposits must be valid USD amounts of at least $5.00.');
       const funding=fundingCreditForPayment(payment);
-      const paidMicros=payment.amount_cents*10000,bonusMicros=funding.bonusCents*10000,micros=funding.totalCreditCents*10000;
+      assert(funding.amountCents>=MIN_WALLET_FUNDING_CENTS&&funding.amountCents<=MAX_WALLET_FUNDING_CENTS,400,'PAYMENT_MISMATCH','Wallet deposits must be valid USD credit amounts of at least $5.00.');
+      const paidMicros=funding.amountCents*10000,bonusMicros=funding.bonusCents*10000,micros=funding.totalCreditCents*10000;
       const user=financeAccount(payment.user_id);
       assert(user&&canAdd(user.wallet_micros,micros),409,'BALANCE_LIMIT','This credit would exceed the supported wallet balance. Contact support.');
       run(`UPDATE ${accountTable()} SET wallet_micros=wallet_micros+? WHERE ${accountIdColumn()}=?`, micros, payment.user_id);
@@ -117,8 +120,13 @@ export function requestWithdrawal(userId: string, amountCents: number, note = ''
     return id;
   });
 }
-export async function createCheckout(userId: string, kind: 'funding' | 'activation', cents: number, languageCode?:string,promoCode?:string,promoRevision?:number,creatorConsent?:CreatorPassConsent) {
+export async function createCheckout(userId: string, kind: 'funding' | 'activation', cents: number, languageCode?:string,promoCode?:string,promoRevision?:number,creatorConsent?:CreatorPassConsent,choice:CheckoutChoice={method:'card'}) {
   const consent=kind==='activation'?requireCreatorPassConsent(creatorConsent):undefined;
+  const method=choice.method;
+  assert(method==='card'||method==='wechat_pay',400,'INVALID_PAYMENT_METHOD','Choose a supported payment method.');
+  if(method==='wechat_pay')assert(wechatPayEnabled(),503,'WECHAT_UNAVAILABLE','WeChat Pay is not available.');
+  assert(!choice.fundingQuoteId||kind==='funding'&&method==='wechat_pay',400,'WECHAT_QUOTE_MISMATCH','This quote applies only to WeChat Pay wallet top-ups.');
+  const wechatQuote=kind==='funding'&&method==='wechat_pay'?requestedWechatQuote(choice.fundingQuoteId,userId,cents):null;
   assert(promoCode===undefined||kind==='activation',400,'PROMOTION_NOT_APPLICABLE','Promotion codes apply only to Dramio Pass, not wallet deposits.');
   const promotion=promoCode===undefined?null:quotePromotion(userId,promoCode);
   const assertRevision=()=>{if(promotion)assert(promoRevision===promotion.revision||promoRevision===undefined&&promotion.code===PASS_PROMOTION_CODE&&promotion.amountHkdCents===PASS_PROMOTION_HKD_CENTS,409,'PROMOTION_CHANGED','This promotion changed. Apply the code again to confirm the current price.');};
@@ -140,7 +148,7 @@ export async function createCheckout(userId: string, kind: 'funding' | 'activati
       assert(price.active&&price.type==='one_time'&&price.currency==='hkd'&&price.unit_amount===ACTIVATION_HKD_CENTS&&stripeModeMatches(price.livemode),503,'PAYMENT_CONFIG_ERROR','The Dramio Pass price must be HK$88 once in the correct payment mode.');
     }
   }
-  const currency=kind==='activation'?'hkd':'usd',amount=kind==='activation'?(promotion?promotion.amountHkdCents:ACTIVATION_HKD_CENTS):cents;
+  const currency=kind==='activation'||method==='wechat_pay'?'hkd':'usd',amount=kind==='activation'?(promotion?promotion.amountHkdCents:ACTIVATION_HKD_CENTS):wechatQuote?wechatQuote.hkd_cents:cents;
   const requestedLanguage=languageCode||one('SELECT language FROM users WHERE id=?',userId)?.language||'en';
   const checkoutLanguage=LANGUAGES.some(language=>language.code===requestedLanguage)?requestedLanguage:'en';
   // Custom messages cover every app language. Stripe's own controls use its
@@ -153,19 +161,23 @@ export async function createCheckout(userId: string, kind: 'funding' | 'activati
         const pending=one(`SELECT * FROM ${paymentTable()} WHERE user_id=? AND kind='activation' AND status='pending' AND provider=? ORDER BY created_at DESC LIMIT 1`,userId,config.payments);
         if(pending)return{...pending,created:false};
       }
+      if(wechatQuote?.payment_id){const pending=one(`SELECT * FROM ${paymentTable()} WHERE id=? AND user_id=? AND kind='funding' AND status='pending' AND provider='stripe'`,wechatQuote.payment_id,userId);assert(pending,409,'WECHAT_QUOTE_USED','This quote has already been used. Refresh the HKD payment amount.');return{...pending,created:false};}
       if(promotion){const fresh=quotePromotion(userId,promotion.code);assert(fresh.revision===promotion.revision&&fresh.amountHkdCents===promotion.amountHkdCents,409,'PROMOTION_CHANGED','This promotion changed. Apply the code again to confirm the current price.');}
       const id=crypto.randomUUID();run(`INSERT INTO ${paymentTable()} (id,user_id,kind,amount_cents,currency,provider) VALUES (?,?,?,?,?,?)`,id,userId,kind,amount,currency,config.payments);
       if(promotion)storePromotionQuote(id,promotion);
-      if(kind==='funding')storeFundingQuote(id,userId,amount);
+      if(kind==='funding')storeFundingQuote(id,userId,cents);
+      storeCheckoutMethod(id,method);
+      if(wechatQuote)bindWechatQuote(wechatQuote.id,id);
       if(consent)recordCreatorPassConsent(id,userId,consent,checkoutLanguage);
       return{id,provider_session:null,amount_cents:amount,currency,created:true};
     });
     if(!payment)return{alreadyPaid:true};
     const id=payment.id as string;
     const funding=kind==='funding'?fundingCreditForPayment({...payment,id,user_id:userId,kind:'funding'}):undefined;
-    const messages=checkoutCopy(checkoutLanguage,kind==='funding'?amount:0,funding?.bonusCents||0);
+    const messages=checkoutCopy(checkoutLanguage,funding?.amountCents||0,funding?.bonusCents||0,wechatQuote?{amountCents:amount,currency:'hkd'}:undefined);
+    const sameMethod=checkoutMethod(id)===method;
     const sameQuote=kind!=='activation'||payment.amount_cents===amount&&payment.currency===currency&&(promotion?validPromotionPayment({...payment,id})&&promotionSnapshot(id)?.code===promotion.code:!promotionSnapshot(id));
-    const assertSameQuote=()=>{if(!sameQuote)throw new AppError(409,'ACTIVATION_CHECKOUT_CONFLICT','Close your existing unpaid Dramio Pass checkout before changing its promotion.',{paymentId:id});};
+    const assertSameQuote=()=>{if(!sameMethod)throw new AppError(409,'ACTIVATION_CHECKOUT_CONFLICT','Close your existing unpaid Dramio Pass checkout before changing payment method.',{paymentId:id,reason:'payment_method'});if(!sameQuote)throw new AppError(409,'ACTIVATION_CHECKOUT_CONFLICT','Close your existing unpaid Dramio Pass checkout before changing its promotion.',{paymentId:id});};
     const recordResumeConsent=()=>{if(consent&&!payment.created)transaction(()=>recordCreatorPassConsent(id,userId,consent,checkoutLanguage));};
     if(config.payments==='demo'){assertSameQuote();recordResumeConsent();return{demo:true,paymentId:id,amount_cents:amount,currency,...(funding?{funding}:{})};}
     if(payment.provider_session){
@@ -181,12 +193,12 @@ export async function createCheckout(userId: string, kind: 'funding' | 'activati
         recordResumeConsent();return{url:existing.url,paymentId:id,...(funding?{funding}:{})};
       }
       assert(existing.status!=='complete',409,'PAYMENT_PROCESSING','Your payment is still processing. Please wait before trying again.');
-      run(`UPDATE ${paymentTable()} SET status='expired' WHERE id=? AND status='pending'`,id);continue;
+      run(`UPDATE ${paymentTable()} SET status='expired' WHERE id=? AND status='pending'`,id);if(wechatQuote)throw new AppError(409,'WECHAT_QUOTE_USED','This checkout expired. Refresh the HKD payment amount.');continue;
     }
     assertSameQuote();
     try{
-      const metadata={app:'aidramio',site:stripeSiteOrigin(),financialMode:config.stripeTestMode?'test':'default',paymentId:id,userId,...(promotion?{promotionCode:promotion.code,regularAmountHkdCents:String(ACTIVATION_HKD_CENTS)}:{})};
-      const session=await stripe!.checkout.sessions.create({mode:'payment',payment_method_types:['card'],client_reference_id:id,metadata,payment_intent_data:{metadata},locale,customer_email:one('SELECT email FROM users WHERE id=?',userId)!.email,
+      const metadata={...(method==='wechat_pay'?{checkoutMethod:method,...(wechatQuote?{fundingQuoteId:wechatQuote.id}:{})}:{}),app:'aidramio',site:stripeSiteOrigin(),financialMode:config.stripeTestMode?'test':'default',paymentId:id,userId,...(promotion?{promotionCode:promotion.code,regularAmountHkdCents:String(ACTIVATION_HKD_CENTS)}:{})};
+      const session=await stripe!.checkout.sessions.create({mode:'payment',payment_method_types:[method],...(method==='wechat_pay'?{payment_method_options:{wechat_pay:{client:'web' as const}}}:{}),client_reference_id:id,metadata,payment_intent_data:{metadata},locale,customer_email:one('SELECT email FROM users WHERE id=?',userId)!.email,
         branding_settings:{display_name:'LingYing · HK NovaXR Production'},
         custom_text:{after_submit:{message:messages.afterSubmit},...(kind==='funding'?{submit:{message:messages.submit}}:{})},
         line_items:kind==='activation'&&config.stripeActivationPriceId&&!promotion?[{price:config.stripeActivationPriceId,quantity:1}]:[{price_data:{currency,unit_amount:amount,...(kind==='funding'&&config.stripeWalletProductId&&!funding?.bonusCents?{product:config.stripeWalletProductId}:{product_data:{name:kind==='activation'?'Dramio Pass':'LingYing wallet credit',...(kind==='funding'?{description:messages.description}:promotion?{description:`Promotion ${promotion.code} · HK$${(amount/100).toFixed(2)} once (regular HK$88).`}:{})}})},quantity:1}],

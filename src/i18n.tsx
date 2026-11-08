@@ -1,3 +1,4 @@
+import {wechatEnglish,wechatMessages} from './wechat-pay-locales';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { LANGUAGES, type Locale } from '../shared/config';
 import { additionalMessages,googleAuthEnglish,googleAuthMessages,walletFundingEnglish,walletFundingMessages,sandboxEnglish,sandboxMessages,stripeTestingEnglish,stripeTestingMessages,analyticsEnglish,analyticsMessages,dramioPassEnglish,dramioPassMessages,editorValidationEnglish,editorValidationMessages,accountAuthEnglish,accountAuthMessages,livePaymentEnglish,livePaymentMessages } from './localeExtras';
@@ -24,6 +25,7 @@ import {transactionFeeEnglish,transactionFeeMessages} from './transaction-fee-lo
 import {testPayoutEnglish,testPayoutMessages} from './test-payout-locales';
 
 const en = {
+  ...wechatEnglish,
   ...transactionFeeEnglish,
   ...testPayoutEnglish,
   ...withdrawalEnglish,
@@ -201,6 +203,7 @@ for(const language of LANGUAGES){if(!suggestionsMessages[language.code])throw ne
 for(const language of LANGUAGES)Object.assign(dictionaries[language.code],withdrawalMessages[language.code]);
 for(const language of LANGUAGES)Object.assign(dictionaries[language.code],testPayoutMessages[language.code]);
 for(const language of LANGUAGES)Object.assign(dictionaries[language.code],transactionFeeMessages[language.code]);
+for(const language of LANGUAGES)if(language.code!=='en')Object.assign(dictionaries[language.code],wechatMessages[language.code]);
 const uploadConfirmationMessages:Record<Locale,string>={
   en:'Upload confirmation was interrupted. Refresh this series before retrying the file.',
   'zh-TW':'上傳確認中斷。請重新整理此系列，再重試上傳檔案。',

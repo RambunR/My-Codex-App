@@ -719,6 +719,13 @@ try{
   assert.equal((await request('/api/auth/me',undefined,viewer)).data.user.wallet_micros,0);
   assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.earnings_micros,0);
   assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.publisher_active,1);
+  assert.equal(stripeTest.paymentMethods.wechatPay,true);
+  const wechatQuote=(await request('/api/payments/wechat/quote',{amount_cents:1000},viewer)).data.quote;
+  assert.equal(wechatQuote.amountUsdCents,1000);assert.equal(wechatQuote.amountHkdCents,7800);assert.equal(wechatQuote.rateMicros,7_800_000);assert.ok(wechatQuote.expiresAt>Date.now());
+  await request('/api/payments/wechat/quote',{amount_cents:499},viewer,400);
+  await request('/api/payments/wechat/quote',{amount_cents:1000},'',401);
+  assert.equal((await request('/api/auth/me',undefined,viewer)).data.user.wallet_micros,0);
+  console.log('PASS: Cloudflare SQL stores actor-bound HKD quotes for USD wallet credit without creating credit or payment.');
   const testWallet=(await request('/api/wallet',undefined,viewer)).data;assert.deepEqual(testWallet.ledger,[]);assert.deepEqual(testWallet.payments,[]);
   const retainedUnlock=(await request(`/api/episodes/${second.id}/unlock`,{},viewer)).data;assert.equal(retainedUnlock.alreadyUnlocked,true);assert.equal(retainedUnlock.user.wallet_micros,0);
   await request('/api/studio/connect',{},publisher,503);

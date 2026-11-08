@@ -22,6 +22,7 @@ export const config = {
   officialCreatorName: process.env.OFFICIAL_CREATOR_NAME || 'LingYingDrama Offical',
   dataDir: path.resolve(process.env.DATA_DIR || './data'),
   payments: process.env.PAYMENTS_MODE || (process.env.NODE_ENV === 'production' ? 'disabled' : 'demo'),
+  wechatPayEnabled: process.env.STRIPE_WECHAT_PAY_ENABLED === 'true',
   usdToHkd: Number(process.env.USD_TO_HKD || 7.8),
   ...selectStripeSettings(process.env,process.env.STRIPE_TEST_MODE==='true'),
   googleClientId: process.env.GOOGLE_CLIENT_ID || '',
