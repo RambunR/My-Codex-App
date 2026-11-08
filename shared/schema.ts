@@ -10,6 +10,7 @@ import {SUBTITLE_LANGUAGE_SCHEMA} from './subtitle-language-schema.js';
 import {CATALOG_RETIREMENT_SCHEMA} from './catalog-retirement-schema.js';
 import {TEST_PAYOUT_SCHEMA} from './test-payout-schema.js';
 import {CREATOR_PASS_CONSENT_SCHEMA} from './creator-pass-consent-schema.js';
+import {DEFAULT_QUOTA_BYTES} from './config.js';
 
 export const DATABASE_SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -18,9 +19,15 @@ CREATE TABLE IF NOT EXISTS users (
  publisher_active INTEGER NOT NULL DEFAULT 0, language TEXT NOT NULL DEFAULT 'en',
  wallet_micros INTEGER NOT NULL DEFAULT 0 CHECK(wallet_micros >= 0),
  earnings_micros INTEGER NOT NULL DEFAULT 0 CHECK(earnings_micros >= 0),
- quota_bytes INTEGER NOT NULL DEFAULT 5368709120 CHECK(quota_bytes >= 0), used_bytes INTEGER NOT NULL DEFAULT 0 CHECK(used_bytes >= 0),
+ quota_bytes INTEGER NOT NULL DEFAULT ${DEFAULT_QUOTA_BYTES} CHECK(quota_bytes >= 0), used_bytes INTEGER NOT NULL DEFAULT 0 CHECK(used_bytes >= 0),
  stripe_account_id TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+-- Older databases retain their original column default. Raise their existing
+-- accounts and future inserts without rebuilding referenced account tables.
+CREATE TRIGGER IF NOT EXISTS users_minimum_storage_quota AFTER INSERT ON users
+WHEN NEW.quota_bytes < ${DEFAULT_QUOTA_BYTES}
+BEGIN UPDATE users SET quota_bytes=${DEFAULT_QUOTA_BYTES} WHERE id=NEW.id; END;
+UPDATE users SET quota_bytes=${DEFAULT_QUOTA_BYTES} WHERE quota_bytes < ${DEFAULT_QUOTA_BYTES};
 CREATE TABLE IF NOT EXISTS platform_owner_access_events (
  id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), previous_role TEXT NOT NULL,
  promoted_at TEXT NOT NULL DEFAULT (datetime('now'))

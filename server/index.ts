@@ -18,8 +18,9 @@ if(!config.production){
   app.use(async(req,res,next)=>{try{const html=await readFile(path.resolve('index.html'),'utf8');res.status(200).type('html').send(await vite.transformIndexHtml(req.originalUrl,html));}catch(e){vite.ssrFixStacktrace(e as Error);next(e);}});
 }else{
   app.use('/assets',express.static(path.resolve('dist/client/assets'),{maxAge:'1y',immutable:true}));
+  app.use('/assets',(_req,res)=>res.status(404).setHeader('Cache-Control','no-store').type('text').send('Asset not found.'));
   app.use(express.static(path.resolve('dist/client'),{index:false,maxAge:'1h'}));
-  app.use((_req,res)=>res.sendFile(path.resolve('dist/client/index.html')));
+  app.use((_req,res)=>res.setHeader('Cache-Control','no-store').sendFile(path.resolve('dist/client/index.html')));
 }
 app.use(errorHandler);
 const server=app.listen(config.port,'0.0.0.0',()=>console.log(`AIDramio running on port ${config.port} · payments: ${config.payments}`));

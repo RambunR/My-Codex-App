@@ -85,7 +85,7 @@ test('signed discounted settlement requires exact session, currency and amount; 
   for(const change of [{amount_total:5799},{amount_total:8800},{currency:'usd'},{id:'cs_wrong'}]){const rejected=await webhook(p,change,400);assert.equal(rejected.error.code,'PAYMENT_MISMATCH');assert.equal(payment(p.id).status,'pending');}
   const ignored=await webhook(p,{livemode:true},200,true);assert.equal(ignored.ignored,true);assert.equal(payment(p.id).status,'pending');
   await Promise.all([webhook(p),webhook(p)]);
-  const account=(await request('/api/auth/me',undefined,user.cookie)).data.user;assert.equal(account.publisher_active,1);assert.equal(account.wallet_micros,0);assert.equal(account.earnings_micros,0);assert.equal(account.dramio_pass.active,true);assert.ok(account.dramio_pass.purchased_at);assert.equal(account.quota_bytes,5*1024**3);
+  const account=(await request('/api/auth/me',undefined,user.cookie)).data.user;assert.equal(account.publisher_active,1);assert.equal(account.wallet_micros,0);assert.equal(account.earnings_micros,0);assert.equal(account.dramio_pass.active,true);assert.ok(account.dramio_pass.purchased_at);assert.equal(account.quota_bytes,10*1024**3);
   const ledger=one("SELECT COUNT(*) AS n,MAX(description) AS description FROM ledger WHERE user_id=? AND kind='activation'",user.id)!;assert.equal(ledger.n,1);assert.match(ledger.description,/HK\$58.*LINGYING58/);
   await assert.rejects(finance.createCheckout(user.id,'activation',8800,undefined,undefined,undefined,creatorConsent),(error:any)=>error.code==='ALREADY_ACTIVE');
  }finally{f.restore();}

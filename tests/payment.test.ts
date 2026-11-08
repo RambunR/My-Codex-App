@@ -96,7 +96,7 @@ test('publisher activation stays a one-time HK$88 charge separate from USD walle
   await Promise.all([0,1].map(()=>request(`/api/payments/${id}/demo-confirm`,{},user.cookie)));
   const activated=(await request('/api/auth/me',undefined,user.cookie)).data.user;
   assert.equal(activated.publisher_active,1);assert.equal(activated.role,'publisher');assert.equal(activated.wallet_micros,5_000_000);
-  assert.equal(activated.quota_bytes,5*1024**3);
+  assert.equal(activated.quota_bytes,10*1024**3);
   await request('/api/payments/checkout',{kind:'activation',creator_consent:creatorConsent},user.cookie,409);
   assert.equal(one("SELECT COUNT(*) AS n FROM payments WHERE user_id=? AND kind='activation'",user.id)!.n,1);
   assert.equal(one("SELECT COUNT(*) AS n FROM ledger WHERE user_id=? AND kind='activation'",user.id)!.n,1);

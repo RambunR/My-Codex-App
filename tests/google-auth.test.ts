@@ -100,7 +100,7 @@ test('production OAuth browser cookies require HTTPS and carry Secure, HttpOnly 
 test('a verified signed Google identity registers an ordinary viewer and a persistent application session',async()=>{
   const a=await start('/wallet','','zh-TW');const email='new-google-viewer@gmail.com';const subject='new-google-viewer';
   const r=await callback(a,{claims:{email,sub:subject}});assert.equal(location(r).pathname,'/wallet');const session=cookie(r,'drama_session');assert.ok(session);
-  const me=(await json('/api/auth/me',undefined,session)).data.user;assert.equal(me.email,email);assert.equal(me.role,'viewer');assert.equal(me.publisher_active,0);assert.equal(me.wallet_micros,0);assert.equal(me.earnings_micros,0);assert.equal(me.quota_bytes,5*1024**3);assert.equal(me.language,'zh-TW');assert.equal(me.password_hash,undefined);
+  const me=(await json('/api/auth/me',undefined,session)).data.user;assert.equal(me.email,email);assert.equal(me.role,'viewer');assert.equal(me.publisher_active,0);assert.equal(me.wallet_micros,0);assert.equal(me.earnings_micros,0);assert.equal(me.quota_bytes,10*1024**3);assert.equal(me.language,'zh-TW');assert.equal(me.password_hash,undefined);
   const identities=(await json('/api/account/identities',undefined,session)).data;assert.equal(identities.google.linked,true);assert.equal(identities.google.email,email);assert.equal(identities.password,false);assert.ok(certificates>0,'ID-token validation must retrieve a trusted Google signing key');
   await json('/api/auth/login',{email,password},'',401);
   assert.equal((await json('/api/auth/me',undefined,session)).data.user.id,me.id);

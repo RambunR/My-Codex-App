@@ -1,6 +1,6 @@
 import {test,expect,type Page} from '@playwright/test';
 
-import {LEGAL_POLICY_VERSION} from '../../shared/creator-pass-consent';
+import {LEGAL_POLICY_VERSION,LEGAL_POLICY_EFFECTIVE_DATE} from '../../shared/creator-pass-consent';
 const version=LEGAL_POLICY_VERSION;
 const contact='contactus@hknovaxrproduction.com';
 const passRisk='Dramio Pass provides publishing access. Buying a pass does not guarantee content approval, promotion, views, sales, revenue or income. Earnings may be zero.';
@@ -29,11 +29,12 @@ async function noOverflow(page:Page){await expect.poll(()=>page.evaluate(()=>doc
 for(const locale of ['en','zh-TW','zh-CN'] as const)for(const kind of ['terms','privacy'] as const)test(`${locale} ${kind} is public, dated and navigable on a 320px phone`,async({page})=>{
   const writes=await fixture(page,locale);await page.goto('/'+kind);const policy=page.locator('.legal-policy-page');
   await expect(policy).toBeVisible();await expect(policy).toHaveAttribute('lang',locale);await expect(policy).toHaveAttribute('dir','ltr');await expect(policy).toHaveAttribute('data-policy-version',version);await expect(policy.getByRole('heading',{level:1})).toHaveText(names[locale][kind]);
-  await expect(policy.locator('.legal-effective-date time')).toHaveAttribute('datetime',version);await expect(policy.locator('.legal-language-notice')).toHaveCount(0);await expect(policy.locator('.legal-summary ul')).toBeVisible();expect(await policy.locator('.legal-summary li').count()).toBeGreaterThan(1);
+  await expect(policy.locator('.legal-effective-date time')).toHaveAttribute('datetime',LEGAL_POLICY_EFFECTIVE_DATE);await expect(policy.locator('.legal-language-notice')).toHaveCount(0);await expect(policy.locator('.legal-summary ul')).toBeVisible();expect(await policy.locator('.legal-summary li').count()).toBeGreaterThan(1);
   await expect(policy).toContainText('HK NovaXR Production');await expect(policy.locator(`a[href="mailto:${contact}"]`).first()).toBeVisible();
   const ids=kind==='terms'?termsIds:privacyIds;await expect(policy.locator('.legal-section')).toHaveCount(ids.length);
   for(const id of ids){await expect(policy.locator('.legal-section#'+id+' h2')).toHaveCount(1);await expect(policy.locator(`.legal-toc a[href="#${id}"]`)).toHaveCount(1);}
   if(kind==='terms'){
+    await expect(policy.locator('#creator-pass')).toContainText('10 GiB');
     await expect(policy.locator('#copyright-reports')).toContainText(contact);await expect(policy.locator('#disputes')).toContainText(locale==='en'?/internal/i:/內部|内部/);await expect(policy.locator('#disputes')).toContainText(locale==='en'?/courts?|regulators?/i:/法院|法庭|監管|监管/);
     await expect(policy).toContainText(locale==='en'?/mandatory|non-waivable|statutory/i:/強制|强制|法定|不可放棄|不可放弃/);
   }

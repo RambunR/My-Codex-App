@@ -30,7 +30,7 @@ import type {SeriesAccessType} from './catalog-access.js';
 export type {SeriesAccessType} from './catalog-access.js';
 export const MAX_EPISODE_SECONDS = 240;
 export const MAX_EPISODE_BYTES = 200 * 1024 * 1024;
-export const DEFAULT_QUOTA_BYTES = 5 * 1024 * 1024 * 1024;
+export const DEFAULT_QUOTA_BYTES = 10 * 1024 * 1024 * 1024;
 export const USD_MICROS = 1_000_000;
 export const ACTIVATION_HKD_CENTS = 8800;
 export const MIN_PRICE_CENTS = 10;

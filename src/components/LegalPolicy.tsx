@@ -4,7 +4,7 @@ import {Mail} from 'lucide-react';
 import {useI18n} from '../i18n';
 import {PageTitle} from '../ui';
 import {COMPANY_NAME,CONTACT_EMAIL,CONTACT_HREF} from '../company';
-import {LEGAL_POLICY_VERSION,legalPolicyContent,type LegalLocale,type LegalPolicyType} from '../legal-policy-content';
+import {LEGAL_POLICY_VERSION,LEGAL_POLICY_EFFECTIVE_DATE,legalPolicyContent,type LegalLocale,type LegalPolicyType} from '../legal-policy-content';
 import '../legal-policy.css';
 
 export function LegalPolicy({type}:{type:LegalPolicyType}){
@@ -19,7 +19,7 @@ export function LegalPolicy({type}:{type:LegalPolicyType}){
   },[type,language,hash]);
   return <div className="page info-page legal-policy-page" lang={language} dir="ltr" data-policy-version={LEGAL_POLICY_VERSION}>
     <PageTitle eyebrow="LingYing" title={documentCopy.title} description={documentCopy.intro}/>
-    <div className="legal-policy-meta"><p className="legal-effective-date">{copy.effective}: <time dateTime={LEGAL_POLICY_VERSION}>{copy.date}</time><span>{copy.version}: {LEGAL_POLICY_VERSION}</span></p>
+    <div className="legal-policy-meta"><p className="legal-effective-date">{copy.effective}: <time dateTime={LEGAL_POLICY_EFFECTIVE_DATE}>{copy.date}</time><span>{copy.version}: {LEGAL_POLICY_VERSION}</span></p>
       <nav className="legal-language-options" aria-label={copy.languages}>{([['en','English'],['zh-TW','繁體中文'],['zh-CN','简体中文']] as const).map(([code,label])=><button key={code} type="button" lang={code} aria-pressed={language===code} onClick={()=>setLocale(code)}>{label}</button>)}</nav>
     </div>
     {locale!==language&&<p className="legal-language-notice" role="note">{copy.fallback}</p>}

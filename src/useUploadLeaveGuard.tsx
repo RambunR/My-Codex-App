@@ -4,6 +4,7 @@ import {LoaderCircle,Upload} from 'lucide-react';
 import {Modal} from './ui';
 import {useI18n} from './i18n';
 import './upload-leave-warning.css';
+import {notifyPageReloadSafety,registerPageReloadBlocker} from './page-load-recovery';
 
 interface UploadLeaveState{
   active:boolean;
@@ -27,9 +28,11 @@ export function useUploadLeaveGuard(state:UploadLeaveState){
     const active=latest.current.isActive();
     if(active&&!installed.current){window.addEventListener('beforeunload',beforeUnload);installed.current=true;}
     else if(!active&&installed.current){window.removeEventListener('beforeunload',beforeUnload);installed.current=false;}
+    notifyPageReloadSafety();
   },[beforeUnload]);
   const blocker=useBlocker(useCallback<BlockerFunction>(({currentLocation,nextLocation})=>currentLocation.pathname!==nextLocation.pathname&&latest.current.isActive(),[]));
   useEffect(()=>{syncProtection();},[state.active,syncProtection]);
+  useEffect(()=>registerPageReloadBlocker(()=>latest.current.isActive()),[]);
   useEffect(()=>()=>{if(installed.current)window.removeEventListener('beforeunload',beforeUnload);installed.current=false;},[beforeUnload]);
   useEffect(()=>{
     if(blocker.state!=='blocked'&&confirming.current){confirming.current=false;setStopping(false);}

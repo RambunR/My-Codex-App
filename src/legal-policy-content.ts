@@ -1,6 +1,6 @@
 import {COMPANY_NAME,CONTACT_EMAIL} from './company';
 
-export {LEGAL_POLICY_VERSION} from '../shared/creator-pass-consent';
+export {LEGAL_POLICY_VERSION,LEGAL_POLICY_EFFECTIVE_DATE} from '../shared/creator-pass-consent';
 export type LegalLocale='en'|'zh-TW'|'zh-CN';
 export type LegalPolicyType='terms'|'privacy';
 export interface LegalSection{id:string;title:string;paragraphs:string[];items?:string[];contact?:boolean}
@@ -28,7 +28,7 @@ const en:LegalPolicyCopy={
         'Before opening a new Pass checkout, review these Terms, acknowledge the Privacy Policy and expressly confirm that results are not guaranteed using the required checkbox. We record the accepted versions, language, time and related payment as evidence of that acknowledgement. This acknowledgement does not provide consent to unrelated marketing.',
         'Dramio Pass is a one-time payment for access to the creator publishing features described at purchase, subject to these Terms, account eligibility, content review and technical limits. The regular price is HK$88; a valid promotion may change the amount shown at checkout. Actual billing is in HKD. Other-currency displays are indicative estimates. The Pass is not a purchase of viewers, advertising, investment returns or employment.',
         'Buying a Pass, uploading content or being featured does not guarantee approval, distribution, recommendations, any minimum view count, followers, paid unlocks, sales, revenue, income or recovery of production and Pass costs. Earnings may be zero. Results depend on audience demand, content, pricing, lawful availability and other factors. Examples, estimates, promotional language and another creator’s results are not promises of your results.',
-        'Regular publishers currently receive a 5 GiB storage allowance. Administrator-owned media may have different access. The current episode limits are 4 minutes and 200 MiB per input file; covers are subject to separate limits. Any storage increase or additional service must be separately approved and quoted. A Pass does not exempt content from moderation or provide an unconditional right to permanent hosting.',
+        'Regular publishers currently receive a 10 GiB storage allowance. Administrator-owned media may have different access. The current episode limits are 4 minutes and 200 MiB per input file; covers are subject to separate limits. Any storage increase or additional service must be separately approved and quoted. A Pass does not exempt content from moderation or provide an unconditional right to permanent hosting.',
       ]},
       {id:'content-rights',title:'3. Your content and permission to operate the service',paragraphs:[
         'You retain the rights you lawfully hold in your content. You confirm that you have all permissions needed to upload, store, display, stream and monetise it, including video, music, scripts, artwork, trademarks, performances, personal data, voices and likenesses. An AI-generated or AI-assisted label does not establish ownership, clear third-party rights or excuse infringement. Describe the production method and language accurately.',
@@ -142,7 +142,7 @@ const zhTW:LegalPolicyCopy={
       '開啟新的通行證結帳前，請閱讀本條款、知悉私隱政策，並透過必填確認方格明確確認成果不獲保證。我們會記錄所接受的版本、語言、時間及相關付款，作為該項確認的紀錄。這不構成對無關直接促銷的同意。',
       'Dramio Pass 是使用購買時所描述之創作者發布功能的一次性付款，並受本條款、帳戶資格、內容審核及技術限制約束。標準價格為一次港幣88元；有效優惠可能改變結帳顯示的金額。實際以港幣收費，其他貨幣顯示僅供估算。通行證並非購買觀眾、廣告、投資回報或僱傭關係。',
       '購買通行證、上傳內容或獲平台推薦，均不保證審核通過、分發、推薦曝光、最低觀看次數、追蹤者、付費解鎖、銷售、營收、收入，亦不保證收回製作費或通行證成本。收益可能為零。成果取決於觀眾需求、內容、定價、合法可用性及其他因素。示例、估算、宣傳用語及其他創作者的成果，均非對您成果的承諾。',
-      '一般發布者目前獲5 GiB儲存額度，管理員自有媒體的權限可能不同。目前每集輸入檔案上限為4分鐘及200 MiB，封面另有上限。增加儲存額度或其他服務須另行批准及報價。通行證不豁免內容審核，也不提供無條件永久託管的權利。',
+      '一般發布者目前獲10 GiB儲存額度，管理員自有媒體的權限可能不同。目前每集輸入檔案上限為4分鐘及200 MiB，封面另有上限。增加儲存額度或其他服務須另行批准及報價。通行證不豁免內容審核，也不提供無條件永久託管的權利。',
     ]},
     {id:'content-rights',title:'3. 您的內容及平台營運授權',paragraphs:[
       '您保留依法享有的內容權利，並確認已取得上傳、儲存、展示、串流及營利所需的一切許可，包括影片、音樂、劇本、美術、商標、演出、個人資料、聲音及肖像。標示為AI生成或AI輔助，不等於已確立擁有權、清除第三方權利或免除侵權責任。請準確描述製作方式及語言。',
@@ -256,7 +256,7 @@ const zhCN:LegalPolicyCopy={
       '开启新的通行证结账前，请阅读本条款、知悉隐私政策，并通过必填确认框明确确认成果不获保证。我们会记录所接受的版本、语言、时间及相关付款，作为该项确认的记录。这不构成对无关直接营销的同意。',
       'Dramio Pass 是使用购买时所描述的创作者发布功能的一次性付款，并受本条款、账户资格、内容审核及技术限制约束。标准价格为一次港币88元；有效优惠可能改变结账显示的金额。实际以港币收费，其他货币显示仅供估算。通行证并非购买观众、广告、投资回报或雇佣关系。',
       '购买通行证、上传内容或获平台推荐，均不保证审核通过、分发、推荐曝光、最低观看次数、关注者、付费解锁、销售、营收、收入，也不保证收回制作费或通行证成本。收益可能为零。成果取决于观众需求、内容、定价、合法可用性及其他因素。示例、估算、宣传用语及其他创作者的成果，均非对您成果的承诺。',
-      '一般发布者目前获5 GiB存储额度，管理员自有媒体的权限可能不同。目前每集输入文件上限为4分钟及200 MiB，封面另有上限。增加存储额度或其他服务须另行批准及报价。通行证不豁免内容审核，也不提供无条件永久托管的权利。',
+      '一般发布者目前获10 GiB存储额度，管理员自有媒体的权限可能不同。目前每集输入文件上限为4分钟及200 MiB，封面另有上限。增加存储额度或其他服务须另行批准及报价。通行证不豁免内容审核，也不提供无条件永久托管的权利。',
     ]},
     {id:'content-rights',title:'3. 您的内容及平台运营授权',paragraphs:[
       '您保留依法享有的内容权利，并确认已取得上传、存储、展示、串流及营利所需的一切许可，包括视频、音乐、剧本、美术、商标、表演、个人资料、声音及肖像。标示为AI生成或AI辅助，不等于已确立所有权、清除第三方权利或免除侵权责任。请准确描述制作方式及语言。',

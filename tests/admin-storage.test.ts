@@ -21,6 +21,8 @@ let server:Server,base:string,cover:Buffer,video:Buffer;
 function actor(role:'admin'|'publisher'='admin'):Actor{
   const id=randomUUID(),token=randomBytes(32).toString('hex');
   run('INSERT INTO users (id,email,name,password_hash,role,publisher_active,quota_bytes,used_bytes) VALUES (?,?,?,?,?,?,?,?)',id,id+'@admin-storage.test','Storage '+role,'unused-local-fixture',role,role==='admin'?0:1,0,initialUsed);
+  // Deliberately constrain this fixture after the ordinary account baseline.
+  run('UPDATE users SET quota_bytes=0 WHERE id=?',id);
   run('INSERT INTO sessions (token_hash,user_id,expires_at) VALUES (?,?,?)',createHash('sha256').update(token).digest('hex'),id,Date.now()+3600_000);return{id,cookie:'drama_session='+token};
 }
 function series(owner:Actor){const id=randomUUID();run('INSERT INTO series (id,creator_id,title,description,language,genres,status) VALUES (?,?,?,?,?,?,?)',id,owner.id,'Storage regression '+id,'An original drama used only by a local storage regression fixture.','en','["drama"]','draft');return id;}

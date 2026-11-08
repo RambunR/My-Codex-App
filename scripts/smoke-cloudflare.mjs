@@ -105,13 +105,18 @@ try{
   const png=Buffer.from(await icon.arrayBuffer());assert.equal(png.readUInt32BE(16),192);assert.equal(png.readUInt32BE(20),192);
   const robots=await fetch(base+'/robots.txt');assert.equal(robots.status,200);assert.match(robots.headers.get('content-type'),/^text\/plain/);assert.match(await robots.text(),/^Sitemap: https:\/\/lingyingdrama\.com\/sitemap\.xml$/m);
   const sitemap=await fetch(base+'/sitemap.xml');assert.equal(sitemap.status,200);assert.match(sitemap.headers.get('content-type'),/xml/);assert.match(await sitemap.text(),/<loc>https:\/\/lingyingdrama\.com\/<\/loc>/);
+  for(const asset of ['/assets/Studio-retired-release.css','/assets/Studio-retired-release.js']){
+    const missing=await fetch(base+asset);assert.equal(missing.status,404);assert.match(missing.headers.get('content-type'),/^text\/plain/);assert.equal(missing.headers.get('cache-control'),'no-store');assert.doesNotMatch(await missing.text(),/id="root"|<!doctype/i);
+  }
+  const studioPage=await fetch(base+'/studio');assert.equal(studioPage.status,200);assert.equal(studioPage.headers.get('cache-control'),'no-store');await studioPage.body.cancel();
   console.log('PASS: homepage canonical stays scoped; favicon, crawler instructions and sitemap serve real assets instead of SPA fallback HTML.');
   const cfg=(await request('/api/config')).data;assert.equal(cfg.runtime,'cloudflare');assert.equal(cfg.paymentsMode,'demo');assert.equal(cfg.auth.google,true);
   const spokenCodes=cfg.spokenLanguages.map(item=>item.code),interfaceCodes=cfg.languages.map(item=>item.code);
   assert.equal(spokenCodes.length,21);assert.ok(spokenCodes.includes('cmn')&&spokenCodes.includes('yue'));assert.ok(!spokenCodes.includes('zh-TW')&&!spokenCodes.includes('zh-CN'));
   assert.equal(interfaceCodes.length,21);assert.ok(interfaceCodes.includes('zh-TW')&&interfaceCodes.includes('zh-CN'));assert.ok(!interfaceCodes.includes('cmn')&&!interfaceCodes.includes('yue'));
-  assert.deepEqual(cfg.creatorPassConsent,{policyVersion:'2026-11-08',disclosureVersion:'creator-pass-ack-v1'});
+  assert.deepEqual(cfg.creatorPassConsent,{policyVersion:'2026-11-08.1',disclosureVersion:'creator-pass-ack-v1'});
   const creatorConsent={accepted:true,policy_version:cfg.creatorPassConsent.policyVersion,disclosure_version:cfg.creatorPassConsent.disclosureVersion};
+  assert.equal(cfg.limits.quotaBytes,10*1024**3);
   assert.equal(cfg.limits.maxEpisodeBytes,maxEpisodeBytes);assert.equal(cfg.limits.maxEpisodeSeconds,240);assert.deepEqual(cfg.episodeUpload,{mode:'chunked',chunkBytes});
   assert.deepEqual(cfg.walletFunding.presetAmountsCents,[1000,2500,5000,10000]);assert.deepEqual(cfg.walletFunding.rewards,[{amountCents:5000,bonusCents:500},{amountCents:10000,bonusCents:1500}]);
   assert.ok(cfg.standardGenres.includes('romantic-comedy'));assert.ok(cfg.standardGenres.includes('medical'));
@@ -174,7 +179,7 @@ try{
   assert.equal((await request('/api/payments/checkout',{kind:'activation',creator_consent:creatorConsent},publisher)).data.paymentId,activation.paymentId,'An explicit acknowledgement retry must reuse the original unpaid checkout.');
   await request(`/api/payments/${activation.paymentId}/demo-confirm`,{},viewer,404);
   await Promise.all([0,1].map(()=>request(`/api/payments/${activation.paymentId}/demo-confirm`,{},publisher)));
-  const activated=(await request('/api/auth/me',undefined,publisher)).data.user;assert.equal(activated.publisher_active,1);assert.equal(activated.quota_bytes,5*1024**3);
+  const activated=(await request('/api/auth/me',undefined,publisher)).data.user;assert.equal(activated.publisher_active,1);assert.equal(activated.quota_bytes,10*1024**3);
   assert.equal(activated.dramio_pass.active,true);assert.equal(activated.dramio_pass.test,true);assert.match(activated.dramio_pass.purchased_at,/^\d{4}-\d{2}-\d{2}T/);
   const funding=(await request('/api/payments/checkout',{kind:'funding',amount_cents:1000},viewer)).data;
   await Promise.all([0,1].map(()=>request(`/api/payments/${funding.paymentId}/demo-confirm`,{},viewer)));
@@ -188,7 +193,7 @@ try{
   await request('/api/admin/publishers',undefined,publisher,403);
   const adminBeforeProfiles=(await request('/api/auth/me',undefined,admin)).data.user;
   assert.equal(adminBeforeProfiles.storage_unlimited,true);
-  assert.equal(adminBeforeProfiles.quota_bytes,5*1024**3,'Unlimited access must not inflate the persisted quota.');
+  assert.equal(adminBeforeProfiles.quota_bytes,10*1024**3,'Unlimited access must not inflate the persisted quota.');
   assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.storage_unlimited,false);
   const profileUsersBefore=(await request('/api/admin',undefined,admin)).data.users.length;
   const initialPublishers=(await request('/api/admin/publishers',undefined,admin)).data;
@@ -290,7 +295,7 @@ try{
   const adminChunk=await chunkedEpisode(profileSeriesPath+'/episode-uploads',video.length,(offset,length)=>video.subarray(offset,offset+length),'Profile 002.mp4',admin,{title:'Profile episode 002',number:2});
   assert.equal(adminChunk.episode.owner_storage.storage_unlimited,true);
   assert.equal(adminChunk.episode.owner_storage.used_bytes,cover.length+video.length*2);
-  assert.equal(adminChunk.episode.owner_storage.quota_bytes,5*1024**3);
+  assert.equal(adminChunk.episode.owner_storage.quota_bytes,10*1024**3);
   console.log('PASS: administrator storage policy is serialized for covers, direct/chunked episodes and replays, tracks actual bytes, and follows the owner.');
   await request(profileSeriesPath,{...profileSeriesBody,subtitle_languages:[]},admin,200,'PATCH');
   assert.deepEqual((await request(profileSeriesPath,undefined,admin)).data.series.subtitle_languages,[]);
@@ -466,10 +471,10 @@ try{
   assert.equal(withdrawal.user.earnings_micros,507_000);
   await request(`/api/admin/withdrawals/${withdrawal.id}`,{approve:true},admin);
   await request(`/api/admin/withdrawals/${withdrawal.id}`,{approve:true},admin,409);
-  await request('/api/studio/storage-requests',{requested_gb:10,reason:'More storage for additional drama episodes.'},publisher,201);
+  await request('/api/studio/storage-requests',{requested_gb:20,reason:'More storage for additional drama episodes.'},publisher,201);
   const pending=(await request('/api/admin',undefined,admin)).data.storageRequests[0];
   await request(`/api/admin/storage-requests/${pending.id}`,{approve:true},admin);
-  assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.quota_bytes,10*1024**3);
+  assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.quota_bytes,20*1024**3);
   console.log('PASS: concurrent purchases debit once, exact fractional-cent 70/30 split, payout minimum/approval, storage approval.');
 
   const adminSeriesPath='/api/admin/series?'+new URLSearchParams({q:body.title,status:'all',page:'1',limit:'5'});
@@ -736,6 +741,7 @@ try{
   console.log('PASS: signed refund events persist once across Cloudflare SQL restart, unmatched cases stay held, and non-admin/unmapped resolutions are rejected.');
 
   await stop();await start(true);
+  assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.quota_bytes,20*1024**3,'A restart must retain the approved higher allowance.');
   const production=(await request('/api/config')).data;assert.equal(production.paymentsMode,'disabled');assert.equal(production.runtime,'cloudflare');assert.equal(production.auth.google,false);
   const retainedFinale=await readFinale();assert.equal(retainedFinale.series.last_episode_free,true);assert.equal(retainedFinale.series.free_episode_count,1);assert.equal(retainedFinale.episodes.find(episode=>episode.free).id,finaleEpisodes[2].id);assert.equal(retainedFinale.series.views,3);assert.deepEqual(retainedFinale.episodes.map(episode=>episode.views),[1,1,1]);
   const retainedLikes=(await request(`/api/series/${sid}`,undefined,viewer)).data;assert.equal(retainedLikes.series.likes,1);assert.equal(retainedLikes.series.liked,true);

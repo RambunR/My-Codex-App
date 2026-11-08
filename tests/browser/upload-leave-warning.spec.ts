@@ -138,6 +138,21 @@ test('100% transferred processing stays guarded, and an open warning resolves sa
   }finally{state.release();state.releaseCleanup();}
 });
 
+test('a background lazy CSS failure preserves the active upload and leave guard until an explicit safe refresh',async({page})=>{
+  const state=await fixture(page),documents:string[]=[];page.on('request',request=>{if(request.isNavigationRequest()&&request.frame()===page.mainFrame())documents.push(new URL(request.url()).pathname);});
+  await open(page);await choose(page,2,6*MiB);await state.entered;
+  try{
+    const titleInput=await page.locator('#series-title').elementHandle();
+    const prevented=await page.evaluate(()=>{const event=new Event('vite:preloadError',{cancelable:true});Object.defineProperty(event,'payload',{value:new Error('Unable to preload CSS for /assets/Studio-old-release.css')});window.dispatchEvent(event);return event.defaultPrevented;});
+    expect(prevented).toBe(true);const notice=page.locator('.page-recovery-notice');await expect(notice).toBeVisible();await expect(notice).toContainText('Your upload is still running. Keep this page open.');await expect(notice.getByRole('button',{name:'Refresh page',exact:true})).toBeDisabled();
+    expect(await titleInput!.evaluate(element=>element===document.querySelector('#series-title'))).toBe(true);await expect(page.locator('.queue-row')).toHaveCount(2);expect(documents).toEqual([editorPath()]);expect(state.calls.parts).toEqual(['1:1']);expect(state.calls.aborts).toEqual([]);expect(state.calls.cancels).toEqual([]);
+    await requestLeave(page);await keep(page);expect(state.calls.parts).toEqual(['1:1']);expect(state.calls.cancels).toEqual([]);expect(state.calls.aborts).toEqual([]);
+    state.release();await expect(page.locator('.queue-row')).toContainText(['Uploaded','Uploaded']);await expect(page.locator('.upload-drop button.button.ghost')).toBeEnabled();await expect(notice.getByRole('button',{name:'Refresh page',exact:true})).toBeEnabled();
+    expect(state.rows).toHaveLength(2);expect(documents).toEqual([editorPath()]);expect(await page.evaluate(()=>sessionStorage.getItem('lingying-page-recovery-v1'))).toBeNull();
+    await notice.getByRole('button',{name:'Refresh page',exact:true}).click();await expect(page.locator('.upload-drop button.button.ghost')).toBeEnabled();expect(documents).toEqual([editorPath(),editorPath()]);await expect(page.locator('.queue-row')).toHaveCount(0);expect(state.rows).toHaveLength(2);expect(state.calls.cancels).toEqual([]);
+  }finally{state.release();state.releaseCleanup();}
+});
+
 for(const locale of ['en','zh-TW','ar'])test(`upload warning fits a 320px ${locale} phone with safe focus and touch actions`,async({browser})=>{
   const context=await browser.newContext({baseURL:'http://127.0.0.1:3001',hasTouch:true,isMobile:true,viewport:{width:320,height:740}}),page=await context.newPage();await page.addInitScript(value=>localStorage.setItem('drama-language',value),locale);const state=await fixture(page);
   try{

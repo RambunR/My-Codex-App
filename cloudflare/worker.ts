@@ -75,7 +75,11 @@ export default {
     if(url.pathname==='/api/display-currency')return displayCurrencyResponse(request);
     if(url.pathname.startsWith('/api/'))return env.APP.get(env.APP.idFromName('platform')).fetch(request as any) as unknown as Promise<Response>;
     const response=await env.ASSETS.fetch(request as any) as unknown as Response;
+    // A removed build chunk must not masquerade as successful SPA HTML.
+    if(url.pathname.startsWith('/assets/')&&(response.status===404||response.headers.get('Content-Type')?.includes('text/html')))
+      return new Response('Asset not found.',{status:404,headers:{'Content-Type':'text/plain; charset=utf-8','Cache-Control':'no-store',...responseSecurityHeaders(url.pathname)}});
     const headers=new Headers(response.headers);for(const[name,value]of Object.entries(responseSecurityHeaders(url.pathname)))headers.set(name,value);
+    if(response.headers.get('Content-Type')?.includes('text/html'))headers.set('Cache-Control','no-store');
     if(url.pathname==='/auth')headers.set('Cache-Control','no-store');
     return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
   },

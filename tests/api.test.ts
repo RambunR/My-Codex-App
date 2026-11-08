@@ -54,7 +54,7 @@ test('publisher activation costs HK$88, cannot be confirmed by another user, and
   const checkout=await request('/api/payments/checkout',{kind:'activation',creator_consent:creatorConsent,amount_cents:500},publisher);assert.equal(checkout.data.amount_cents,8800);assert.equal(checkout.data.currency,'hkd');
   assert.equal((await request(`/api/payments/${checkout.data.paymentId}/demo-confirm`,{},viewer)).status,404);
   const results=await Promise.all([request(`/api/payments/${checkout.data.paymentId}/demo-confirm`,{},publisher),request(`/api/payments/${checkout.data.paymentId}/demo-confirm`,{},publisher)]);assert.ok(results.every(r=>r.status===200));
-  const me=await request('/api/auth/me',undefined,publisher);assert.equal(me.data.user.publisher_active,1);assert.equal(me.data.user.quota_bytes,5*1024**3);assert.equal(me.data.user.wallet_micros,0);
+  const me=await request('/api/auth/me',undefined,publisher);assert.equal(me.data.user.publisher_active,1);assert.equal(me.data.user.quota_bytes,10*1024**3);assert.equal(me.data.user.wallet_micros,0);
   assert.equal(one("SELECT COUNT(*) AS n FROM ledger WHERE user_id=? AND kind='activation'",publisherId)!.n,1);
 });
 test('wallet funding is idempotent and cannot be forged by client amounts',async()=>{
@@ -120,7 +120,7 @@ test('quota, real video processing, cover upload, publishing and episode edits w
   const sample=await readFile(path.join(dir,'objects','demo','preview.mp4'));
   run('UPDATE users SET quota_bytes=20 WHERE id=?',publisherId);
   const quota=await upload(`/api/studio/series/${seriesId}/episodes`,sample,'01 Opening.mp4',publisher,{title:'Opening',number:'1'});assert.equal(quota.status,413);assert.equal(quota.data.error.code,'QUOTA_EXCEEDED');
-  run('UPDATE users SET quota_bytes=? WHERE id=?',5*1024**3,publisherId);
+  run('UPDATE users SET quota_bytes=? WHERE id=?',10*1024**3,publisherId);
   const video=await upload(`/api/studio/series/${seriesId}/episodes`,sample,'01 Opening.mp4',publisher,{title:'Opening',number:'1'});assert.equal(video.status,201,JSON.stringify(video.data));uploadedId=video.data.id;assert.ok(video.data.duration<=240);assert.ok(video.data.bytes>0);
   assert.equal((await upload(`/api/studio/series/${seriesId}/cover`,Buffer.from('not an image'),'bad.png',publisher,{},'cover')).status,422);
   const image=await readFile(path.resolve('public/images/midnight.jpg'));const cover=await upload(`/api/studio/series/${seriesId}/cover`,image,'poster.jpg',publisher,{},'cover');assert.equal(cover.status,200);
@@ -175,12 +175,12 @@ test('payout minimum, reservation, rejection refund and duplicate processing are
   assert.equal(one('SELECT earnings_micros FROM users WHERE id=?',publisherId)!.earnings_micros,5_000_000);
 });
 test('storage expansion requires administrator approval and preserves the original allowance until approved',async()=>{
-  const r=await request('/api/studio/storage-requests',{requested_gb:10,reason:'A larger catalogue of original short dramas.'},publisher);assert.equal(r.status,201);
-  assert.equal(one('SELECT quota_bytes FROM users WHERE id=?',publisherId)!.quota_bytes,5*1024**3);
+  const r=await request('/api/studio/storage-requests',{requested_gb:20,reason:'A larger catalogue of original short dramas.'},publisher);assert.equal(r.status,201);
+  assert.equal(one('SELECT quota_bytes FROM users WHERE id=?',publisherId)!.quota_bytes,10*1024**3);
   const pending=one('SELECT id FROM storage_requests WHERE user_id=?',publisherId)!;
   assert.equal((await request(`/api/admin/storage-requests/${pending.id}`,{approve:true},publisher)).status,403);
   assert.equal((await request(`/api/admin/storage-requests/${pending.id}`,{approve:true},admin)).status,200);
-  assert.equal(one('SELECT quota_bytes FROM users WHERE id=?',publisherId)!.quota_bytes,10*1024**3);
+  assert.equal(one('SELECT quota_bytes FROM users WHERE id=?',publisherId)!.quota_bytes,20*1024**3);
 });
 test('Stripe webhooks reject forged signatures and settle a correctly signed paid event only once',async()=>{
   const{config}=await import('../server/config');const{stripe}=await import('../server/finance');const previous=config.payments;config.payments='stripe';config.stripeWebhook='whsec_local_signature_test_only';

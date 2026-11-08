@@ -26,6 +26,10 @@ try{
   const catalogue=await fetch(url+'/api/series').then(r=>r.json());assert.equal(catalogue.series.length,0,'A fresh production instance must not contain demo content');
   const html=await fetch(url).then(r=>r.text());assert.ok(html.includes('id="root"'));const asset=/src="([^\"]+\.js)"/.exec(html)?.[1];assert.ok(asset,'Compiled client entry exists');
   const js=await fetch(url+asset);assert.equal(js.status,200);assert.ok((js.headers.get('cache-control')||'').includes('immutable'));assert.ok((await js.text()).length>1000);
+  for(const filename of ['/assets/Studio-retired-release.css','/assets/Studio-retired-release.js']){
+    const missing=await fetch(url+filename);assert.equal(missing.status,404);assert.equal(missing.headers.get('cache-control'),'no-store');assert.match(missing.headers.get('content-type'),/^text\/plain/);assert.doesNotMatch(await missing.text(),/id="root"|<!doctype/i);
+  }
+  const studio=await fetch(url+'/studio');assert.equal(studio.status,200);assert.equal(studio.headers.get('cache-control'),'no-store');await studio.arrayBuffer();
   const login=await fetch(url+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});assert.equal(login.status,200);
   const setCookie=login.headers.get('set-cookie');assert.ok(setCookie?.includes('Secure'));assert.ok(setCookie?.includes('HttpOnly'));const cookie=setCookie.split(';')[0];await login.arrayBuffer();
   const headers={'Content-Type':'application/json',Cookie:cookie};
