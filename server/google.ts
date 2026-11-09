@@ -115,7 +115,7 @@ export function registerGoogleAuth(app:Express){
     const identity=one('SELECT email FROM oauth_identities WHERE provider=? AND user_id=?','google',req.user!.id);
     const apple=one('SELECT email FROM apple_identities WHERE user_id=?',req.user!.id);
     const user=one('SELECT password_hash FROM users WHERE id=?',req.user!.id)!;
-    res.json({google:identity?{linked:true,email:identity.email}:{linked:false},apple:apple?{linked:true,email:apple.email}:{linked:false},password:passwordEnabled(user.password_hash)});
+    res.json({wechat:{linked:!!one('SELECT 1 FROM wechat_identities WHERE user_id=?',req.user!.id)},google:identity?{linked:true,email:identity.email}:{linked:false},apple:apple?{linked:true,email:apple.email}:{linked:false},password:passwordEnabled(user.password_hash)});
   });
   app.get('/api/auth/google/start',rateLimit('google-start',30,15*60_000),(req,res)=>{res.redirect(302,start(req,res,'signin',req.query.next,req.query.language));});
   app.post('/api/auth/google/link',requireAuth,rateLimit('google-link',10,15*60_000),async(req,res)=>{

@@ -25,6 +25,8 @@ export const config = {
   wechatPayEnabled: process.env.STRIPE_WECHAT_PAY_ENABLED === 'true',
   usdToHkd: Number(process.env.USD_TO_HKD || 7.8),
   ...selectStripeSettings(process.env,process.env.STRIPE_TEST_MODE==='true'),
+  wechatAppId: process.env.WECHAT_APP_ID || '',
+  wechatAppSecret: process.env.WECHAT_APP_SECRET || '',
   googleClientId: process.env.GOOGLE_CLIENT_ID || '',
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
   appleClientId: process.env.APPLE_CLIENT_ID || '',

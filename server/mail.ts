@@ -45,6 +45,21 @@ export async function sendAccountEmail(email:string,kind:MailKind,token:string,r
   const ignore=kind==='reset'?'If you did not request a password reset, you can ignore this email. Your password has not changed.':'If you did not request this email, you can ignore it.';
   const text=`${title}\n\n${instruction}\n\n${url.href}\n\n${expiry}\n\n${ignore}\n\nLingYing`;
   const html=`<!doctype html><html><body style="font-family:Arial,sans-serif;background:#f5f5f7;padding:24px;color:#202024"><main style="max-width:560px;margin:auto;background:#fff;padding:32px;border-radius:20px"><p style="font-weight:bold;color:#ff684d">LingYing</p><h1 style="font-size:25px">${escapeHtml(title)}</h1><p>${escapeHtml(instruction)}</p><p style="margin:28px 0"><a href="${escapeHtml(url.href)}" style="display:inline-block;padding:14px 20px;background:#ff684d;color:#111;text-decoration:none;border-radius:10px;font-weight:bold">${escapeHtml(title)}</a></p><p>${escapeHtml(expiry)}</p><p style="color:#666">${escapeHtml(ignore)}</p><p style="font-size:12px;overflow-wrap:anywhere">If the button does not work, open this link:<br>${escapeHtml(url.href)}</p></main></body></html>`;
+  return deliverAccountMessage(email,title,text,html,requestId);
+}
+
+export async function sendWechatRegistrationCode(email:string,code:string,requestId:string){
+  if(!/^\d{6}$/.test(code))throw new Error('Invalid verification code.');
+  const title='LingYing WeChat email verification code';
+  const instruction='Enter this code only on the LingYing registration page where you started WeChat sign-in. Do not share it with anyone.';
+  const expiry='This code is valid for up to 10 minutes while your WeChat registration is active. If you did not request it, ignore this email. No account has been created.';
+  const text=`${title}\n\n${code}\n\n${instruction}\n\n${expiry}\n\nLingYing`;
+  const html=`<!doctype html><html><body style="font-family:Arial,sans-serif;padding:24px;color:#202024"><h1>${escapeHtml(title)}</h1><p style="font-size:32px;font-weight:bold;letter-spacing:8px">${code}</p><p>${escapeHtml(instruction)}</p><p>${escapeHtml(expiry)}</p></body></html>`;
+  return deliverAccountMessage(email,title,text,html,requestId);
+}
+
+async function deliverAccountMessage(email:string,title:string,text:string,html:string,requestId:string){
+  if(!mailEnabled())throw new Error('Account email delivery is unavailable.');
   const selected=provider();
   const cloudflare=selected==='cloudflare';
   const endpoint=cloudflare?`https://api.cloudflare.com/client/v4/accounts/${config.cloudflareEmailAccountId}/email/sending/send`:'https://api.resend.com/emails';

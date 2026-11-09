@@ -31,3 +31,5 @@
 .account-provider-method+.account-provider-method{border-top:1px solid var(--line);padding-top:22px;margin-top:22px}
 .account-provider-method>.muted{line-height:1.8;margin-bottom:18px}
 @media(max-width:600px){.auth-recovery-links{font-size:11px;align-items:flex-start}.auth-email-status{font-size:11px}.email-verification-heading{flex-wrap:wrap}.email-verification-heading>h2{min-width:65%}.email-verification-badge{font-size:9px}.email-verification-panel .button{font-size:11px}}
+
+.button.wechat-button{background:#087f3f;color:#fff;border-color:#087f3f}.button.wechat-button:hover{background:#066b35;border-color:#066b35}.button.wechat-button:disabled{opacity:.45;cursor:not-allowed}.wechat-mark{flex:0 0 20px;width:20px;height:20px}.wechat-qr-hint{font-size:.8rem;line-height:1.5;color:var(--muted);margin:.4rem 0 .75rem}.wechat-registration .auth-form-panel{min-width:0}.wechat-registration-links{display:flex;flex-wrap:wrap;gap:1rem;margin-top:1.25rem}

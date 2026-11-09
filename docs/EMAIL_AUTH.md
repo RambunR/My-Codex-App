@@ -88,3 +88,5 @@ Do not paste API keys into chat, Git, the browser frontend, or tracked Wrangler 
 ## Validation
 
 `tests/email-auth.test.ts` uses mocked Cloudflare/Resend HTTPS transports and a temporary SQLite database. It checks unavailable configuration, explicit/automatic provider selection without post-attempt fallback, Cloudflare queued/delivered results and rejected/bounced/mismatched results, generic acknowledgements and cooldowns, hashed proofs and fragment links, atomic concurrent reset, expiry, wrong-purpose and changed-email rejection, session invalidation, preserved account assets, provider-only safeguards, failed delivery, persistent target budgets, matching Google verification and registration resilience. No real email is sent by these tests.
+
+WeChat website registration also uses this configured sending service for a six-digit inbox code before user/identity creation. It does not fall back to an unverified contact email when delivery is unavailable. Existing WeChat-linked sign-in remains independent of email delivery. See [WeChat sign-in](WECHAT_SIGN_IN.md).

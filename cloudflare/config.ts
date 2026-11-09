@@ -1,6 +1,6 @@
 import type {Env} from './runtime';
 import {selectStripeSettings} from '../shared/stripe-settings';
-export const config={wechatPayEnabled:false,testPayoutsEnabled:false,testPayoutAccount:'',testConnectWebhook:'',port:8080,production:true,sandbox:false,stripeTestMode:false,payoutsEnabled:false,stripeAutoConfigureWebhook:false,passPromotionEnabled:false,publicUrl:'',stripeSiteOrigin:'',platformOwnerUserId:'',platformAdminEmailHash:'',officialCreatorName:'LingYingDrama Offical',appUrl:'https://aidramio.example',dataDir:'/tmp',payments:'disabled',usdToHkd:7.8,...selectStripeSettings({},false),googleClientId:'',googleClientSecret:'',appleClientId:'',appleTeamId:'',appleKeyId:'',applePrivateKey:'',resendApiKey:'',mailFrom:'',mailProvider:'auto',cloudflareEmailAccountId:'',cloudflareEmailApiToken:'',seed:false,ffmpeg:'',ffprobe:'',runtime:'cloudflare',videoFormats:['mp4','mov','m4v']};
+export const config={wechatAppId:'',wechatAppSecret:'',wechatPayEnabled:false,testPayoutsEnabled:false,testPayoutAccount:'',testConnectWebhook:'',port:8080,production:true,sandbox:false,stripeTestMode:false,payoutsEnabled:false,stripeAutoConfigureWebhook:false,passPromotionEnabled:false,publicUrl:'',stripeSiteOrigin:'',platformOwnerUserId:'',platformAdminEmailHash:'',officialCreatorName:'LingYingDrama Offical',appUrl:'https://aidramio.example',dataDir:'/tmp',payments:'disabled',usdToHkd:7.8,...selectStripeSettings({},false),googleClientId:'',googleClientSecret:'',appleClientId:'',appleTeamId:'',appleKeyId:'',applePrivateKey:'',resendApiKey:'',mailFrom:'',mailProvider:'auto',cloudflareEmailAccountId:'',cloudflareEmailApiToken:'',seed:false,ffmpeg:'',ffprobe:'',runtime:'cloudflare',videoFormats:['mp4','mov','m4v']};
 export function configure(env:Env){
   config.testPayoutsEnabled=env.STRIPE_TEST_PAYOUTS_ENABLED==='true';
   config.testPayoutAccount=env.STRIPE_TEST_PAYOUT_ACCOUNT_ID||'';
@@ -15,6 +15,7 @@ export function configure(env:Env){
   config.passPromotionEnabled=env.PASS_PROMOTION_ENABLED==='true';
   if(config.production&&config.payments==='demo')throw new Error('Demo payments are prohibited in a deployed application.');
   Object.assign(config,selectStripeSettings(env,config.stripeTestMode));
+  config.wechatAppId=env.WECHAT_APP_ID||'';config.wechatAppSecret=env.WECHAT_APP_SECRET||'';
   config.googleClientId=env.GOOGLE_CLIENT_ID||'';config.googleClientSecret=env.GOOGLE_CLIENT_SECRET||'';
   config.appleClientId=env.APPLE_CLIENT_ID||'';config.appleTeamId=env.APPLE_TEAM_ID||'';config.appleKeyId=env.APPLE_KEY_ID||'';config.applePrivateKey=env.APPLE_PRIVATE_KEY||'';
   config.resendApiKey=env.RESEND_API_KEY||'';config.mailFrom=env.MAIL_FROM||'';

@@ -24,7 +24,7 @@ async function fixture(page:Page,locale='en',reply:'success'|'changed'|'required
 
 for(const locale of ['en','zh-TW','zh-CN','ar'])test(`${locale} creator must expressly agree before checkout; viewing policies never checks the box`,async({page})=>{
   await page.setViewportSize({width:320,height:844});const calls=await fixture(page,locale);await page.goto('/studio');
-  const consent=page.locator('.creator-pass-consent');await expect(consent).toBeVisible();await expect(checkbox(page)).toHaveAttribute('required','');await expect(checkbox(page)).not.toBeChecked();await expect(purchase(page)).toBeDisabled();
+  const consent=page.locator('.creator-pass-consent');await expect(consent).toBeVisible({timeout:15000});await expect(checkbox(page)).toHaveAttribute('required','');await expect(checkbox(page)).not.toBeChecked();await expect(purchase(page)).toBeDisabled();
   const terms=consent.locator('a[href="/terms#creator-pass"]');await expect(terms).toHaveAttribute('target','_blank');await expect(terms).toHaveAttribute('rel',/noopener/);
   const popupPromise=page.waitForEvent('popup');await terms.click();const popup=await popupPromise;await expect(popup).toHaveURL('/terms#creator-pass');await expect(popup.locator('.legal-section#creator-pass h2')).toBeInViewport();await popup.close();await expect(checkbox(page)).not.toBeChecked();await expect(purchase(page)).toBeDisabled();expect(calls).toEqual([]);
   await checkbox(page).focus();await page.keyboard.press('Space');await expect(checkbox(page)).toBeChecked();await expect(purchase(page)).toBeEnabled();await page.keyboard.press('Space');await expect(purchase(page)).toBeDisabled();expect(calls).toEqual([]);

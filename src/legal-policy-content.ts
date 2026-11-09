@@ -79,12 +79,13 @@ const en:LegalPolicyCopy={
   privacy:{title:'Privacy Policy',intro:`${COMPANY_NAME} operates LingYing and is responsible for the personal data it collects for the service. This policy explains the data we use, why we use it, who may receive it and how to make a privacy request. It covers visitors, viewers and creators, including people watching free episodes without an account.`,summary:[
     'We use account, content, viewing and transaction information to provide and secure LingYing. Free guest viewing still involves essential cookies, playback measurement and network processing.',
     'Creators receive aggregate performance statistics, not individual viewers’ names, email addresses, passwords or card details.',
-    'Hosting, payment, sign-in and email providers may process data, including outside Hong Kong. We do not store full payment-card numbers or your Google or Apple password.',
+    'Hosting, payment, sign-in and email providers may process data, including outside Hong Kong. We do not store full payment-card numbers or your Google, Apple or WeChat password.',
     'Contact us to request access, correction or account/data deletion. Requests are handled through support; legal, accounting, dispute and security records may need to be retained.',
   ],sections:[
     {id:'data-controller',title:'1. Who is responsible and how to contact us',paragraphs:[`The service is operated by ${COMPANY_NAME}. Contact ${CONTACT_EMAIL} for privacy questions, access or correction requests, account closure requests, or concerns about an upload containing personal data. Explain the request without sending passwords or full payment-card details.`],contact:true},
     {id:'data-collected',title:'2. Information collected',paragraphs:[
       'Account and identity information includes your name, email address, language, account role and status, authentication-provider identifiers, timestamps and storage allowance. Password registration uses a salted password hash rather than a stored plain-text password. Google or Apple sign-in can supply an account identifier, name and email, including an Apple relay email; we do not request your Google or Apple password, Gmail messages, contacts or Drive files, and do not store their access or refresh tokens for sign-in.',
+      'When configured and selected, WeChat sign-in supplies an application-scoped OpenID, an optional UnionID and nickname. We retain these identifiers to recognise or explicitly link your account, not your WeChat password, messages, contacts or sign-in access/refresh tokens. WeChat does not supply your email; new users provide a contact email separately and prove access with an emailed verification code before an account is created. WeChat authorisation itself does not verify that email. Pending registration authorisations expire after ten minutes. Email verification is separate and depends on the configured delivery service.',
       'Content and activity information includes uploaded video, artwork, titles, descriptions, classifications and declared languages; public publisher-profile information; likes, saved stories, watch progress, playback events, viewing time and related aggregate statistics. Account-linked or random guest identifiers are hashed for playback measurement. A hash is a protective measure, not a promise that the data is completely anonymous.',
       'Transaction and support information includes payment and purchase identifiers, amounts and currencies, wallet and creator-ledger entries, Pass status, policy and acknowledgement versions, acceptance times and languages linked to Pass payments, withdrawal requests, connected-payment-account references, fraud or payment reviews, moderation records and messages you send us. Hosting and security systems may process IP addresses, request times, browser/device information and diagnostic records. Raw IP addresses are not stored in the application’s playback-measurement records, but may be processed for network delivery, security and rate limiting.',
     ]},
@@ -94,7 +95,7 @@ const en:LegalPolicyCopy={
       'We do not treat account creation or a Pass purchase as consent to unrelated direct marketing. If direct marketing is introduced, we will provide the notices, choices and consent required by applicable law. This policy does not grant a separate right to use creator uploads for unrelated AI training.',
     ]},
     {id:'cookies',title:'4. Cookies, browser storage and location-related display',paragraphs:[
-      'The application uses a secure, HTTP-only session cookie for sign-in and a separate random guest-viewer cookie when guest playback begins. These application cookies currently have a 30-day lifetime. Short-lived sign-in cookies help bind Google or Apple authentication attempts to your browser. Cookie expiry is not the retention period for the associated business or playback records.',
+      'The application uses a secure, HTTP-only session cookie for sign-in and a separate random guest-viewer cookie when guest playback begins. These application cookies currently have a 30-day lifetime. Short-lived sign-in cookies help bind Google, Apple or WeChat authentication attempts to your browser. WeChat also uses a short-lived, HTTP-only cookie to complete registration. Cookie expiry is not the retention period for the associated business or playback records.',
       'Browser local storage remembers your interface language; session storage may temporarily retain a deliberately entered promotion code during registration. Browser or installed-app storage may also hold static application files. You can clear browser storage or manage cookies in your browser, but sign-in, purchases, preferences and some measurement or app features may stop working.',
       'Cloudflare may provide coarse country information to show an indicative local-currency price. This does not require GPS location. The exchange-rate service receives the currency pair needed for the estimate, not your LingYing account details. Hosting, delivery and security providers may also use their own operational measurement and logs. Our application playback measurement is described here separately from those provider services.',
     ]},
@@ -196,12 +197,13 @@ const zhTW:LegalPolicyCopy={
   privacy:{title:'私隱政策',intro:`${COMPANY_NAME} 營運 LingYing 靈映，並對服務所收集的個人資料負責。本政策說明使用哪些資料、使用目的、可能的接收者及提出私隱要求的方法，涵蓋訪客、觀眾及創作者，包括免帳戶觀看免費集數的人士。`,summary:[
     '我們使用帳戶、內容、觀看及交易資料提供並保障 LingYing。免費訪客觀看仍涉及必要Cookie、播放統計及網絡處理。',
     '創作者只獲整體成效統計，不會透過報表獲得個別觀眾姓名、電郵、密碼或卡資料。',
-    '託管、支付、登入及電郵供應商可能處理資料，包括在香港以外處理。我們不儲存完整付款卡號或您的 Google、Apple 密碼。',
+    '託管、支付、登入及電郵供應商可能處理資料，包括在香港以外處理。我們不儲存完整付款卡號或您的 Google、Apple、微信密碼。',
     '請聯絡我們申請查閱、更正資料或刪除帳戶／資料。要求由支援人員處理；法律、會計、爭議及安全紀錄可能須保留。',
   ],sections:[
     {id:'data-controller',title:'1. 責任主體及聯絡方式',paragraphs:[`服務由 ${COMPANY_NAME} 營運。如有私隱問題、查閱或更正要求、結束帳戶要求，或擔心上傳內容包含個人資料，請聯絡 ${CONTACT_EMAIL}。說明要求時，請勿提供密碼或完整付款卡資料。`],contact:true},
     {id:'data-collected',title:'2. 所收集的資料',paragraphs:[
       '帳戶及身份資料包括姓名、電郵、語言、帳戶角色及狀態、身份驗證服務商識別碼、時間紀錄及儲存額度。密碼註冊使用加鹽雜湊值，不儲存明文密碼。Google 或 Apple 登入可提供帳戶識別碼、姓名及電郵，包括 Apple 轉送電郵；我們不要求 Google 或 Apple 密碼、Gmail 郵件、通訊錄或 Drive 檔案，也不為登入儲存其存取或更新權杖。',
+      '如已配置並由您選用，微信登入會提供應用程式範圍內的OpenID、可選的UnionID及暱稱。我們保留這些識別資料以識別或經明確操作連結您的帳戶，不保留微信密碼、訊息、通訊錄或登入存取／更新權杖。微信不會提供電郵；新用戶須另行提供聯絡電郵，並在建立帳戶前以電郵驗證碼確認可存取該郵箱。微信授權本身並不驗證該電郵。待完成的註冊授權於10分鐘後失效。電郵驗證另行處理，並取決於已配置的傳送服務。',
       '內容及活動資料包括上傳影片、美術、標題、描述、分類及所聲明的語言；公開發布者資料；讚好、片單、觀看進度、播放事件、觀看時間及相關整體統計。與帳戶相關或隨機訪客識別碼會經雜湊處理作播放統計用途。雜湊是一項保障措施，並非資料完全匿名的保證。',
       '交易及支援資料包括付款和購買識別碼、金額及貨幣、錢包和創作者帳目、通行證狀態、與通行證付款相關的政策及確認版本、接受時間及語言、提領申請、關聯支付帳戶參考、欺詐或付款覆核、審核紀錄及您寄給我們的訊息。託管及安全系統可能處理IP位址、請求時間、瀏覽器／裝置資料及診斷紀錄。應用程式的播放統計紀錄不儲存原始IP位址，但網絡傳送、安全及速率限制可能處理IP。',
     ]},
@@ -211,12 +213,12 @@ const zhTW:LegalPolicyCopy={
       '建立帳戶或購買通行證不會被視為同意無關的直接促銷。如日後引入直接促銷，我們會提供適用法律要求的通知、選擇及同意機制。本政策不另外授權將創作者上傳內容用於與服務無關的AI訓練。',
     ]},
     {id:'cookies',title:'4. Cookie、瀏覽器儲存及地區價格顯示',paragraphs:[
-      '應用程式以安全、HTTP-only工作階段Cookie維持登入，並在訪客開始播放時使用獨立的隨機訪客Cookie。這些應用程式Cookie目前有效期為30天。短期登入Cookie會將 Google 或 Apple 身份驗證嘗試與瀏覽器連結。Cookie到期日並不是相關商業或播放紀錄的保留期限。',
+      '應用程式以安全、HTTP-only工作階段Cookie維持登入，並在訪客開始播放時使用獨立的隨機訪客Cookie。這些應用程式Cookie目前有效期為30天。短期登入Cookie會將 Google、Apple 或微信身份驗證嘗試與瀏覽器連結。微信亦會使用短期、HTTP-only Cookie完成註冊。Cookie到期日並不是相關商業或播放紀錄的保留期限。',
       '瀏覽器本機儲存記憶介面語言；工作階段儲存可能在註冊期間暫存您主動輸入的優惠碼。瀏覽器或已安裝應用程式亦可能儲存靜態檔案。您可透過瀏覽器清除儲存或管理Cookie，但登入、購買、偏好及部分統計或功能可能無法正常使用。',
       'Cloudflare 可能提供概略國家資料，以顯示本地貨幣價格估算；這不需要GPS定位。匯率服務只取得估算所需的貨幣組合，不會收到您的 LingYing 帳戶資料。託管、傳送及安全供應商亦可能使用自身的營運統計及紀錄；其服務與本政策所述的應用程式播放統計分開說明。',
     ]},
     {id:'providers-transfers',title:'5. 服務供應商、披露及跨境處理',paragraphs:[
-      'Cloudflare 提供託管、傳送、安全、資料庫及物件儲存基礎設施。Stripe 提供卡資料輸入頁及處理付款；配置提領服務後，Stripe Connect 可能處理創作者身份及銀行驗證。我們保留交易紀錄和參考，不儲存完整卡號。如使用 Google 或 Apple 登入，相關供應商按自身私隱條款驗證身份。已配置的電郵傳送服務（例如 Cloudflare Email Sending 或 Resend）會收到收件人地址及其傳送的帳戶安全訊息或連結。',
+      'Cloudflare 提供託管、傳送、安全、資料庫及物件儲存基礎設施。Stripe 提供卡資料輸入頁及處理付款；配置提領服務後，Stripe Connect 可能處理創作者身份及銀行驗證。我們保留交易紀錄和參考，不儲存完整卡號。如使用 Google、Apple 或微信登入，相關供應商按自身私隱條款驗證身份。已配置的電郵傳送服務（例如 Cloudflare Email Sending 或 Resend）會收到收件人地址及其傳送的帳戶安全訊息或連結。',
       '我們可向按所述用途提供服務的供應商、專業顧問、依法有權要求的機關，或為調查欺詐、安全事件、法律申索及權利投訴而必要的相關人士，提供合理所需資料。為讓受影響上傳者公平回應，可能分享必要投訴詳情；在可行情況下，會保留或遮蓋不必要的個人資料。我們不出售個人資料。',
       '供應商可能在香港或您居住地以外處理及儲存資料。我們會尋求適當的合約及安全安排，以保障供應商的處理及保留，並遵守適用法律。您直接向供應商提供的資料亦受其私隱條款規管。我們不保證所有資料只留在某個國家。',
     ]},
@@ -313,12 +315,13 @@ const zhCN:LegalPolicyCopy={
   privacy:{title:'隐私政策',intro:`${COMPANY_NAME} 运营 LingYing 灵映，并对服务所收集的个人资料负责。本政策说明使用哪些资料、使用目的、可能的接收者及提出隐私要求的方法，涵盖访客、观众及创作者，包括免账户观看免费集数的人士。`,summary:[
     '我们使用账户、内容、观看及交易资料提供并保护 LingYing。免费访客观看仍涉及必要Cookie、播放统计及网络处理。',
     '创作者只获整体成效统计，不会通过报表获得个别观众姓名、电邮、密码或卡资料。',
-    '托管、支付、登录及电邮供应商可能处理资料，包括在香港以外处理。我们不存储完整付款卡号或您的 Google、Apple 密码。',
+    '托管、支付、登录及电邮供应商可能处理资料，包括在香港以外处理。我们不存储完整付款卡号或您的 Google、Apple、微信密码。',
     '请联系我们申请查阅、更正资料或删除账户／资料。要求由支持人员处理；法律、会计、争议及安全记录可能须保留。',
   ],sections:[
     {id:'data-controller',title:'1. 责任主体及联系方式',paragraphs:[`服务由 ${COMPANY_NAME} 运营。如有隐私问题、查阅或更正要求、结束账户要求，或担心上传内容包含个人资料，请联系 ${CONTACT_EMAIL}。说明要求时，请勿提供密码或完整付款卡资料。`],contact:true},
     {id:'data-collected',title:'2. 所收集的资料',paragraphs:[
       '账户及身份资料包括姓名、电邮、语言、账户角色及状态、身份验证服务商识别码、时间记录及存储额度。密码注册使用加盐哈希值，不存储明文密码。Google 或 Apple 登录可提供账户识别码、姓名及电邮，包括 Apple 转发电邮；我们不要求 Google 或 Apple 密码、Gmail 邮件、通讯录或 Drive 文件，也不为登录存储其访问或刷新令牌。',
+      '如已配置并由您选用，微信登录会提供应用程序范围内的OpenID、可选的UnionID及昵称。我们保留这些标识资料以识别或经明确操作关联您的账户，不保留微信密码、消息、通讯录或登录访问／刷新令牌。微信不会提供邮箱；新用户须另行提供联系邮箱，并在创建账户前以邮件验证码确认可访问该邮箱。微信授权本身并不验证该邮箱。待完成的注册授权于10分钟后失效。邮箱验证另行处理，并取决于已配置的发送服务。',
       '内容及活动资料包括上传视频、美术、标题、描述、分类及所声明的语言；公开发布者资料；点赞、片单、观看进度、播放事件、观看时间及相关整体统计。与账户相关或随机访客识别码会经哈希处理作播放统计用途。哈希是一项保护措施，并非资料完全匿名的保证。',
       '交易及支持资料包括付款和购买识别码、金额及货币、钱包和创作者账目、通行证状态、与通行证付款相关的政策及确认版本、接受时间及语言、提现申请、关联支付账户参考、欺诈或付款复核、审核记录及您寄给我们的消息。托管及安全系统可能处理IP地址、请求时间、浏览器／设备资料及诊断记录。应用程序的播放统计记录不存储原始IP地址，但网络传送、安全及速率限制可能处理IP。',
     ]},
@@ -328,12 +331,12 @@ const zhCN:LegalPolicyCopy={
       '建立账户或购买通行证不会被视为同意无关的直接营销。如日后引入直接营销，我们会提供适用法律要求的通知、选择及同意机制。本政策不另外授权将创作者上传内容用于与服务无关的AI训练。',
     ]},
     {id:'cookies',title:'4. Cookie、浏览器存储及地区价格显示',paragraphs:[
-      '应用程序以安全、HTTP-only会话Cookie维持登录，并在访客开始播放时使用独立的随机访客Cookie。这些应用程序Cookie目前有效期为30天。短期登录Cookie会将 Google 或 Apple 身份验证尝试与浏览器关联。Cookie到期日并不是相关商业或播放记录的保留期限。',
+      '应用程序以安全、HTTP-only会话Cookie维持登录，并在访客开始播放时使用独立的随机访客Cookie。这些应用程序Cookie目前有效期为30天。短期登录Cookie会将 Google、Apple 或微信身份验证尝试与浏览器关联。微信也会使用短期、HTTP-only Cookie完成注册。Cookie到期日并不是相关商业或播放记录的保留期限。',
       '浏览器本地存储记忆界面语言；会话存储可能在注册期间暂存您主动输入的优惠码。浏览器或已安装应用程序也可能存储静态文件。您可通过浏览器清除存储或管理Cookie，但登录、购买、偏好及部分统计或功能可能无法正常使用。',
       'Cloudflare 可能提供概略国家资料，以显示本地货币价格估算；这不需要GPS定位。汇率服务只取得估算所需的货币组合，不会收到您的 LingYing 账户资料。托管、传送及安全供应商也可能使用自身的运营统计及记录；其服务与本政策所述的应用程序播放统计分开说明。',
     ]},
     {id:'providers-transfers',title:'5. 服务供应商、披露及跨境处理',paragraphs:[
-      'Cloudflare 提供托管、传送、安全、数据库及对象存储基础设施。Stripe 提供卡资料输入页及处理付款；配置提现服务后，Stripe Connect 可能处理创作者身份及银行验证。我们保留交易记录和参考，不存储完整卡号。如使用 Google 或 Apple 登录，相关供应商按自身隐私条款验证身份。已配置的电邮传送服务（例如 Cloudflare Email Sending 或 Resend）会收到收件人地址及其传送的账户安全消息或链接。',
+      'Cloudflare 提供托管、传送、安全、数据库及对象存储基础设施。Stripe 提供卡资料输入页及处理付款；配置提现服务后，Stripe Connect 可能处理创作者身份及银行验证。我们保留交易记录和参考，不存储完整卡号。如使用 Google、Apple 或微信登录，相关供应商按自身隐私条款验证身份。已配置的电邮传送服务（例如 Cloudflare Email Sending 或 Resend）会收到收件人地址及其传送的账户安全消息或链接。',
       '我们可向按所述用途提供服务的供应商、专业顾问、依法有权要求的机关，或为调查欺诈、安全事件、法律申索及权利投诉而必要的相关人士，提供合理所需资料。为让受影响上传者公平回应，可能分享必要投诉详情；在可行情况下，会保留或遮盖不必要的个人资料。我们不出售个人资料。',
       '供应商可能在香港或您居住地以外处理及存储资料。我们会寻求适当的合同及安全安排，以保护供应商的处理及保留，并遵守适用法律。您直接向供应商提供的资料也受其隐私条款规范。我们不保证所有资料只留在某个国家。',
     ]},

@@ -1,3 +1,5 @@
+import {wechatVerificationEnglish,wechatVerificationMessages} from './wechat-verification-locales';
+import {wechatAuthEnglish,wechatAuthMessages} from './wechat-auth-locales';
 import {wechatEnglish,wechatMessages} from './wechat-pay-locales';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { LANGUAGES, type Locale } from '../shared/config';
@@ -25,6 +27,8 @@ import {transactionFeeEnglish,transactionFeeMessages} from './transaction-fee-lo
 import {testPayoutEnglish,testPayoutMessages} from './test-payout-locales';
 
 const en = {
+  ...wechatVerificationEnglish,
+  ...wechatAuthEnglish,
   ...wechatEnglish,
   ...transactionFeeEnglish,
   ...testPayoutEnglish,
@@ -204,6 +208,8 @@ for(const language of LANGUAGES)Object.assign(dictionaries[language.code],withdr
 for(const language of LANGUAGES)Object.assign(dictionaries[language.code],testPayoutMessages[language.code]);
 for(const language of LANGUAGES)Object.assign(dictionaries[language.code],transactionFeeMessages[language.code]);
 for(const language of LANGUAGES)if(language.code!=='en')Object.assign(dictionaries[language.code],wechatMessages[language.code]);
+for(const language of LANGUAGES)if(language.code!=='en')Object.assign(dictionaries[language.code],wechatAuthMessages[language.code]);
+for(const language of LANGUAGES)if(language.code!=='en')Object.assign(dictionaries[language.code],wechatVerificationMessages[language.code]);
 const uploadConfirmationMessages:Record<Locale,string>={
   en:'Upload confirmation was interrupted. Refresh this series before retrying the file.',
   'zh-TW':'上傳確認中斷。請重新整理此系列，再重試上傳檔案。',

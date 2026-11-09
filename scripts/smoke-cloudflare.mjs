@@ -1,5 +1,6 @@
+import ts from 'typescript';
 import assert from 'node:assert/strict';
-import {mkdtemp,readFile,rm} from 'node:fs/promises';
+import {mkdtemp,readFile,writeFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {spawn,execFileSync} from 'node:child_process';
@@ -8,14 +9,15 @@ import {randomBytes,createHmac,createHash} from 'node:crypto';
 
 // Entirely local: Miniflare emulates Durable Objects and R2. Never deploys or charges money.
 const dir=await mkdtemp(path.join(tmpdir(),'aidramio-cloudflare-test-'));
+const runtimeConfigPath=path.join(dir,'wrangler.runtime.json');
 const port=Number(process.env.CLOUDFLARE_TEST_PORT||8789),base=`http://127.0.0.1:${port}`;
 const bootstrap=randomBytes(32).toString('hex');
 const password='LocalSmokePassword123!';
 const maxEpisodeBytes=200*1024**2,chunkBytes=5*1024**2;
 let child,logs='';
-async function start(production=false,testStripe=false,publicOrigin=base,missingTestPair=false){
+async function start(production=false,testStripe=false,publicOrigin=base,missingTestPair=false,wechatLogin=false){
   logs='';
-  const args=['node_modules/wrangler/bin/wrangler.js','dev','--local','--port',String(port),'--local-upstream',new URL(base).host,'--upstream-protocol','http','--inspector-port',String(port+400),'--persist-to',path.join(dir,'state'),
+  const args=['node_modules/wrangler/bin/wrangler.js','dev','--config',runtimeConfigPath,'--tsconfig',path.resolve('tsconfig.cloudflare.json'),'--local','--port',String(port),'--local-upstream',new URL(base).host,'--upstream-protocol','http','--inspector-port',String(port+400),'--persist-to',path.join(dir,'state'),
     '--var',`ENVIRONMENT:${production?'production':'development'}`,'--var',`PAYMENTS_MODE:${testStripe?'stripe':production?'disabled':'demo'}`,'--var',`STRIPE_TEST_MODE:${testStripe}`,'--var',`APP_URL:${base}`,'--var',`PUBLIC_APP_URL:${publicOrigin}`,'--var',`STRIPE_SITE_ORIGIN:${base}`,'--var',`BOOTSTRAP_TOKEN:${bootstrap}`];
   if(!production||testStripe)args.push('--var','GOOGLE_CLIENT_ID:local-test.apps.googleusercontent.com','--var','GOOGLE_CLIENT_SECRET:local-test-only-google-secret');
   if(testStripe){
@@ -23,6 +25,7 @@ async function start(production=false,testStripe=false,publicOrigin=base,missing
     if(!missingTestPair)args.push('--var','STRIPE_TEST_SECRET_KEY:rk_test_local_cloudflare_fixture_only','--var','STRIPE_TEST_WEBHOOK_SECRET:whsec_local_cloudflare_fixture_only');
     else args.push('--var','STRIPE_TEST_SECRET_KEY:','--var','STRIPE_TEST_WEBHOOK_SECRET:');
   }
+  if(wechatLogin)args.push('--var','WECHAT_APP_ID:wx1111111111111111','--var','WECHAT_APP_SECRET:11111111111111111111111111111111');
   args.push('--var',`PAYOUTS_ENABLED:${!production}`);
   // These disposable local fixtures exercise the catalogue and playback paths.
   // The production canonical host separately retires samples and never seeds.
@@ -72,8 +75,16 @@ async function chunkedEpisode(route,size,read,name,cookie,fields,{restartAfterPa
   return{episode:completed,sha256:expected.digest('hex'),sessionPath};
 }
 try{
+  // The required build runs before this suite. Re-running its typechecks and
+  // asset rotation on every emulator restart is both slow and changes the build
+  // under test. Keep deployment config intact; omit only this hook locally.
+  await readFile('dist/cloudflare/server/app.ts');await readFile('dist/client/index.html');
+  const parsed=ts.parseConfigFileTextToJson('wrangler.jsonc',await readFile('wrangler.jsonc','utf8'));assert.ok(!parsed.error);
+  const runtimeConfig={...parsed.config,main:path.resolve(parsed.config.main),assets:{...parsed.config.assets,directory:path.resolve(parsed.config.assets.directory)}};
+  delete runtimeConfig.build;delete runtimeConfig.$schema;
+  await writeFile(runtimeConfigPath,JSON.stringify(runtimeConfig),{mode:0o600});
   const primary='https://primary.example';
-  await start(false,false,primary);
+  await start(false,false,primary,false,true);
   for(const route of ['/','/browse?sort=newest','/account','/manifest.webmanifest']){
     for(const method of ['GET','HEAD']){
       const response=await fetch(base+route,{method,redirect:'manual'});
@@ -84,6 +95,16 @@ try{
     }
   }
   console.log('PASS: Cloudflare canonical redirects run before SPA and static asset serving on alias hosts.');
+  const wechatStart=await fetch(base+'/api/auth/wechat/start?next=%2Fwallet&language=zh-TW',{redirect:'manual'});
+  assert.equal(wechatStart.status,302);assert.match(wechatStart.headers.get('cache-control'),/no-store/);
+  const wechatLocation=new URL(wechatStart.headers.get('location'));
+  assert.equal(wechatLocation.origin,'https://open.weixin.qq.com');assert.equal(wechatLocation.searchParams.get('appid'),'wx1111111111111111');
+  assert.equal(wechatLocation.searchParams.get('scope'),'snsapi_login');assert.equal(wechatLocation.searchParams.get('redirect_uri'),base+'/api/auth/wechat/callback');
+  const wechatCookie=wechatStart.headers.getSetCookie().find(value=>value.startsWith('drama_wechat='))?.split(';')[0];assert.ok(wechatCookie);
+  const wechatCancelPath='/api/auth/wechat/callback?'+new URLSearchParams({state:wechatLocation.searchParams.get('state'),error:'access_denied'});
+  for(const expected of ['wechat_cancelled','wechat_expired']){const cancelled=await fetch(base+wechatCancelPath,{redirect:'manual',headers:{Cookie:wechatCookie}});assert.equal(cancelled.status,303);assert.equal(new URL(cancelled.headers.get('location')).searchParams.get('error'),expected);assert.ok(!cancelled.headers.getSetCookie().some(value=>value.startsWith('drama_session=')));}
+  console.log('PASS: configured WeChat website authorization uses Durable Object SQL, the exact callback, browser binding and single-use cancellation without contacting WeChat or granting a session.');
+
   await stop();
   await start();
   const currencyResponse=await fetch(base+'/api/display-currency?country=TW',{headers:{'CF-IPCountry':'TW','Accept-Language':'zh-TW'}});
@@ -110,11 +131,14 @@ try{
   }
   const studioPage=await fetch(base+'/studio');assert.equal(studioPage.status,200);assert.equal(studioPage.headers.get('cache-control'),'no-store');await studioPage.body.cancel();
   console.log('PASS: homepage canonical stays scoped; favicon, crawler instructions and sitemap serve real assets instead of SPA fallback HTML.');
-  const cfg=(await request('/api/config')).data;assert.equal(cfg.runtime,'cloudflare');assert.equal(cfg.paymentsMode,'demo');assert.equal(cfg.auth.google,true);
+  const cfg=(await request('/api/config')).data;assert.equal(cfg.runtime,'cloudflare');assert.equal(cfg.paymentsMode,'demo');assert.equal(cfg.auth.google,true);assert.equal(cfg.auth.wechat,false);
+  await request('/api/auth/wechat/start',undefined,'',503);
+  await request('/api/auth/wechat/registration',undefined,'',503);
+  await request('/api/auth/wechat/link',{password:'NoExistingAccount'},'',401);
   const spokenCodes=cfg.spokenLanguages.map(item=>item.code),interfaceCodes=cfg.languages.map(item=>item.code);
   assert.equal(spokenCodes.length,21);assert.ok(spokenCodes.includes('cmn')&&spokenCodes.includes('yue'));assert.ok(!spokenCodes.includes('zh-TW')&&!spokenCodes.includes('zh-CN'));
   assert.equal(interfaceCodes.length,21);assert.ok(interfaceCodes.includes('zh-TW')&&interfaceCodes.includes('zh-CN'));assert.ok(!interfaceCodes.includes('cmn')&&!interfaceCodes.includes('yue'));
-  assert.deepEqual(cfg.creatorPassConsent,{policyVersion:'2026-11-08.2',disclosureVersion:'creator-pass-ack-v2'});
+  assert.deepEqual(cfg.creatorPassConsent,{policyVersion:'2026-11-09',disclosureVersion:'creator-pass-ack-v2'});
   const creatorConsent={accepted:true,policy_version:cfg.creatorPassConsent.policyVersion,disclosure_version:cfg.creatorPassConsent.disclosureVersion};
   assert.equal(cfg.limits.quotaBytes,10*1024**3);
   assert.equal(cfg.limits.minimumPriceUsd,0.1);assert.equal(cfg.limits.maximumPriceUsd,1);
@@ -169,7 +193,7 @@ try{
   const claimed=(await request('/api/account',{name:'Local Viewer',language:'en',role:'admin',publisher_active:1,email_verified:true},viewer,200,'PATCH')).data.user;
   assert.equal(claimed.role,'viewer');assert.equal(claimed.publisher_active,0);assert.equal(claimed.email_verified,false);
   await request('/api/admin',undefined,viewer,403);await request('/api/studio/series',{},viewer,403);
-  assert.deepEqual((await request('/api/account/identities',undefined,viewer)).data,{google:{linked:false},apple:{linked:false},password:true});
+  assert.deepEqual((await request('/api/account/identities',undefined,viewer)).data,{google:{linked:false},apple:{linked:false},wechat:{linked:false},password:true});
   await request('/api/auth/login',{email:'viewer@example.test',password:'wrong'},'',401);
   await request('/api/admin',undefined,publisher,403);
   await request('/api/studio/series',{},publisher,403);
