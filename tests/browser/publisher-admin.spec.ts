@@ -52,6 +52,7 @@ test('own-series publisher selection defaults to official and changes attributio
 async function mockEditor(page:Page,role:'admin'|'publisher'){
   const account={...administrator,role},series={id:'profile-editor-series',title:'Independent original drama',description:'A complete synopsis for the publisher attribution permission browser fixture.',language:'en',genres:['drama'],themes:[],format:null,cover:'/images/placeholder.svg',creator_id:role==='admin'?'another-creator':account.id,creator_name:'Independent creator',creation_type:'human',price_cents:10,free_episodes:1,episode_count:0,views:0,saves:0,likes:0,status:'draft',featured:0,created_at:'2026-10-30 12:00:00',publisher_profile_id:null};
   const writes:Record<string,unknown>[]=[],profileReads:string[]=[];
+  await page.route('**/api/studio/title-availability**',route=>route.request().method()==='GET'?route.fulfill({json:{available:true}}):route.abort());
   await page.route('**/api/auth/me',route=>route.fulfill({json:{user:account}}));await page.route('**/api/admin/publishers',route=>{profileReads.push(route.request().method());return route.fulfill({json:{publishers:[official],default_publisher_id:official.id}});});
   await page.route('**/api/studio/series/profile-editor-series',route=>{if(route.request().method()==='PATCH'){writes.push(route.request().postDataJSON());return route.fulfill({json:{ok:true}});}return route.fulfill({json:{series,episodes:[],episodes_revision:'fixture-revision',owner_storage:{used_bytes:0,quota_bytes:5*1024**3}}});});
   return{writes,profileReads};

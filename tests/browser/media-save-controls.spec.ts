@@ -25,6 +25,7 @@ async function fixture(page:Page,{signedIn=false}:{signedIn?:boolean}={}){
     }
     if(pathname==='/api/auth/me')return route.fulfill({json:{user:signedIn?creator:null}});
     if(pathname==='/api/config')return route.fulfill({json:{brand:'LingYing',paymentsMode:'disabled',paymentsReady:false,paymentsTestMode:false,payoutsEnabled:false,uploadsEnabled:true,usdToHkd:7.8,demo:false,limits:{activationHkd:88}}});
+    if(pathname==='/api/studio/title-availability')return route.fulfill({json:{available:true}});
     if(pathname==='/api/series')return route.fulfill({json:{series:[series]}});
     if(pathname===`/api/series/${series.id}`)return route.fulfill({json:{series,episodes}});
     if(pathname===`/api/studio/series/${series.id}`)return route.fulfill({json:{series,episodes,episodes_revision:'a'.repeat(64),owner_storage:{used_bytes:0,quota_bytes:creator.quota_bytes}}});

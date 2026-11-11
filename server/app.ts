@@ -1,4 +1,5 @@
 import {registerWechatAuth,wechatAuthEnabled} from './wechat-auth.js';
+import {registerSearchDiscovery} from './search-discovery.js';
 import {wechatPayEnabled,createWechatFundingQuote} from './wechat-pay.js';
 import {episodeFreeSql,lastEpisodeFreeSchema,seriesLastEpisodeFree,writeSeriesLastEpisodeFree,seriesFreeEpisodeCount} from './episode-access.js';
 import {getOwnerStorage,withinStorageQuota} from './storage-quota.js';
@@ -50,6 +51,7 @@ import {coverAspectRatioSchema,seriesCoverAspectRatio,writeSeriesCoverLayout} fr
 import {subtitleLanguagesSchema,seriesSubtitleLanguages,writeSeriesSubtitleLanguages} from './subtitle-languages.js';
 import {applyEpisodePriceCap,episodePriceCents} from './episode-pricing.js';
 import {SPOKEN_LANGUAGES,SPOKEN_LANGUAGE_CODES} from '../shared/spoken-languages.js';
+import {seriesTitleAvailable,assertSeriesTitleAvailable} from './series-titles.js';
 
 const language = z.enum(LANGUAGES.map(x => x.code) as [string, ...string[]]);
 const spokenLanguage=z.enum(SPOKEN_LANGUAGE_CODES as [string,...string[]]);
@@ -169,6 +171,9 @@ export function createApp() {
   app.post('/api/auth/apple/callback',express.urlencoded({extended:false,limit:'16kb',parameterLimit:8}));
   app.use('/api', express.json({ limit: '128kb' }), (req, res, next) => {
     res.setHeader('Cache-Control','private, no-store');
+    // Crawlers may fetch public JSON to render the page, while the HTML page
+    // remains the search result. Cover images retain their own image policy.
+    if(['GET','HEAD'].includes(req.method)&&/^\/(?:config|series(?:\/[^/]+)?|publishers\/[^/]+)\/?$/u.test(req.path))res.setHeader('X-Robots-Tag','noindex');
     // Apple's cross-site form_post is authenticated by its one-use state,
     // browser binding and verified identity token in the dedicated handler.
     if (!['GET','HEAD','OPTIONS'].includes(req.method)&&!(req.method==='POST'&&req.path==='/auth/apple/callback')) {
@@ -335,6 +340,12 @@ export function createApp() {
     const result=await deleteSeriesPermanently(req.user!.id,id(req),body);
     try{res.json({...result,user:getUser(req.user!.id),owner_storage:ownerStorage(target)});}catch{res.json({...result,cleanup_pending:true});}
   });
+  app.get('/api/studio/title-availability',requirePublisher,rateLimit('series-title-availability',30,60_000),(req,res)=>{
+    const query=z.object({title:z.string().max(1024).trim().min(SERIES_LIMITS.titleMin).max(SERIES_LIMITS.titleMax),exclude:z.string().min(1).max(200).optional()}).strict().parse(req.query);
+    const current=query.exclude?ownSeries(req,query.exclude):undefined;
+    res.setHeader('Cache-Control','private, no-store');
+    res.json({available:seriesTitleAvailable(query.title,current?{id:current.id,title:current.title}:undefined)});
+  });
   app.get('/api/studio/series/:id',requireAuth,(req,res)=>{
     ownSeries(req);const s=one(`${catalogSelect} WHERE s.id=?`,id(req))!;
     const episodes=all(`SELECT e.id,e.series_id,e.title,e.number,${episodeDurationSql('e')} AS duration,e.bytes FROM episodes e WHERE e.series_id=? ORDER BY e.number`,s.id);
@@ -355,7 +366,7 @@ export function createApp() {
   });
   app.post('/api/studio/series', requirePublisher, (req,res) => {
     const b=seriesSchema.parse(req.body);const seriesId=crypto.randomUUID();
-    transaction(()=>{run('INSERT INTO series (id,creator_id,title,description,language,genres,creation_type,price_cents,free_episodes) VALUES (?,?,?,?,?,?,?,?,?)',seriesId,req.user!.id,b.title,b.description,b.language,JSON.stringify(b.genres),b.creation_type,b.price_cents,b.free_episodes);
+    transaction(()=>{assertSeriesTitleAvailable(b.title);run('INSERT INTO series (id,creator_id,title,description,language,genres,creation_type,price_cents,free_episodes) VALUES (?,?,?,?,?,?,?,?,?)',seriesId,req.user!.id,b.title,b.description,b.language,JSON.stringify(b.genres),b.creation_type,b.price_cents,b.free_episodes);
       writeSeriesClassification(seriesId,b.genres,b);
       assignSeriesPublisher(req.user!.id,one('SELECT * FROM series WHERE id=?',seriesId)!,b.publisher_profile_id,{creating:true});
       writeSeriesCoverLayout(seriesId,b.cover_aspect_ratio,{creating:true});
@@ -367,6 +378,7 @@ export function createApp() {
   app.patch('/api/studio/series/:id', requirePublisher, (req,res) => {
     const b=seriesSchema.parse(req.body);
     transaction(()=>{const before=writableSeries(req),beforeGenres=JSON.parse(before.genres),beforeClassification=seriesClassification(before.id,beforeGenres),beforeCoverRatio=seriesCoverAspectRatio(before.id),beforeSubtitles=seriesSubtitleLanguages(before.id),beforeLastEpisodeFree=seriesLastEpisodeFree(before.id);
+      assertSeriesTitleAvailable(b.title,{id:before.id,title:before.title});
       run("UPDATE series SET title=?,description=?,language=?,genres=?,creation_type=?,price_cents=?,free_episodes=?,updated_at=datetime('now') WHERE id=?",b.title,b.description,b.language,JSON.stringify(b.genres),b.creation_type,b.price_cents,b.free_episodes,id(req));
       // Preserve proven legacy format when an older editor changes only genre metadata.
       const classificationInput=b.format===undefined&&beforeClassification.format==='animation'&&!b.genres.includes('animation')?{...b,format:beforeClassification.format}:b;
@@ -509,6 +521,7 @@ export function createApp() {
     const body=z.object({decision:z.enum(['reconciled','platform_loss','provider_reversed']),note:z.string().trim().min(10).max(2000),wallet_debit_cents:z.number().int().min(0).max(MAX_WALLET_FUNDING_CENTS).optional()}).parse(req.body);
     res.json({review:resolvePaymentReview(id(req),req.user!.id,body)});
   });
+  registerSearchDiscovery(app);
   app.use('/api',(_req,res)=>res.status(404).json({error:{code:'NOT_FOUND',message:'This endpoint does not exist.'}}));
   return app;
 }

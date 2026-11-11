@@ -1,4 +1,10 @@
 User-agent: *
 Allow: /
+Disallow: /api/
+Allow: /api/config$
+Allow: /api/series$
+Allow: /api/series?
+Allow: /api/series/
+Allow: /api/publishers/
 
 Sitemap: https://lingyingdrama.com/sitemap.xml

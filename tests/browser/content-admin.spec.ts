@@ -16,6 +16,7 @@ async function fixture(page:Page,options:FixtureOptions={}){
   await page.route('**/api/config',async route=>{const response=await route.fetch();const config=await response.json();await route.fulfill({response,json:{...config,paymentsMode:'stripe',paymentsReady:true,paymentsTestMode:false,payoutsEnabled:false,uploadsEnabled:true}});});
   await page.route('**/api/admin',route=>route.fulfill({json:stats}));
   await page.route('**/api/studio',route=>route.fulfill({json:{user:account,series:options.studioSeries?[current]:[],stats:{sales:0,lifetime_micros:0},withdrawals:[],storageRequests:[]}}));
+  await page.route('**/api/studio/title-availability**',route=>{const request=route.request(),pathname=new URL(request.url()).pathname;if(request.method()!=='GET'||pathname!=='/api/studio/title-availability')return route.abort();reads.push(pathname);return account.role==='viewer'?route.fulfill({status:403,json:{error:{code:'PUBLISHER_REQUIRED',message:'Publisher access is required.'}}}):route.fulfill({json:{available:true}});});
   await page.route('**/api/admin/series**',async route=>{
     const request=route.request(),url=new URL(request.url());reads.push(url.pathname);
     if(request.method()==='POST'){

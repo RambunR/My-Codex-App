@@ -1,6 +1,8 @@
 import {Link,useParams,useSearchParams} from 'react-router-dom';
 import {BadgeCheck,CalendarDays,ChevronLeft,ChevronRight,Clapperboard,Clock3,Eye,Heart,Info} from 'lucide-react';
-import {useApi} from '../api';
+import {useApi,ApiError} from '../api';
+import {useSearchMetadata,searchSeriesFromPublic,searchClientOrigin} from '../useSearchMetadata';
+import {publisherSearchDocument,missingSearchDocument} from '../../shared/search-discovery';
 import {useI18n} from '../i18n';
 import {Avatar,BackLink,Empty,engagementCount,ErrorState,Loading,SectionHeading,SeriesCard} from '../ui';
 import type {PublisherPage} from '../../shared/config';
@@ -29,6 +31,7 @@ export function Publisher(){
   const pageInput=Number(params.get('page')||1);
   const requestedPage=Number.isSafeInteger(pageInput)&&pageInput>0?pageInput:1;
   const{data,loading,error,refresh}=useApi<PublisherPage>(id?`/api/publishers/${encodeURIComponent(id)}?page=${requestedPage}&page_size=24`:undefined);
+  useSearchMetadata(error instanceof ApiError&&error.status===404?missingSearchDocument('/publishers/'+encodeURIComponent(id||''),searchClientOrigin()):data&&data.publisher.id===id?{...publisherSearchDocument({id:data.publisher.id,name:data.publisher.display_name},data.series.map(searchSeriesFromPublic),searchClientOrigin()),robots:data.stats.series_count?'index, follow':'noindex, follow'}:undefined);
   if(loading||(!error&&data?.publisher.id!==id))return <Loading/>;
   if(error)return <div className="page publisher-page"><BackLink to="/browse" label={t('explore')}/><ErrorState error={error} retry={refresh}/></div>;
   if(!data)return <Empty title={t('noResults')}/>;

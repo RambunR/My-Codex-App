@@ -20,6 +20,7 @@ import {DEMO_PREVIEW_BYTES} from './preview-meta';
 import {canonicalApiRedirect,canonicalPageRedirect} from './routing';
 import {responseSecurityHeaders} from '../shared/security-headers';
 import {displayCurrencyResponse} from './display-currency';
+import {searchDiscoveryResponse} from './search-discovery';
 
 let listening=false;
 export class AIDramioApp {
@@ -74,6 +75,7 @@ export default {
     const canonical=canonicalApiRedirect(request,env)||canonicalPageRedirect(request,env);if(canonical)return canonical;
     if(url.pathname==='/api/display-currency')return displayCurrencyResponse(request);
     if(url.pathname.startsWith('/api/'))return env.APP.get(env.APP.idFromName('platform')).fetch(request as any) as unknown as Promise<Response>;
+    const discovery=await searchDiscoveryResponse(request,env);if(discovery)return discovery;
     const response=await env.ASSETS.fetch(request as any) as unknown as Response;
     // A removed build chunk must not masquerade as successful SPA HTML.
     if(url.pathname.startsWith('/assets/')&&(response.status===404||response.headers.get('Content-Type')?.includes('text/html')))

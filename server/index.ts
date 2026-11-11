@@ -5,6 +5,8 @@ import { config } from './config.js';
 import { createApp, errorHandler } from './app.js';
 import { seed } from './seed.js';
 import { one } from './db.js';
+import {searchDocumentForPath} from './search-discovery.js';
+import {renderSearchShell,searchPageRequest} from '../shared/search-discovery.js';
 
 if(config.payments==='demo'&&config.production)throw new Error('Demo payments are prohibited in production. Configure Stripe or use PAYMENTS_MODE=disabled.');
 if(config.seed&&config.production)throw new Error('Public demo accounts must not be seeded in production. Set SEED_DEMO=false.');
@@ -13,14 +15,14 @@ if(config.production&&config.payments==='stripe'&&!config.appUrl.startsWith('htt
 if(config.seed)await seed();
 const app=createApp();
 if(!config.production){
-  const {createServer}=await import('vite');const vite=await createServer({server:{middlewareMode:true,hmr:{port:config.port+21000}},appType:'spa'});
+  const {createServer}=await import('vite');const vite=await createServer({server:{middlewareMode:true,hmr:{port:config.port+21000}},appType:'custom'});
   app.use(vite.middlewares);
-  app.use(async(req,res,next)=>{try{const html=await readFile(path.resolve('index.html'),'utf8');res.status(200).type('html').send(await vite.transformIndexHtml(req.originalUrl,html));}catch(e){vite.ssrFixStacktrace(e as Error);next(e);}});
+  app.use(async(req,res,next)=>{if(!['GET','HEAD'].includes(req.method)||!searchPageRequest(req.path))return next();try{const document=searchDocumentForPath(req.originalUrl),html=await vite.transformIndexHtml(req.originalUrl,await readFile(path.resolve('index.html'),'utf8'));res.status(document.status).set({'Cache-Control':'private, no-store','X-Robots-Tag':document.robots,Link:`<${document.canonical}>; rel="canonical"`}).type('html').send(renderSearchShell(html,document));}catch(e){vite.ssrFixStacktrace(e as Error);next(e);}});
 }else{
   app.use('/assets',express.static(path.resolve('dist/client/assets'),{maxAge:'1y',immutable:true}));
   app.use('/assets',(_req,res)=>res.status(404).setHeader('Cache-Control','no-store').type('text').send('Asset not found.'));
   app.use(express.static(path.resolve('dist/client'),{index:false,maxAge:'1h'}));
-  app.use((_req,res)=>res.setHeader('Cache-Control','no-store').sendFile(path.resolve('dist/client/index.html')));
+  app.use(async(req,res,next)=>{if(!['GET','HEAD'].includes(req.method)||!searchPageRequest(req.path))return next();try{const document=searchDocumentForPath(req.originalUrl),html=await readFile(path.resolve('dist/client/index.html'),'utf8');res.status(document.status).set({'Cache-Control':'private, no-store','X-Robots-Tag':document.robots,Link:`<${document.canonical}>; rel="canonical"`}).type('html').send(renderSearchShell(html,document));}catch(error){next(error);}});
 }
 app.use(errorHandler);
 const server=app.listen(config.port,'0.0.0.0',()=>console.log(`AIDramio running on port ${config.port} · payments: ${config.payments}`));

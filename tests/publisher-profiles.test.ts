@@ -110,7 +110,7 @@ test('ordinary uploaders and administrators editing another account cannot forge
 test('admin assignment changes public attribution while retaining the real creator, purchases, storage and financial owner',async()=>{
   const admin=identity('admin'),profile=await createProfile(admin),id=await createSeries(admin),episodeId=episode(id,1);publish(id);
   run('INSERT INTO purchases (id,user_id,episode_id,price_micros,creator_micros,platform_micros) VALUES (?,?,?,?,?,?)',randomUUID(),viewer.id,episodeId,100000,70000,30000);
-  const before=financial();await request('/api/studio/series/'+id,{...details,publisher_profile_id:profile.id},admin,200,'PATCH');
+  const before=financial();await request('/api/studio/series/'+id,{...details,title:one('SELECT title FROM series WHERE id=?',id)!.title,publisher_profile_id:profile.id},admin,200,'PATCH');
   assert.deepEqual(financial(),before);assert.equal(one('SELECT creator_id FROM series WHERE id=?',id)!.creator_id,admin.id);
   const privateData=(await request('/api/studio/series/'+id,undefined,admin)).data.series;assert.equal(privateData.creator_id,admin.id);assert.equal(privateData.publisher_profile_id,profile.id);
   const publicData=(await request('/api/series/'+id,undefined,viewer)).data;assert.equal(publicData.series.publisher.id,profile.id);assert.equal(publicData.series.creator_name,profile.display_name);assert.equal(publicData.episodes[0].unlocked,true);assertPublic(publicData);
@@ -176,7 +176,7 @@ test('profile creation, editing, assignment and clearing leave append-only authe
   assert.equal(initial.length,1);assert.equal(initial[0].action,'create');assert.equal(initial[0].actor_id,admin.id);
   await request(profileAdmin+'/'+profile.id,{display_name:'Audited changed brand',registered_at:'2002-03-04'},admin,200,'PATCH');
   const id=await createSeries(admin,{publisher_profile_id:profile.id});publish(id);episode(id,1);
-  await request('/api/studio/series/'+id,{...details,publisher_profile_id:null},admin,200,'PATCH');
+  await request('/api/studio/series/'+id,{...details,title:one('SELECT title FROM series WHERE id=?',id)!.title,publisher_profile_id:null},admin,200,'PATCH');
   const events=all('SELECT * FROM publisher_profile_events WHERE publisher_id=? OR series_id=? ORDER BY rowid',profile.id,id);
   for(const action of ['create','update','assign','clear'])assert.ok(events.some(event=>event.action===action),action+' must be audited');
   assert.ok(events.every(event=>event.actor_id===admin.id));assert.deepEqual(one('SELECT * FROM publisher_profile_events WHERE id=?',initial[0].id),initial[0]);

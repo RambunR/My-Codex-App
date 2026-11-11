@@ -1,4 +1,5 @@
 import {test,expect,type Page,type Locator} from '@playwright/test';
+import {demoAdminSession} from './helpers/admin-session';
 import path from 'node:path';
 import {STORY_THEMES,STANDARD_GENRES,type StoryTheme} from '../../shared/taxonomy';
 
@@ -6,9 +7,7 @@ const draft={title:'Legacy classification fixture',description:'A complete origi
 const addedThemes=['entrepreneurship','business-rivalry','inheritance-succession','family-feud','love-triangle','redemption','friendship','self-discovery','survival','found-family'] as const;
 
 async function signInAdmin(page:Page){
-  const response=await page.request.post('/api/auth/login',{data:{email:'admin@demo.aidramio.test',password:'DemoPass123!'}});
-  expect(response.ok()).toBe(true);
-  const body=await response.json();expect(body.user.role).toBe('admin');return body.user;
+  const user=await demoAdminSession(page);expect(user.role).toBe('admin');return user;
 }
 function theme(page:Page,id:StoryTheme){return page.locator('#series-themes button').nth(STORY_THEMES.indexOf(id));}
 async function saveDetails(page:Page){

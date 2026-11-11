@@ -30,7 +30,7 @@ async function request(route:string,body?:unknown,actor?:Actor,status=200,method
   const data=await response.json();assert.equal(response.status,status,method+' '+route+': '+JSON.stringify(data));return data;
 }
 async function create(values:Record<string,unknown>={},actor=owner){return(await request('/api/studio/series',{...details,title:'Cover '+randomUUID(),...values},actor,201)).id as string;}
-async function edit(id:string,values:Record<string,unknown>={},actor=owner,status=200){return request('/api/studio/series/'+id,{...details,...values},actor,status,'PATCH');}
+async function edit(id:string,values:Record<string,unknown>={},actor=owner,status=200){const current=one('SELECT title FROM series WHERE id=?',id)!;return request('/api/studio/series/'+id,{...details,title:current.title,...values},actor,status,'PATCH');}
 async function read(id:string,actor=owner){return(await request('/api/studio/series/'+id,undefined,actor)).series;}
 function legacy(){const id=randomUUID();run('INSERT INTO series (id,creator_id,title,description,language,genres,creation_type,price_cents,free_episodes,cover_key,cover_bytes) VALUES (?,?,?,?,?,?,?,?,?,?,?)',id,owner.id,'Legacy retained cover',details.description,'en','["drama"]','human',10,1,'public:/images/midnight.jpg',1234);return id;}
 function publish(id:string){run("UPDATE series SET status='published' WHERE id=?",id);}

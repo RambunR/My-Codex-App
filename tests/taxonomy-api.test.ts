@@ -25,9 +25,9 @@ async function request(route:string,body?:unknown,actor?:string,method=body===un
   const response=await fetch(base+route,{method,headers:{...(actor?{Cookie:cookies.get(actor)!}:{}),...(body===undefined?{}:{'Content-Type':'application/json'})},body:body===undefined?undefined:JSON.stringify(body)});
   return{status:response.status,data:await response.json()};
 }
-async function create(input:Record<string,unknown>={},actor=owner){const result=await request('/api/studio/series',{...details,...input},actor);assert.equal(result.status,201,JSON.stringify(result.data));return result.data.id as string;}
+async function create(input:Record<string,unknown>={},actor=owner){const result=await request('/api/studio/series',{...details,title:'Classified drama '+randomUUID(),...input},actor);assert.equal(result.status,201,JSON.stringify(result.data));return result.data.id as string;}
 async function read(id:string,actor=owner){const response=await request('/api/studio/series/'+id,undefined,actor);assert.equal(response.status,200);return response.data.series;}
-async function change(id:string,input:Record<string,unknown>,actor=owner){return request('/api/studio/series/'+id,{...details,...input},actor,'PATCH');}
+async function change(id:string,input:Record<string,unknown>,actor=owner){const current=one('SELECT title FROM series WHERE id=?',id)!;return request('/api/studio/series/'+id,{...details,title:current.title,...input},actor,'PATCH');}
 async function list(filters:Record<string,string>){const response=await request('/api/series?'+new URLSearchParams(filters));assert.equal(response.status,200,JSON.stringify(response.data));return response.data.series as any[];}
 function publish(id:string){run("UPDATE series SET status='published' WHERE id=?",id);}
 function money(){return{users:all('SELECT id,publisher_active,wallet_micros,earnings_micros,quota_bytes,used_bytes FROM users ORDER BY id'),payments:all('SELECT * FROM payments ORDER BY id'),testPayments:all('SELECT * FROM test_payments ORDER BY id'),ledger:all('SELECT * FROM ledger ORDER BY id'),testLedger:all('SELECT * FROM test_ledger ORDER BY id'),purchases:all('SELECT * FROM purchases ORDER BY id')};}
@@ -76,7 +76,7 @@ test('all browse axes combine with AND semantics and old animation links retain 
   const title='A unique taxonomy browse '+randomUUID();
   const target={title,language:'ja',genres:['thriller'],themes:['revenge'],format:'animation',creation_type:'ai-generated'};
   const wanted=await create(target);publish(wanted);
-  for(const variation of [{language:'ko'},{genres:['horror']},{themes:['betrayal-secrets']},{format:'live-action'},{creation_type:'human'}])publish(await create({...target,...variation}));
+  for(const[index,variation]of [{language:'ko'},{genres:['horror']},{themes:['betrayal-secrets']},{format:'live-action'},{creation_type:'human'}].entries())publish(await create({...target,...variation,title:title+' variant '+index}));
   const filters={q:title,language:'ja',genre:'thriller',theme:'revenge',format:'animation',creation:'ai-generated'};
   assert.deepEqual((await list(filters)).map(s=>s.id),[wanted]);
   assert.ok((await list({q:title,theme:'revenge'})).length>1);

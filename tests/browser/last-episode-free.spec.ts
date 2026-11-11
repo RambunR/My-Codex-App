@@ -7,6 +7,7 @@ async function fixture(page:Page,{admin=false,enabled=false,episodes=false}:{adm
   const user={...account,role:admin?'admin':'publisher',storage_unlimited:admin};let series={...original,last_episode_free:enabled};const writes:Record<string,any>[]=[];
   let rows=episodes?[1,3,5].map((number,index)=>({id:`last-free-episode-${number}`,series_id:series.id,number,title:`Original chapter ${number}`,duration:index===2?15:120,bytes:1024,free:index===0||enabled&&index===2,unlocked:false})):[];
   await page.route('**/api/auth/me',route=>route.fulfill({json:{user}}));
+  await page.route('**/api/studio/title-availability**',route=>route.request().method()==='GET'&&new URL(route.request().url()).pathname==='/api/studio/title-availability'?route.fulfill({json:{available:true}}):route.abort());
   await page.route('**/api/admin/publishers',route=>route.fulfill({json:{publishers:[],default_publisher_id:null}}));
   await page.route('**/api/studio/series',route=>{writes.push(route.request().postDataJSON());series={...series,...route.request().postDataJSON()};return route.fulfill({status:201,json:{id:series.id}});});
   await page.route('**/api/studio/series/last-free-editor',route=>{

@@ -5,7 +5,7 @@ import { api,post } from './api';
 import type { User } from '../shared/config';
 import type {CreatorPassConsent} from '../shared/creator-pass-consent';
 import { useI18n } from './i18n';
-import { brandName } from './brand';
+import {useDefaultSearchMetadata} from './useSearchMetadata';
 import { Modal } from './ui';
 import {FundingReward,validFundingCreditQuote,type FundingCreditQuote} from './components/FundingReward';
 interface AppConfig {paymentMethods?:{wechatPay:boolean};creatorPassConsent?:{policyVersion:string;disclosureVersion:string};withdrawalPolicy?:{minimumCents:number;feeCents:number;processingMinDays:number;processingMaxDays:number};passPromotion?:{enabled:boolean};brand:string;paymentsMode:string;paymentsReady?:boolean;sandbox?:boolean;paymentsTestMode?:boolean;payoutsEnabled?:boolean;uploadsEnabled?:boolean;usdToHkd:number;demo:boolean;limits:Record<string,number>;runtime?:string;videoFormats?:string[];episodeUpload?:{mode:'multipart'|'chunked';chunkBytes?:number};walletFunding?:{presetAmountsCents:number[];rewards:Array<{amountCents:number;bonusCents:number}>;offerVersion:string};auth?:{wechat?:boolean;google:boolean;apple?:boolean;email?:boolean}}
@@ -18,7 +18,7 @@ export function AppProvider({children}:{children:ReactNode}){
   const[toasts,setToasts]=useState<Toast[]>([]);const[payment,setPayment]=useState<Checkout|null>(null);const[busy,setBusy]=useState(false);
   const refreshUser=async()=>{const d=await api('/api/auth/me');setUser(d.user);};
   useEffect(()=>{Promise.all([api('/api/auth/me').then(d=>setUser(d.user)),api<AppConfig>('/api/config').then(setConfig)]).catch(()=>{}).finally(()=>setReady(true));},[]);
-  useEffect(()=>{const name=locale.startsWith('zh')?brandName(locale):config.brand;document.title=`${name}${config.sandbox?' Test':''} — ${t('heroTitle').replace('\n',' ')}`;},[config.brand,config.sandbox,locale,t('heroTitle')]);
+  useDefaultSearchMetadata(locale,!!config.sandbox);
   const toast=(message:string,error=false)=>{const id=Date.now()+Math.random();setToasts(v=>[...v.slice(-2),{id,message,error}]);window.setTimeout(()=>setToasts(v=>v.filter(x=>x.id!==id)),5500);};
   const checkout=async(kind:'activation'|'funding',cents=1000,promoCode?:string,promoRevision?:number,consent?:CreatorPassConsent,choice?:CheckoutChoice)=>{if(user?.payment_review)throw new Error(t('paymentReviewTitle'));if(config.paymentsMode==='disabled'||config.paymentsReady===false)throw new Error(t('paymentUnavailable'));const result=await post<Checkout>('/api/payments/checkout',{kind,amount_cents:cents,language:locale,...(choice?{payment_method:choice.method,...(choice.fundingQuoteId?{funding_quote_id:choice.fundingQuoteId}:{})}:{}),...(kind==='activation'&&consent?{creator_consent:consent}:{}),...(kind==='activation'&&promoCode?{promo_code:promoCode,...(promoRevision===undefined?{}:{promo_revision:promoRevision})}:{})});if(result.url){window.location.assign(result.url);return;}if(result.alreadyPaid){await refreshUser();toast(t('paymentSuccess'));return;}setPayment(result);};
   const confirmDemo=async()=>{if(!payment?.paymentId)return;setBusy(true);try{const d=await post(`/api/payments/${payment.paymentId}/demo-confirm`);setUser(d.user);setPayment(null);toast(t('paymentSuccess'));}catch(e){toast((e as Error).message,true);}finally{setBusy(false);}};

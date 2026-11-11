@@ -114,22 +114,24 @@ try{
   console.log('PASS: local display-currency fallback is private, read-only, ignores spoofed country inputs and does not call an external provider.');
   for(const route of ['/','/?search-source=fixture']){
     const home=await fetch(base+route);
-    assert.equal(home.status,200);assert.equal(home.headers.get('link'),'<https://lingyingdrama.com/>; rel="canonical"');
+    assert.equal(home.status,200);assert.equal(home.headers.get('link'),`<${base}/>; rel="canonical"`);
     const html=await home.text();assert.match(html,/href="\/favicon\.ico"/);assert.match(html,/sizes="192x192" href="\/icon-192\.png"/);
+    assert.match(html,/LingYing/);assert.match(html,/data-search-snapshot/);assert.match(html,/application\/ld\+json/);
   }
-  for(const route of ['/browse','/series/fixture']){
-    const page=await fetch(base+route);assert.equal(page.status,200);assert.equal(page.headers.get('link'),null,'Distinct SPA pages must not be canonicalized to the homepage.');await page.body.cancel();
+  for(const [route,status]of [['/browse',200],['/series/fixture',404]]){
+    const page=await fetch(base+route);assert.equal(page.status,status);assert.equal(page.headers.get('link'),`<${base}${route}>; rel="canonical"`,'Each public page must retain its own canonical identity.');
+    if(status===404)assert.match(page.headers.get('x-robots-tag'),/noindex/);await page.body.cancel();
   }
   const favicon=await fetch(base+'/favicon.ico');assert.equal(favicon.status,200);assert.match(favicon.headers.get('content-type'),/^image\//);
   const ico=Buffer.from(await favicon.arrayBuffer());assert.deepEqual([...ico.subarray(0,6)],[0,0,1,0,2,0]);
   const icon=await fetch(base+'/icon-192.png');assert.equal(icon.status,200);assert.match(icon.headers.get('content-type'),/^image\/png/);
   const png=Buffer.from(await icon.arrayBuffer());assert.equal(png.readUInt32BE(16),192);assert.equal(png.readUInt32BE(20),192);
-  const robots=await fetch(base+'/robots.txt');assert.equal(robots.status,200);assert.match(robots.headers.get('content-type'),/^text\/plain/);assert.match(await robots.text(),/^Sitemap: https:\/\/lingyingdrama\.com\/sitemap\.xml$/m);
-  const sitemap=await fetch(base+'/sitemap.xml');assert.equal(sitemap.status,200);assert.match(sitemap.headers.get('content-type'),/xml/);assert.match(await sitemap.text(),/<loc>https:\/\/lingyingdrama\.com\/<\/loc>/);
+  const robots=await fetch(base+'/robots.txt');assert.equal(robots.status,200);assert.match(robots.headers.get('content-type'),/^text\/plain/);assert.ok((await robots.text()).includes(`Sitemap: ${base}/sitemap.xml`));
+  const sitemap=await fetch(base+'/sitemap.xml');assert.equal(sitemap.status,200);assert.match(sitemap.headers.get('content-type'),/xml/);assert.ok((await sitemap.text()).includes(`<loc>${base}/</loc>`));
   for(const asset of ['/assets/Studio-retired-release.css','/assets/Studio-retired-release.js']){
     const missing=await fetch(base+asset);assert.equal(missing.status,404);assert.match(missing.headers.get('content-type'),/^text\/plain/);assert.equal(missing.headers.get('cache-control'),'no-store');assert.doesNotMatch(await missing.text(),/id="root"|<!doctype/i);
   }
-  const studioPage=await fetch(base+'/studio');assert.equal(studioPage.status,200);assert.equal(studioPage.headers.get('cache-control'),'no-store');await studioPage.body.cancel();
+  const studioPage=await fetch(base+'/studio');assert.equal(studioPage.status,200);assert.match(studioPage.headers.get('cache-control'),/no-store/);await studioPage.body.cancel();
   console.log('PASS: homepage canonical stays scoped; favicon, crawler instructions and sitemap serve real assets instead of SPA fallback HTML.');
   const cfg=(await request('/api/config')).data;assert.equal(cfg.runtime,'cloudflare');assert.equal(cfg.paymentsMode,'demo');assert.equal(cfg.auth.google,true);assert.equal(cfg.auth.wechat,false);
   await request('/api/auth/wechat/start',undefined,'',503);
@@ -148,7 +150,7 @@ try{
   assert.ok(cfg.storyThemes.includes('revenge'));assert.deepEqual(cfg.formats,['live-action','animation','anime-donghua','motion-comic']);
   assert.deepEqual(cfg.creationTypes,['human','ai-assisted','ai-generated']);
   assert.equal(cfg.auth.apple,false);assert.equal(cfg.auth.email,false);
-  const authPage=await fetch(base+'/auth?mode=forgot');assert.equal(authPage.status,200);assert.equal(authPage.headers.get('referrer-policy'),'no-referrer');assert.equal(authPage.headers.get('cache-control'),'no-store');
+  const authPage=await fetch(base+'/auth?mode=forgot');assert.equal(authPage.status,200);assert.equal(authPage.headers.get('referrer-policy'),'no-referrer');assert.match(authPage.headers.get('cache-control'),/no-store/);
   assert.equal(authPage.headers.get('x-frame-options'),'DENY');assert.equal(authPage.headers.get('x-content-type-options'),'nosniff');assert.match(authPage.headers.get('content-security-policy'),/frame-ancestors 'none'/);
   const protectedPage=await fetch(base+'/studio');assert.equal(protectedPage.status,200);assert.equal(protectedPage.headers.get('x-frame-options'),'DENY');assert.equal(protectedPage.headers.get('referrer-policy'),'strict-origin-when-cross-origin');await protectedPage.body.cancel();
   await request('/api/auth/apple/start',undefined,'',503);
@@ -275,6 +277,15 @@ try{
   const body={title:'Cloudflare Published Drama',description:'A real upload used to validate durable financial and media storage.',language:'cmn',genres:['romance'],themes:['revenge','hidden-identity','entrepreneurship'],format:'animation',creation_type:'human',price_cents:51,free_episodes:1};
   await request('/api/studio/series',{...body,price_cents:101},publisher,400);
   const sid=(await request('/api/studio/series',body,publisher,201)).data.id;
+  const duplicateName='  '+body.title.toUpperCase().replaceAll(' ','   ')+'  ';
+  const availability=title=>'/api/studio/title-availability?'+new URLSearchParams({title});
+  await request(availability(body.title),undefined,'',401);
+  assert.deepEqual((await request(availability(duplicateName),undefined,publisher)).data,{available:false});
+  assert.deepEqual((await request(availability(body.title)+'&exclude='+sid,undefined,publisher)).data,{available:true});
+  const duplicate=(await request('/api/studio/series',{...body,title:duplicateName},publisher,409)).data;
+  assert.equal(duplicate.error.code,'SERIES_TITLE_EXISTS');
+  assert.ok(!(await(await fetch(base+'/sitemap.xml')).text()).includes(`/series/${sid}`),'A private draft must not appear in the public sitemap.');
+  console.log('PASS: global normalized duplicate titles are refused atomically while the current series retains its own name and private drafts stay out of discovery.');
   await request(`/api/studio/series/${sid}`,{...body,price_cents:101},publisher,400,'PATCH');
   const privateClassification=(await request(`/api/studio/series/${sid}`,undefined,publisher)).data.series;
   assert.deepEqual(privateClassification.themes,body.themes);assert.equal(privateClassification.format,body.format);
@@ -384,7 +395,15 @@ try{
   const publishedAt=newest[0].published_at;assert.ok(Number.isFinite(Date.parse(publishedAt)));
   await request(`/api/studio/series/${sid}/status`,{status:'published'},publisher);
   assert.equal((await request(newestPath)).data.series[0].published_at,publishedAt);
-  const image=await fetch(base+`/api/series/${sid}/cover`);assert.equal(image.headers.get('content-type'),'image/jpeg');assert.deepEqual(Buffer.from(await image.arrayBuffer()),cover);
+  const publishedSearchPage=await fetch(base+'/series/'+sid);assert.equal(publishedSearchPage.status,200);
+  assert.equal(publishedSearchPage.headers.get('link'),`<${base}/series/${sid}>; rel="canonical"`);
+  assert.equal(publishedSearchPage.headers.get('cache-control'),'private, no-store');
+  const searchHtml=await publishedSearchPage.text();assert.ok(searchHtml.includes(body.title));assert.match(searchHtml,/TVSeries/);assert.match(searchHtml,/data-search-snapshot/);
+  assert.ok((await(await fetch(base+'/sitemap.xml')).text()).includes(`/series/${sid}`));
+  assert.equal((await request(`/api/series/${sid}`)).headers.get('x-robots-tag'),'noindex','Public JSON is available for rendering, but the HTML series page is the indexable document.');
+  const privateSearchPage=await fetch(base+'/account');assert.equal(privateSearchPage.status,200);assert.match(privateSearchPage.headers.get('x-robots-tag'),/noindex/);await privateSearchPage.body.cancel();
+  console.log('PASS: published series receive crawlable HTML, unique canonical metadata and JSON-LD; the live sitemap updates without exposing private account pages.');
+  const image=await fetch(base+`/api/series/${sid}/cover`);assert.equal(image.headers.get('content-type'),'image/jpeg');assert.equal(image.headers.get('x-robots-tag'),null,'Public poster images must remain crawlable.');assert.deepEqual(Buffer.from(await image.arrayBuffer()),cover);
   const free=await fetch(base+`/api/episodes/${first.id}/stream`,{headers:{Range:'bytes=0-31'}});assert.equal(free.status,206);assert.equal((await free.arrayBuffer()).byteLength,32);
   await request(`/api/episodes/${second.id}/stream`,undefined,'',403);
   console.log('PASS: R2 covers and videos, quota accounting, publication, byte ranges, 301-second and over-200 MiB rejection.');
@@ -840,7 +859,8 @@ try{
   await request('/api/payments/checkout',{kind:'funding',amount_cents:500},viewer,503);
   await request(`/api/payments/${funding.paymentId}/demo-confirm`,{},viewer,404);
   const login=await request('/api/auth/login',{email:'viewer@example.test',password});assert.match(login.headers.get('set-cookie'),/Secure/);assert.match(login.headers.get('set-cookie'),/HttpOnly/);
-  const page=await fetch(base+'/studio');assert.equal(page.status,200);assert.match(await page.text(),/<div id="root"><\/div>/);
+  const page=await fetch(base+'/studio');assert.equal(page.status,200);assert.match(page.headers.get('x-robots-tag'),/noindex/);
+  const privateShell=await page.text();assert.match(privateShell,/<div id="root">/);assert.match(privateShell,/data-search-snapshot/);assert.ok(!privateShell.includes(body.title),'The generic private-page shell must not expose creator details.');
   const restartedPromotions=(await request('/api/admin/promotions',undefined,admin)).data;assert.equal(restartedPromotions.promotions.find(row=>row.id===managedPromotion.id).amount_hkd_cents,6800);assert.equal(restartedPromotions.promotions.find(row=>row.id===managedPromotion.id).max_redemptions,2);
   assert.equal((await request('/api/auth/me',undefined,promotion)).data.user.dramio_pass.active,true);
   assert.equal((await request('/api/wallet',undefined,promotion)).data.ledger.find(row=>row.kind==='activation').payment_amount_cents,5800);

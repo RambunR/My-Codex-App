@@ -65,7 +65,7 @@ test('content administration requires an administrator and leaves paid Pass owne
     assert.equal((await bytes(`/api/admin/episodes/${drama.episode}/stream`,actor)).status,403);
   }
   const before=moneySnapshot();
-  const created=await request('/api/studio/series',details,administrator);assert.equal(created.status,201,JSON.stringify(created.data));
+  const created=await request('/api/studio/series',{...details,title:'Administrator original '+randomUUID()},administrator);assert.equal(created.status,201,JSON.stringify(created.data));
   const me=await request('/api/auth/me',undefined,administrator);assert.equal(me.data.user.publisher_active,0);assert.equal(me.data.user.dramio_pass.active,false);
   assert.deepEqual(moneySnapshot(),before);
   const list=await request('/api/admin/series?limit=1&page=1',undefined,administrator);assert.equal(list.status,200);assert.equal(list.data.series.length,1);assert.equal(list.data.limit,1);assert.ok(list.data.total>=2);

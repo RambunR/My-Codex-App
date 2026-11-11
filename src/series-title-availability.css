@@ -1,0 +1,2 @@
+.series-title-availability{display:block;min-width:0;font-size:12px;line-height:1.6;overflow-wrap:anywhere}
+.series-title-availability[data-status="available"]{color:#8ee2aa}

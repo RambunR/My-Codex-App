@@ -28,8 +28,8 @@ async function request(route:string,body?:unknown,actor?:Actor,status=200,method
   const response=await fetch(base+route,{method,headers:{...(actor?{Cookie:actor.cookie}:{}),...(body===undefined?{}:{'Content-Type':'application/json',Origin:origin})},body:body===undefined?undefined:JSON.stringify(body)});
   const data=await response.json();assert.equal(response.status,status,method+' '+route+': '+JSON.stringify(data));return data;
 }
-async function create(values:Record<string,unknown>={}){return(await request('/api/studio/series',{...details,...values},owner,201)).id as string;}
-async function edit(id:string,values:Record<string,unknown>={},actor=owner,status=200){return request('/api/studio/series/'+id,{...details,...values},actor,status,'PATCH');}
+async function create(values:Record<string,unknown>={}){return(await request('/api/studio/series',{...details,title:'Subtitle metadata '+randomUUID(),...values},owner,201)).id as string;}
+async function edit(id:string,values:Record<string,unknown>={},actor=owner,status=200){const current=one('SELECT title FROM series WHERE id=?',id)!;return request('/api/studio/series/'+id,{...details,title:current.title,...values},actor,status,'PATCH');}
 async function read(id:string){return(await request('/api/studio/series/'+id,undefined,owner)).series;}
 function preserved(){return{users:all('SELECT * FROM users ORDER BY id'),episodes:all('SELECT * FROM episodes ORDER BY id'),purchases:all('SELECT * FROM purchases ORDER BY id'),testPurchases:all('SELECT * FROM test_purchases ORDER BY id'),payments:all('SELECT * FROM payments ORDER BY id'),ledger:all('SELECT * FROM ledger ORDER BY id')};}
 before(async()=>{

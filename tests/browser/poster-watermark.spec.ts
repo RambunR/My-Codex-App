@@ -15,6 +15,7 @@ async function covers(page:Page,locale='en'){
     if(request.method()!=='GET'){writes.push(request.method()+' '+path);return route.abort();}
     if(path==='/api/auth/me')return route.fulfill({json:{user:account}});if(path==='/api/config')return route.fulfill({json:config});
     if(path==='/api/display-currency')return route.fulfill({json:{quote:{country:null,currency:'HKD',ratePerHkd:1,asOf:null}}});
+    if(path==='/api/studio/title-availability')return route.fulfill({json:{available:true}});
     if(path==='/api/series')return route.fulfill({json:{series:[series]}});
     if(path==='/api/series/'+series.id||path==='/api/studio/series/'+series.id)return route.fulfill({json:{series,episodes:[episode],episodes_revision:'poster-fixture',owner_storage:{used_bytes:0,quota_bytes:5*1024**3,storage_unlimited:true}}});
     if(path==='/api/history')return route.fulfill({json:{history:[{...series,episode_id:episode.id,episode_number:1,seconds:10,duration:60}]}});

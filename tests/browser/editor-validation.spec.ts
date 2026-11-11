@@ -59,7 +59,7 @@ test('short nonempty synopsis explains the required length, preserves the form, 
 
   const folder=await mkdtemp('/tmp/aidramio-validation-upload-');
   try{
-    await copyFile('/tmp/aidramio-browser-tests/objects/demo/preview.mp4',path.join(folder,'Episode_01.mp4'));
+    await copyFile('public/demo-preview.mp4',path.join(folder,'Episode_01.mp4'));
     const choosing=page.waitForEvent('filechooser');
     await page.getByRole('button',{name:'Choose a folder',exact:true}).click();
     await(await choosing).setFiles(folder);

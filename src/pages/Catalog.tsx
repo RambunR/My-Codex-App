@@ -2,7 +2,9 @@ import {seriesTitleClass} from '../series-title';
 import { useEffect,useState } from 'react';
 import { Link,useNavigate,useParams,useSearchParams } from 'react-router-dom';
 import { Play,ArrowUpRight,ArrowRight,Plus,Check,Sparkles,Globe2,Clapperboard,Film,Bookmark,LockKeyhole,Share2,SlidersHorizontal,Search,Flame,Clock3,ArrowDownUp,Heart,Eye,Tags,Coins } from 'lucide-react';
-import { useApi,post,api } from '../api';
+import { useApi,post,api,ApiError } from '../api';
+import {useSearchMetadata,searchSeriesFromPublic,searchClientOrigin} from '../useSearchMetadata';
+import {staticSearchDocument,seriesSearchDocument,missingSearchDocument} from '../../shared/search-discovery';
 import { useApp } from '../context';
 import { useI18n,type Key } from '../i18n';
 import {spokenLanguageName,spokenLanguageOptions} from '../spoken-language-locales';
@@ -28,6 +30,7 @@ const taxonomyLink=(axis:string,value:string)=>`/browse?${new URLSearchParams({[
 export function Home(){
   const{t,locale}=useI18n();const{user}=useApp();const{data,loading,error,refresh}=useApi<{series:Series[]}>('/api/series');
   const[genre,setGenre]=useState('all');const all=data?.series||[];
+  useSearchMetadata(staticSearchDocument('/',searchClientOrigin(),all.map(searchSeriesFromPublic)));
   const featured=useApi<{series:Series[]}>('/api/series?featured=true');
   const highlights=(featured.data?.series||all.filter(series=>series.featured===1)).filter(series=>series.featured===1);
   const heroAvailable=highlights.length>0||all.length>0;
@@ -46,6 +49,7 @@ export function Home(){
 export function Browse(){
   const{t,locale}=useI18n();const[params,setParams]=useSearchParams();const[q,setQ]=useState(params.get('q')||'');const query=new URLSearchParams(params);query.delete('tab');
   const{data,loading,error,refresh}=useApi<{series:Series[]}>(`/api/series?${query.toString()}`);
+  useSearchMetadata(staticSearchDocument('/browse',searchClientOrigin(),(data?.series||[]).map(searchSeriesFromPublic)));
   const filter=(key:string,value:string)=>{
     // BrowserRouter writes history before its deferred render. Read the latest
     // URL so a quick second selection retains the first pending filter change.
@@ -56,10 +60,12 @@ export function Browse(){
 }
 export function Rankings(){
   const{t,locale}=useI18n();const{data,loading,error,refresh}=useApi<{series:Series[]}>('/api/series?sort=popular');
+  useSearchMetadata(staticSearchDocument('/rankings',searchClientOrigin(),(data?.series||[]).map(searchSeriesFromPublic)));
   return <div className="page catalog-page rankings-page"><PageTitle eyebrow={t('originals')} title={t('rankings')} description={t('heroSubtitle')}/>{loading?<Loading/>:error?<ErrorState error={error} retry={refresh}/>:<div className="ranking-list">{data?.series.slice(0,10).map((s,i)=><Link to={`/series/${s.id}`} className="ranking-row" key={s.id}><span className={`ranking-position ${i<3?'top-three':''}`}>{String(i+1).padStart(2,'0')}</span><CoverThumbnail src={s.cover} alt={s.title} loading="lazy"/><div className="ranking-text"><span className="eyebrow">{t(genreKey(s.genres[0]))} · {spokenLanguageName(s.language,locale)}</span><h2 className={seriesTitleClass(s.language)}>{s.title}</h2><p>{s.description}</p><span>{s.episode_count} {t('episodes')} · {s.free_episode_count??s.free_episodes} {t('freeEpisodes')}</span><SeriesEngagement series={s} compact/></div><span className="round-arrow"><Play size={18} fill="currentColor"/></span></Link>)}</div>}</div>;
 }
 export function SeriesDetail(){
   const{id}=useParams();const{t,locale}=useI18n();const{user,toast}=useApp();const navigate=useNavigate();const{data,loading,error,refresh,setData}=useApi<{series:Series;episodes:Episode[]}>(`/api/series/${id}`);const[busy,setBusy]=useState(false);const[liking,setLiking]=useState(false);
+  useSearchMetadata(error instanceof ApiError&&error.status===404?missingSearchDocument('/series/'+encodeURIComponent(id||''),searchClientOrigin()):data&&data.series.id===id?data.series.status==='published'&&data.series.episode_count>0?seriesSearchDocument(searchSeriesFromPublic(data.series),searchClientOrigin()):{...staticSearchDocument('/auth',searchClientOrigin()),canonical:searchClientOrigin()+'/series/'+encodeURIComponent(id||'')}:undefined);
   const related=useApi<{series:Series[]}>(data?`/api/series?genre=${data.series.genres[0]}`:undefined);
   if(loading)return <Loading/>;if(error)return <ErrorState error={error} retry={refresh}/>;if(!data)return null;const series=data.series;
   const save=async()=>{if(!user){navigate(`/auth?next=/series/${id}`);return;}setBusy(true);try{await post(`/api/series/${id}/save`);refresh();}catch(e){toast((e as Error).message,true);}finally{setBusy(false);}};

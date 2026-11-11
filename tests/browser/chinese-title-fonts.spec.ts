@@ -16,6 +16,7 @@ async function fixture(page:Page,locale:string,authenticated=false){
     const detail={series:current,episodes:[{id:release.first_episode_id,series_id:release.id,title,number:1,duration:12,bytes:100,free:true,unlocked:true}],owner_storage:{quota_bytes:account.quota_bytes,used_bytes:0,storage_unlimited:true}};
     if(path==='/api/auth/me')return route.fulfill({json:{user:authenticated?account:null}});
     if(path==='/api/config')return route.fulfill({json:{brand:'LingYing',paymentsMode:'disabled',demo:false,usdToHkd:7.8,payoutsEnabled:false,uploadsEnabled:true,limits:{}}});
+    if(path==='/api/studio/title-availability')return route.fulfill({json:{available:true}});
     if(path==='/api/series')return route.fulfill({json:{series:[current],total:1}});
     if(path===`/api/series/${release.id}`||path===`/api/studio/series/${release.id}`)return route.fulfill({json:detail});
     if(path==='/api/studio')return route.fulfill({json:{user:account,series:[current],stats:{sales:0,lifetime_micros:0},withdrawals:[],storageRequests:[]}});
