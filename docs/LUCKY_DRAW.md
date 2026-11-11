@@ -2,7 +2,9 @@
 
 The account promotion is available at **https://lingyingdrama.com/lucky-draw**. Guests may see the current public pool, but must register or sign in before drawing. Registration and sign-in preserve the return to this page. Each account, including existing accounts, starts with **one free welcome chance**; it is not a daily allowance. There is no payment endpoint for chances, no cash prize and no dependence on wallet funding or buying Dramio Pass.
 
-The gift-box illustration and opening/confetti animation are original CSS artwork inspired by the supplied gift-box reference. The watermarked stock image is not embedded. Reduced-motion settings disable the animation; the announced result and controls remain usable.
+The gift uses a generated pearl-and-plum 3D illustration, exported as a 121 KiB transparent WebP. CSS masks lift the lid while the actual saved winning cover rises from behind the front of the box. The reveal begins only after the server has confirmed the award; it does not pick a prize in the browser. Reduced-motion users receive the result immediately without the moving reveal. The supplied watermarked stock image is not embedded.
+
+After the cover emerges, a focused result dialog shows the title, genres, episode count, drama language, public creator name, upload date, first publication date, synopsis and draw time. The upload date is the earliest valid upload timestamp among currently present episodes, normalised to UTC; it is not guessed from series creation. Older responses without that field omit it. **View it now** opens the awarded drama. **Close and watch later**, Escape and the close button dismiss the panel while preserving the server award. **View prize details** in the saved list reopens the panel without another draw. Unavailable content exposes only the existing minimal receipt, with no play action or removed metadata. No new storage or receipt migration is needed. The public pool header `X-LingYing-Lucky-Draw: gift-reveal-v2` supports read-only rollout verification.
 
 ## Administrator controls
 

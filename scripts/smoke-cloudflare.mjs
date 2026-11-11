@@ -462,6 +462,7 @@ try{
   console.log('PASS: optional final-episode pricing handles sparse order, guest playback, no-charge unlocks, opt-out/default/omitted metadata and acknowledged reorders.');
 
   const luckyPage=await fetch(base+'/lucky-draw');assert.equal(luckyPage.status,200);assert.match(await luckyPage.text(),/noindex/);
+  const luckyVersion=await fetch(base+'/api/lucky-draw/pool');assert.equal(luckyVersion.headers.get('x-lingying-lucky-draw'),'gift-reveal-v2');await luckyVersion.body.cancel();
   await request('/api/lucky-draw',undefined,'',401);await request('/api/lucky-draw/draw',{request_id:randomUUID()},'',401);await request('/api/admin/lucky-draw/pool',undefined,viewer,403);
   const luckyRegistration=await request('/api/auth/register',{email:'lucky-draw@example.test',name:'Local Lucky Viewer',password},'',201),luckyViewer=luckyRegistration.cookie,luckyUserId=luckyRegistration.data.user.id;
   assert.equal((await request('/api/lucky-draw',undefined,luckyViewer)).data.remaining,1);
@@ -472,7 +473,7 @@ try{
   await request('/api/admin/lucky-draw/pool/'+finaleId,{enabled:true},admin,200,'PUT');
   const luckyWalletBefore=(await request('/api/wallet',undefined,luckyViewer)).data,luckyRequestId=randomUUID();
   const luckyDraw=(await request('/api/lucky-draw/draw',{request_id:luckyRequestId},luckyViewer)).data;
-  assert.equal(luckyDraw.remaining,2);assert.equal(luckyDraw.used,1);assert.equal(luckyDraw.draw.series.id,finaleId);assert.match(luckyDraw.draw.drawn_at,/T.*Z$/);
+  assert.equal(luckyDraw.remaining,2);assert.equal(luckyDraw.used,1);assert.equal(luckyDraw.draw.series.id,finaleId);assert.match(luckyDraw.draw.drawn_at,/T.*Z$/);assert.match(luckyDraw.draw.series.uploaded_at,/^\d{4}-\d\d-\d\dT.*Z$/);
   assert.deepEqual((await request('/api/lucky-draw/draw',{request_id:luckyRequestId},luckyViewer)).data,luckyDraw);
   assert.equal((await request(`/api/lucky-draw/draws/${luckyRequestId}`,undefined,viewer,404)).data.error.code,'DRAW_NOT_FOUND');
   assert.ok((await request('/api/series/'+finaleId,undefined,luckyViewer)).data.episodes.every(episode=>episode.unlocked));

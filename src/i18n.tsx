@@ -1,3 +1,4 @@
+import {luckyRevealEnglish,luckyRevealMessages} from './lucky-reveal-locales';
 import {luckyDrawEnglish,luckyDrawMessages} from './lucky-draw-locales';
 import {wechatVerificationEnglish,wechatVerificationMessages} from './wechat-verification-locales';
 import {seriesTitleAvailabilityEnglish,seriesTitleAvailabilityMessages} from './series-title-availability-locales';
@@ -30,6 +31,7 @@ import {transactionFeeEnglish,transactionFeeMessages} from './transaction-fee-lo
 import {testPayoutEnglish,testPayoutMessages} from './test-payout-locales';
 
 const en = {
+  ...luckyRevealEnglish,
   ...luckyDrawEnglish,
   ...ownerEpisodeEnglish,
   ...seriesTitleAvailabilityEnglish,
@@ -217,6 +219,7 @@ for(const language of LANGUAGES)if(language.code!=='en')Object.assign(dictionari
 for(const language of LANGUAGES)if(language.code!=='en')Object.assign(dictionaries[language.code],wechatAuthMessages[language.code]);
 for(const language of LANGUAGES)if(language.code!=='en')Object.assign(dictionaries[language.code],wechatVerificationMessages[language.code]);
 for(const language of LANGUAGES)if(language.code!=='en')Object.assign(dictionaries[language.code],luckyDrawMessages[language.code]);
+for(const language of LANGUAGES)if(language.code!=='en')Object.assign(dictionaries[language.code],luckyRevealMessages[language.code]);
 for(const language of LANGUAGES)Object.assign(dictionaries[language.code],seriesTitleAvailabilityMessages[language.code]);
 for(const language of LANGUAGES)Object.assign(dictionaries[language.code],ownerEpisodeMessages[language.code]);
 const uploadConfirmationMessages:Record<Locale,string>={

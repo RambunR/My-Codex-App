@@ -25,3 +25,7 @@ Cover photography is downloaded from Unsplash's image service and hosted locally
 Source URL format: `https://images.unsplash.com/<photo identifier>`. [Unsplash licence](https://unsplash.com/license). Demo artwork is not an endorsement by the pictured people and should be replaced with the publisher's own licensed cover artwork for real series.
 
 DM Sans and Playfair Display are hosted locally. Their SIL Open Font License files are in `public/fonts/`. Lucide icons are provided by `lucide-react` under its ISC licence.
+
+## Lucky Draw gift
+
+`public/images/lucky-gift-luxe-v2.webp` is original AI-generated artwork created for LingYing on 12 November 2026, optimised to a transparent 896-pixel WebP. The source PNG remains in the generation workspace. CSS masks display and animate its lid/base; publisher covers are shown separately and retain their original files and watermark. The user’s stock-image reference is not embedded or copied.
