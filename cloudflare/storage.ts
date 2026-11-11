@@ -3,7 +3,7 @@ import type {Request,Response} from 'express';
 import {getRuntime,finishInBackground} from './runtime';
 import {AppError,assert} from '../server/errors';
 import {DEMO_PREVIEW_BYTES} from './preview-meta';
-import {MAX_EPISODE_SECONDS} from '../shared/config';
+import {MAX_EPISODE_SECONDS,MAX_TRACKED_EPISODE_SECONDS} from '../shared/config';
 
 const mime=new Map<string,string>();
 async function range(key:string,offset:number,length:number){const object=await getRuntime().env.MEDIA.get(key,{range:{offset,length}});assert(object,404,'MEDIA_UNAVAILABLE','Media file not found.');return Buffer.from(await object.arrayBuffer());}
@@ -33,7 +33,7 @@ function trackDuration(track:Box,media:Timing,movieScale:number,kind:string){
   // short edit cannot conceal a longer audio track. Retain the raw video bound.
   return Math.max(presentation,kind==='soun'?(media.ticks-start)/media.scale:media.seconds);
 }
-export async function prepareVideo(key:string){
+export async function prepareVideo(key:string,maxSeconds:number|null=MAX_EPISODE_SECONDS){
   const bucket=getRuntime().env.MEDIA;const head=await bucket.head(key);assert(head,404,'MEDIA_UNAVAILABLE','Media file not found.');
   let offset=0;let moov:Buffer|undefined;let foundFormat=false;let seen=0;
   while(offset+8<=head.size){assert(++seen<=200,422,'INVALID_VIDEO','The video container is too complex.');const header=await range(key,offset,Math.min(16,head.size-offset));let length=header.readUInt32BE(0);const type=header.toString('ascii',4,8);let headerLength=8;if(length===1){assert(header.length>=16,422,'INVALID_VIDEO','Invalid video container.');length=Number(header.readBigUInt64BE(8));headerLength=16;}if(length===0)length=head.size-offset;assert(Number.isSafeInteger(length)&&length>=headerLength&&offset+length<=head.size,422,'INVALID_VIDEO','Invalid video container.');
@@ -49,7 +49,7 @@ export async function prepareVideo(key:string){
     if(kind==='vide'){assert(codec==='avc1'||codec==='avc3',422,'INVALID_VIDEO','Use an H.264 MP4 video. HEVC/AV1 videos must be exported as H.264 first.');video=true;}
     else assert(codec==='mp4a',422,'INVALID_VIDEO','Use AAC audio in your MP4 video.');
   }
-  assert(video&&Number.isFinite(seconds)&&seconds>0,422,'INVALID_VIDEO','This file has no readable video track.');assert(seconds<=MAX_EPISODE_SECONDS,422,'VIDEO_TOO_LONG',`Episodes must be ${MAX_EPISODE_SECONDS/60} minutes or less.`);if(key.startsWith('tmp/'))mime.set(key,'video/mp4');return{path:key,bytes:head.size,duration:seconds};
+  assert(video&&Number.isFinite(seconds)&&seconds>0&&seconds<=MAX_TRACKED_EPISODE_SECONDS,422,'INVALID_VIDEO','This file has no safely readable video duration.');if(maxSeconds!==null)assert(seconds<=maxSeconds,422,'VIDEO_TOO_LONG',`Episodes must be ${maxSeconds/60} minutes or less.`);if(key.startsWith('tmp/'))mime.set(key,'video/mp4');return{path:key,bytes:head.size,duration:seconds};
 }
 export async function prepareCover(key:string){const head=await getRuntime().env.MEDIA.head(key);assert(head&&head.size<=5*1024*1024,422,'INVALID_IMAGE','Covers must be no larger than 5 MB.');const b=await range(key,0,Math.min(16,head.size));let type='';if(b[0]===255&&b[1]===216&&b[2]===255)type='image/jpeg';else if(b.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])))type='image/png';else if(b.toString('ascii',0,4)==='RIFF'&&b.toString('ascii',8,12)==='WEBP')type='image/webp';assert(type,422,'INVALID_IMAGE','Please use a JPEG, PNG, or WebP cover.');mime.set(key,type);return{path:key,bytes:head.size};}
 export async function putObject(source:string,key:string,contentType:string){const bucket=getRuntime().env.MEDIA;const body=await bucket.get(source);assert(body,404,'MEDIA_UNAVAILABLE','Upload is unavailable.');await bucket.put(key,body.body,{httpMetadata:{contentType:mime.get(source)||contentType}});}

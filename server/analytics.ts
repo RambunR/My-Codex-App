@@ -4,7 +4,7 @@ import {assert} from './errors.js';
 import {config} from './config.js';
 import {purchaseTable,usingTestPaymentState} from './payment-state.js';
 import {publicSeriesAllowedSql} from './moderation.js';
-import {MAX_EPISODE_SECONDS} from '../shared/config.js';
+import {MAX_EPISODE_SECONDS,MAX_TRACKED_EPISODE_SECONDS} from '../shared/config.js';
 import {episodeDurationSql} from './episode-duration.js';
 import {playbackTimeSql,playbackSessionFieldsSql,LEGACY_PLAYBACK_MAX_MS} from './playback-times.js';
 import type {AnalyticsMetrics,AnalyticsRange,AnalyticsRangeInput,PlaybackReceipt,SeriesAnalytics} from '../shared/analytics.js';
@@ -47,12 +47,17 @@ export function startPlayback(episodeId:string,viewerKey:string,now=Date.now()):
 // previously clipped report must never credit the discarded time on a retry.
 export function recordPlayback(sessionId:string,viewerKey:string,cumulativeWatchedMs:number,now=Date.now()):PlaybackReceipt {
   validViewer(viewerKey);
-  assert(Number.isSafeInteger(cumulativeWatchedMs)&&cumulativeWatchedMs>=0&&cumulativeWatchedMs<=MAX_EPISODE_SECONDS*1000,400,'INVALID_WATCH_TIME','Enter valid cumulative playback time.');
+  assert(Number.isSafeInteger(cumulativeWatchedMs)&&cumulativeWatchedMs>=0&&cumulativeWatchedMs<=MAX_TRACKED_EPISODE_SECONDS*1000,400,'INVALID_WATCH_TIME','Enter valid cumulative playback time.');
   return transaction(()=>{
     const session=one<PlaybackSession&{duration:number;series_id:string}>(`SELECT ${playbackSessionFieldsSql()},${episodeDurationSql()} AS duration,e.series_id FROM playback_sessions p JOIN episodes e ON e.id=p.episode_id WHERE p.id=? AND p.viewer_key=?`,sessionId,viewerKey);
     assert(session,404,'NOT_FOUND','Playback session not found.');
     assertSeriesRecordable(session.series_id);
-    assert(now-session.started_at_ms<=SESSION_WINDOW,409,'PLAYBACK_EXPIRED','Restart playback to continue recording viewing activity.');
+    // Preserve the existing short-episode report ceiling and replay high-water
+    // mark, while long episodes may report their actual persisted duration.
+    assert(cumulativeWatchedMs<=Math.max(MAX_EPISODE_SECONDS,session.duration)*1000,400,'INVALID_WATCH_TIME','Enter valid cumulative playback time.');
+    const durationMs=Math.ceil(session.duration*1000);
+    const lifetime=session.duration>MAX_EPISODE_SECONDS?Math.min(Number.MAX_SAFE_INTEGER,durationMs+SESSION_WINDOW):SESSION_WINDOW;
+    assert(now-session.started_at_ms<=lifetime,409,'PLAYBACK_EXPIRED','Restart playback to continue recording viewing activity.');
     const requested=Math.max(0,cumulativeWatchedMs-Math.max(session.reported_ms,session.watched_ms));
     const increase=Math.min(requested,Math.max(0,now-session.last_seen_ms),MAX_HEARTBEAT_MS);
     const watchedMs=Math.min(Math.floor(session.duration*1000),session.watched_ms+increase);
@@ -64,7 +69,8 @@ export function recordPlayback(sessionId:string,viewerKey:string,cumulativeWatch
     const reportedMs=Math.max(session.reported_ms,cumulativeWatchedMs);
     run('UPDATE playback_sessions SET watched_ms=?,reported_ms=?,last_seen_ms=?,counted_view=?,qualified_at_ms=? WHERE id=?',Math.min(LEGACY_PLAYBACK_MAX_MS,watchedMs),Math.min(LEGACY_PLAYBACK_MAX_MS,reportedMs),now,qualifies?1:0,session.qualified_at_ms??(qualifies?now:null),session.id);
     if(watchedMs>LEGACY_PLAYBACK_MAX_MS||reportedMs>LEGACY_PLAYBACK_MAX_MS)run('INSERT INTO playback_session_times (session_id,watched_ms,reported_ms) VALUES (?,?,?) ON CONFLICT(session_id) DO UPDATE SET watched_ms=excluded.watched_ms,reported_ms=excluded.reported_ms',session.id,Math.min(240000,watchedMs),Math.min(240000,reportedMs));
-    if(watchedMs>240000||reportedMs>240000)run('INSERT INTO playback_session_times_extended (session_id,watched_ms,reported_ms) VALUES (?,?,?) ON CONFLICT(session_id) DO UPDATE SET watched_ms=excluded.watched_ms,reported_ms=excluded.reported_ms',session.id,watchedMs,reportedMs);
+    if(watchedMs>240000||reportedMs>240000)run('INSERT INTO playback_session_times_extended (session_id,watched_ms,reported_ms) VALUES (?,?,?) ON CONFLICT(session_id) DO UPDATE SET watched_ms=excluded.watched_ms,reported_ms=excluded.reported_ms',session.id,Math.min(MAX_EPISODE_SECONDS*1000,watchedMs),Math.min(MAX_EPISODE_SECONDS*1000,reportedMs));
+    if(watchedMs>MAX_EPISODE_SECONDS*1000||reportedMs>MAX_EPISODE_SECONDS*1000)run('INSERT INTO playback_session_times_long (session_id,watched_ms,reported_ms) VALUES (?,?,?) ON CONFLICT(session_id) DO UPDATE SET watched_ms=excluded.watched_ms,reported_ms=excluded.reported_ms',session.id,watchedMs,reportedMs);
     return{sessionId:session.id,watchedMs,reportedMs,viewCounted:qualifies};
   });
 }

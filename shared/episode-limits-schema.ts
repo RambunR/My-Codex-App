@@ -1,4 +1,4 @@
-import {MAX_EPISODE_SECONDS} from './config.js';
+import {MAX_EPISODE_SECONDS,MAX_TRACKED_EPISODE_SECONDS} from './config.js';
 
 // Retain the historical 180/240-second tables and all referenced rows.
 export const EPISODE_LIMITS_SCHEMA=`
@@ -10,6 +10,18 @@ CREATE TABLE IF NOT EXISTS playback_session_times_extended (
  session_id TEXT PRIMARY KEY REFERENCES playback_sessions(id) ON DELETE CASCADE,
  watched_ms INTEGER NOT NULL CHECK(watched_ms>=0 AND watched_ms<=${MAX_EPISODE_SECONDS*1000}),
  reported_ms INTEGER NOT NULL CHECK(reported_ms>=0 AND reported_ms<=${MAX_EPISODE_SECONDS*1000})
+);
+-- Existing extended tables retain their 300-second constraints. Longer owner
+-- episodes and measured totals use another additive tier without rebuilding
+-- episodes, sessions or their financial foreign keys.
+CREATE TABLE IF NOT EXISTS episode_durations_long (
+ episode_id TEXT PRIMARY KEY REFERENCES episodes(id) ON DELETE CASCADE,
+ seconds REAL NOT NULL CHECK(seconds>0 AND seconds<=${MAX_TRACKED_EPISODE_SECONDS})
+);
+CREATE TABLE IF NOT EXISTS playback_session_times_long (
+ session_id TEXT PRIMARY KEY REFERENCES playback_sessions(id) ON DELETE CASCADE,
+ watched_ms INTEGER NOT NULL CHECK(watched_ms>=0 AND watched_ms<=${MAX_TRACKED_EPISODE_SECONDS*1000}),
+ reported_ms INTEGER NOT NULL CHECK(reported_ms>=0 AND reported_ms<=${MAX_TRACKED_EPISODE_SECONDS*1000})
 );
 CREATE TABLE IF NOT EXISTS episode_price_cap_events (
  id INTEGER PRIMARY KEY,series_id TEXT NOT NULL REFERENCES series(id),policy_key TEXT NOT NULL,

@@ -9,6 +9,6 @@ export const episodeUploadStorage:EpisodeUploadStorage={
   async complete(key,id,parts){await getRuntime().env.MEDIA.resumeMultipartUpload(key,id).complete(parts);},
   async abort(key,id){await getRuntime().env.MEDIA.resumeMultipartUpload(key,id).abort();},
   async head(key){const head=await getRuntime().env.MEDIA.head(key);return head?{size:head.size}:null;},
-  async validate(key){const result=await prepareVideo(key);return{bytes:result.bytes,duration:result.duration};},
+  async validate(key,maxSeconds){const result=await prepareVideo(key,maxSeconds);return{bytes:result.bytes,duration:result.duration};},
   async remove(key){await getRuntime().env.MEDIA.delete(key);},
 };

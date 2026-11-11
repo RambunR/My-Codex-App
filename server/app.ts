@@ -39,6 +39,7 @@ import {initializePromotions,adminPromotions,createPromotion,updatePromotion,quo
 import {themesSchema,formatSchema,seriesClassification,writeSeriesClassification,SERIES_FORMAT_SQL} from './taxonomy.js';
 import {registerEpisodeUploadSessions,chunkedEpisodeUploadsEnabled,EPISODE_UPLOAD_CHUNK_BYTES,reservedEpisodeUploadBytes,cleanupExpiredEpisodeUploads} from './episode-upload-sessions.js';
 import {episodeDurationSql,legacyEpisodeDuration,writeEpisodeDuration} from './episode-duration.js';
+import {episodeUploadLimits,assertEpisodeUploadDuration} from './episode-upload-policy.js';
 import {responseSecurityHeaders} from '../shared/security-headers.js';
 import {registerEpisodeBatch,episodeBatchRevision,assertEpisodeBatchWritable,deleteSingleEpisode} from './episode-batch.js';
 import {WALLET_FUNDING_OPTIONS} from '../shared/funding-rewards.js';
@@ -190,7 +191,7 @@ export function createApp() {
   registerAppleAuth(app);
   registerEmailAuth(app);
   registerPublisherProfiles(app,{catalogSelect,serializeSeries});
-  app.get('/api/health', (_req,res) => res.json({ ok: true, database: !!one('SELECT 1 AS ready') }));
+  app.get('/api/health', (_req,res) => res.setHeader('X-LingYing-Upload-Policy','owner-duration-v1').json({ ok: true, database: !!one('SELECT 1 AS ready') }));
   app.get('/api/config', async (_req,res) => {initializePromotions();if(config.payments==='stripe'&&stripeConfigured())await ensureStripeWebhookReady(stripe);return res.json({ brand: 'LingYing', languages: LANGUAGES, spokenLanguages:SPOKEN_LANGUAGES, genres: GENRES,standardGenres:STANDARD_GENRES,storyThemes:STORY_THEMES,formats:SERIES_FORMATS,creationTypes:CREATION_TYPES, passPromotion:{enabled:true},creatorPassConsent:{policyVersion:LEGAL_POLICY_VERSION,disclosureVersion:CREATOR_PASS_DISCLOSURE_VERSION},paymentMethods:{wechatPay:wechatPayEnabled()},paymentsMode: config.payments,paymentsReady:paymentsReady(),paymentsConfigured:stripeConfigured(),paymentSetup:stripeWebhookReadiness(),sandbox:config.sandbox,paymentsTestMode:stripeTestPayments()||config.payments==='demo',payoutsEnabled:config.payoutsEnabled&&!stripeTestPayments(),uploadsEnabled:!config.sandbox,usdToHkd: config.usdToHkd,
     limits: { maxEpisodeSeconds: MAX_EPISODE_SECONDS, maxEpisodeBytes: MAX_EPISODE_BYTES, quotaBytes: DEFAULT_QUOTA_BYTES, activationHkd: 88, minimumPriceUsd: MIN_PRICE_CENTS/100,maximumPriceUsd:MAX_PRICE_CENTS/100, creatorShare: 0.7, minimumPayoutUsd: WITHDRAWAL_POLICY.minimumCents/100,minWalletFundingUsd:MIN_WALLET_FUNDING_CENTS/100,maxWalletFundingUsd:MAX_WALLET_FUNDING_CENTS/100 },withdrawalPolicy:WITHDRAWAL_POLICY,walletFunding:WALLET_FUNDING_OPTIONS, demo: config.seed,episodeUpload:{mode:chunkedEpisodeUploadsEnabled()?'chunked':'multipart',chunkBytes:EPISODE_UPLOAD_CHUNK_BYTES}, runtime: (config as any).runtime || 'node', videoFormats: (config as any).videoFormats || ['mp4','mov','webm','m4v'], auth:{wechat:wechatAuthEnabled(),google:googleEnabled(),apple:appleEnabled(),email:emailAuthEnabled()} });});
   app.get('/api/auth/me', (req,res) => res.json({ user: req.user || null }));
@@ -269,7 +270,7 @@ export function createApp() {
     res.json(startPlayback(e.id,playbackViewer(req,res,true)!));
   });
   app.put('/api/playback/:id', rateLimit('playback-heartbeat',180,60_000), (req,res)=>{
-    const {watchedMs}=z.object({watchedMs:z.number().int().min(0).max(MAX_EPISODE_SECONDS*1000)}).parse(req.body);
+    const {watchedMs}=z.object({watchedMs:z.number().int().min(0).max(Number.MAX_SAFE_INTEGER)}).parse(req.body);
     const viewer=playbackViewer(req,res);assert(viewer,404,'NOT_FOUND','Playback session not found.');
     const session=one('SELECT episode_id FROM playback_sessions WHERE id=? AND viewer_key=?',id(req),viewer);assert(session,404,'NOT_FOUND','Playback session not found.');
     const e=episodeRow(session.episode_id);assert(e,404,'NOT_FOUND','Episode not found.');assertSeriesAvailable(e.series_id);assert(canWatch(req.user?.id,e),403,'EPISODE_LOCKED','This episode is unavailable.');
@@ -278,7 +279,7 @@ export function createApp() {
   app.post('/api/episodes/:id/unlock', requireAuth, (req,res) => res.json({ ...unlockEpisode(req.user!.id,id(req)), user: getUser(req.user!.id) }));
   app.post('/api/episodes/:id/progress', requireAuth, (req,res) => {
     const e = episodeRow(id(req));assert(e,404,'NOT_FOUND','Episode not found.');assertSeriesAvailable(e.series_id,{viewerId:req.user?.id,allowOwnerPreview:true});assert(canWatch(req.user!.id,e),403,'EPISODE_LOCKED','Unlock this episode to watch.');
-    const { seconds } = z.object({ seconds: z.number().min(0).max(MAX_EPISODE_SECONDS) }).parse(req.body);
+    const { seconds } = z.object({ seconds: z.number().min(0).max(Math.max(MAX_EPISODE_SECONDS,e.duration)) }).parse(req.body);
     run("INSERT INTO progress (user_id,episode_id,seconds) VALUES (?,?,?) ON CONFLICT(user_id,episode_id) DO UPDATE SET seconds=excluded.seconds,updated_at=datetime('now')",req.user!.id,id(req),Math.min(seconds,e.duration)); res.json({ ok:true });
   });
   app.get('/api/history', requireAuth, (req,res) => {
@@ -349,7 +350,7 @@ export function createApp() {
   app.get('/api/studio/series/:id',requireAuth,(req,res)=>{
     ownSeries(req);const s=one(`${catalogSelect} WHERE s.id=?`,id(req))!;
     const episodes=all(`SELECT e.id,e.series_id,e.title,e.number,${episodeDurationSql('e')} AS duration,e.bytes FROM episodes e WHERE e.series_id=? ORDER BY e.number`,s.id);
-    res.setHeader('Cache-Control','private, no-store');res.json({series:serializeSeries(s,req.user!.id,true),episodes,episodes_revision:episodeBatchRevision(s.id),owner_storage:ownerStorage(s)});
+    res.setHeader('Cache-Control','private, no-store');res.json({series:serializeSeries(s,req.user!.id,true),episodes,episodes_revision:episodeBatchRevision(s.id),owner_storage:ownerStorage(s),owner_upload_limits:episodeUploadLimits(s.creator_id)});
   });
   app.get('/api/studio/series/:id/cover',requireAuth,async(req,res)=>{
     const s=ownSeries(req);assert(s.cover_key,404,'NOT_FOUND','Cover not found.');res.setHeader('Cache-Control','private, no-store');
@@ -409,8 +410,9 @@ export function createApp() {
       const body=z.object({title:z.string().trim().min(1).max(120),number:z.coerce.number().int().min(1).max(1000)}).parse(req.body);
       assert(!one('SELECT id FROM episodes WHERE series_id=? AND number=?',id(req),body.number),409,'EPISODE_EXISTS','An episode with this number already exists.');
       const u=ownerStorage(target);assert(withinStorageQuota(u,u.used_bytes+reservedEpisodeUploadBytes(target.creator_id)+req.file.size),413,'QUOTA_EXCEEDED','Not enough storage. Request an increase from your studio.');
-      processed=await prepareVideo(req.file.path);saved=true;await putObject(processed.path,key,'video/mp4');
-      const episodeId=transaction(()=>{const s=writableSeries(req);assertPaymentAccountClear(s.creator_id);const user=ownerStorage(s);assert(withinStorageQuota(user,user.used_bytes+reservedEpisodeUploadBytes(s.creator_id)+processed!.bytes),413,'QUOTA_EXCEEDED','Not enough storage. Request an increase.');
+      processed=await prepareVideo(req.file.path,episodeUploadLimits(target.creator_id).maxEpisodeSeconds);
+      assert(processed.bytes<=MAX_EPISODE_BYTES,413,'FILE_TOO_LARGE',`Processed episodes must be ${MAX_EPISODE_BYTES/1024**2} MiB or less.`);saved=true;await putObject(processed.path,key,'video/mp4');
+      const episodeId=transaction(()=>{const s=writableSeries(req);assertPaymentAccountClear(s.creator_id);assertEpisodeUploadDuration(s.creator_id,processed!.duration);const user=ownerStorage(s);assert(withinStorageQuota(user,user.used_bytes+reservedEpisodeUploadBytes(s.creator_id)+processed!.bytes),413,'QUOTA_EXCEEDED','Not enough storage. Request an increase.');
         assert(!one('SELECT id FROM episodes WHERE series_id=? AND number=?',id(req),body.number),409,'EPISODE_EXISTS','An episode with this number already exists.');
         const eid=crypto.randomUUID();run('INSERT INTO episodes (id,series_id,title,number,duration,bytes,storage_key,original_name) VALUES (?,?,?,?,?,?,?,?)',eid,id(req),body.title,body.number,legacyEpisodeDuration(processed!.duration),processed!.bytes,key,req.file!.originalname.slice(0,255));writeEpisodeDuration(eid,processed!.duration);run('UPDATE users SET used_bytes=used_bytes+? WHERE id=?',processed!.bytes,s.creator_id);return eid;});
       saved=false;res.status(201).json({id:episodeId,user:getUser(req.user!.id),owner_storage:ownerStorage(target),duration:processed.duration,bytes:processed.bytes});

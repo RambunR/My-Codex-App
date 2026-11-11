@@ -6,7 +6,7 @@ export interface EpisodeUploadStorage {
   complete(key:string,uploadId:string,parts:EpisodeUploadPart[]):Promise<void>;
   abort(key:string,uploadId:string):Promise<void>;
   head(key:string):Promise<{size:number}|null>;
-  validate(key:string):Promise<{bytes:number;duration:number}>;
+  validate(key:string,maxSeconds?:number|null):Promise<{bytes:number;duration:number}>;
   remove(key:string):Promise<void>;
 }
 const unavailable=async():Promise<any>=>{throw new Error('Chunked uploads are unavailable on this runtime.');};

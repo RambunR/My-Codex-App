@@ -14,7 +14,7 @@ const port=Number(process.env.CLOUDFLARE_TEST_PORT||8789),base=`http://127.0.0.1
 const bootstrap=randomBytes(32).toString('hex');
 const password='LocalSmokePassword123!';
 const maxEpisodeBytes=200*1024**2,chunkBytes=5*1024**2;
-let child,logs='';
+let child,logs='',durationOwnerId='';
 async function start(production=false,testStripe=false,publicOrigin=base,missingTestPair=false,wechatLogin=false){
   logs='';
   const args=['node_modules/wrangler/bin/wrangler.js','dev','--config',runtimeConfigPath,'--tsconfig',path.resolve('tsconfig.cloudflare.json'),'--local','--port',String(port),'--local-upstream',new URL(base).host,'--upstream-protocol','http','--inspector-port',String(port+400),'--persist-to',path.join(dir,'state'),
@@ -27,6 +27,7 @@ async function start(production=false,testStripe=false,publicOrigin=base,missing
   }
   if(wechatLogin)args.push('--var','WECHAT_APP_ID:wx1111111111111111','--var','WECHAT_APP_SECRET:11111111111111111111111111111111');
   args.push('--var',`PAYOUTS_ENABLED:${!production}`);
+  args.push('--var',`PLATFORM_OWNER_USER_ID:${durationOwnerId}`);
   // These disposable local fixtures exercise the catalogue and playback paths.
   // The production canonical host separately retires samples and never seeds.
   args.push('--var','SEED_CATALOG:true');
@@ -112,6 +113,7 @@ try{
   assert.deepEqual((await currencyResponse.json()).quote,{country:null,currency:'HKD',ratePerHkd:1,asOf:null});
   const currencyWrite=await fetch(base+'/api/display-currency',{method:'POST'});assert.equal(currencyWrite.status,405);await currencyWrite.body.cancel();
   console.log('PASS: local display-currency fallback is private, read-only, ignores spoofed country inputs and does not call an external provider.');
+  assert.equal((await request('/api/health')).headers.get('x-lingying-upload-policy'),'owner-duration-v1');
   for(const route of ['/','/?search-source=fixture']){
     const home=await fetch(base+route);
     assert.equal(home.status,200);assert.equal(home.headers.get('link'),`<${base}/>; rel="canonical"`);
@@ -865,6 +867,39 @@ try{
   assert.equal((await request('/api/auth/me',undefined,promotion)).data.user.dramio_pass.active,true);
   assert.equal((await request('/api/wallet',undefined,promotion)).data.ledger.find(row=>row.kind==='activation').payment_amount_cents,5800);
   console.log('PASS: full runtime restart retains sessions, wallet balances, purchases, and R2 media; production test payments disabled; secure cookies.');
+  // Only the configured immutable owner receives unlimited episode duration.
+  // Public profile selection and an administrator editing another publisher
+  // must never transfer that privilege. These are disposable local accounts.
+  assert.equal((await request('/api/auth/me',undefined,admin)).data.user.max_episode_seconds,300);
+  durationOwnerId=adminBeforeProfiles.id;await stop();await start(true);
+  assert.equal((await request('/api/auth/me',undefined,admin)).data.user.max_episode_seconds,null);
+  assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.max_episode_seconds,300);
+  assert.equal((await request(`/api/studio/series/${sid}`,undefined,admin)).data.owner_upload_limits.maxEpisodeSeconds,300);
+  const longPath=path.join(dir,'owner-two-hours.mp4');
+  execFileSync('ffmpeg',['-hide_banner','-loglevel','error','-f','lavfi','-i','color=c=purple:s=16x16:r=1:d=7200','-c:v','libx264','-threads','1','-pix_fmt','yuv420p','-movflags','+faststart',longPath]);
+  const longVideo=await readFile(longPath);
+  for(const actor of [publisher,admin]){
+    const rejected=await upload(`/api/studio/series/${sid}/episodes`,longVideo,'two-hours.mp4',actor,{title:'Must remain five minutes',number:999},'video',422);
+    assert.equal(rejected.error.code,'VIDEO_TOO_LONG');
+  }
+  const longProfile=(await request('/api/admin/publishers',{display_name:'Owner long-form profile',registered_at:'2026-11-11'},admin,201)).data.publisher;
+  const longBody={...body,title:'Owner Unlimited Duration Regression',free_episodes:2,publisher_profile_id:longProfile.id};
+  const longSeriesId=(await request('/api/studio/series',longBody,admin,201)).data.id,longSeriesPath=`/api/studio/series/${longSeriesId}`;
+  assert.equal((await request(longSeriesPath,undefined,admin)).data.owner_upload_limits.maxEpisodeSeconds,null);
+  await upload(longSeriesPath+'/cover',cover,'long-owner.jpg',admin,{},'cover',200);
+  const longDirect=await upload(longSeriesPath+'/episodes',longVideo,'two-hours-001.mp4',admin,{title:'Owner episode 001',number:1});
+  assert.equal(longDirect.duration,7200);assert.equal(longDirect.bytes,longVideo.length);
+  const longChunk=await chunkedEpisode(longSeriesPath+'/episode-uploads',longVideo.length,(offset,length)=>longVideo.subarray(offset,offset+length),'two-hours-002.mp4',admin,{title:'Owner episode 002',number:2});
+  assert.equal(longChunk.episode.duration,7200);await request(longSeriesPath+'/status',{status:'published'},admin);
+  const longPublic=(await request(`/api/series/${longSeriesId}`)).data;
+  assert.equal(longPublic.series.publisher_id,longProfile.id);assert.deepEqual(longPublic.episodes.map(episode=>episode.duration),[7200,7200]);
+  await request(`/api/episodes/${longDirect.id}/progress`,{seconds:601},viewer);
+  assert.equal((await request('/api/history',undefined,viewer)).data.history.find(row=>row.id===longSeriesId).seconds,601);
+  await request(`/api/episodes/${longDirect.id}/progress`,{seconds:7201},viewer,400);
+  await stop();await start(true);
+  assert.equal((await request(longSeriesPath,undefined,admin)).data.episodes[0].duration,7200);
+  assert.equal((await request('/api/history',undefined,viewer)).data.history.find(row=>row.id===longSeriesId).seconds,601);
+  console.log('PASS: only the pinned owner and their managed profiles accept two-hour direct/chunked episodes; ordinary creators and admin edits remain five minutes, with long duration/progress retained after restart.');
   console.log('Cloudflare local integration smoke passed. No Cloudflare account resources were created.');
 }catch(error){console.error(error);console.error(logs.slice(-12000));process.exitCode=1;}
 finally{await stop();await rm(dir,{recursive:true,force:true});}

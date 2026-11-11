@@ -7,7 +7,7 @@ export const LEGACY_PLAYBACK_MAX_MS=180_000;
 export function playbackTimeSql(alias='p',field:'watched_ms'|'reported_ms'='watched_ms'){
   assert(/^[A-Za-z_][A-Za-z0-9_]*$/.test(alias),400,'INVALID_SQL_ALIAS','Invalid playback query alias.');
   assert(field==='watched_ms'||field==='reported_ms',400,'INVALID_SQL_ALIAS','Invalid playback time field.');
-  return `COALESCE((SELECT t.${field} FROM playback_session_times_extended t WHERE t.session_id=${alias}.id),(SELECT t.${field} FROM playback_session_times t WHERE t.session_id=${alias}.id),${alias}.${field})`;
+  return `COALESCE((SELECT t.${field} FROM playback_session_times_long t WHERE t.session_id=${alias}.id),(SELECT t.${field} FROM playback_session_times_extended t WHERE t.session_id=${alias}.id),(SELECT t.${field} FROM playback_session_times t WHERE t.session_id=${alias}.id),${alias}.${field})`;
 }
 export function playbackSessionFieldsSql(alias='p'){
   const times=`${playbackTimeSql(alias)} AS watched_ms,${playbackTimeSql(alias,'reported_ms')} AS reported_ms`;

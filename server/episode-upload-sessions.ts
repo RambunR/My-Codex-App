@@ -10,8 +10,9 @@ import {assertPaymentAccountClear} from './payment-risk.js';
 import {config} from './config.js';
 import {scheduleMediaCleanup} from './background.js';
 import {episodeUploadStorage,type EpisodeUploadStorage} from './chunked-storage.js';
-import {MAX_EPISODE_BYTES,MAX_EPISODE_SECONDS} from '../shared/config.js';
+import {MAX_EPISODE_BYTES} from '../shared/config.js';
 import {episodeDurationSql,legacyEpisodeDuration,writeEpisodeDuration} from './episode-duration.js';
+import {episodeUploadLimits,assertEpisodeUploadDuration} from './episode-upload-policy.js';
 
 export const EPISODE_UPLOAD_CHUNK_BYTES=5*1024*1024;
 const LIFETIME=60*60_000;
@@ -127,12 +128,12 @@ export function registerEpisodeUploadSessions(app:Express,helpers:Helpers,storag
         const exists=await storage.head(session.object_key);
         if(!exists)await storage.complete(session.object_key,session.upload_id,parts.map(part=>({partNumber:part.part_number,etag:part.etag})));
         session=owned(req);writable(req,session,helpers);assert(session.status==='completing',409,'UPLOAD_CLOSED','This upload was cancelled.');
-        const media=await storage.validate(session.object_key);
+        const media=await storage.validate(session.object_key,episodeUploadLimits(session.creator_id).maxEpisodeSeconds);
         assert(media.bytes===session.total_bytes&&media.bytes<=MAX_EPISODE_BYTES,422,'INVALID_VIDEO','The uploaded video size does not match this upload.');
-        assert(Number.isFinite(media.duration)&&media.duration>0,422,'INVALID_VIDEO','This file has no readable video track.');
-        assert(media.duration<=MAX_EPISODE_SECONDS,422,'VIDEO_TOO_LONG',`Episodes must be ${MAX_EPISODE_SECONDS/60} minutes or less.`);
+        assertEpisodeUploadDuration(session.creator_id,media.duration);
         transaction(()=>{
           const latest=owned(req),series=writable(req,latest,helpers);assert(latest.status==='completing',409,'UPLOAD_CLOSED','This upload was cancelled.');const owner=helpers.ownerStorage(series);
+          assertEpisodeUploadDuration(series.creator_id,media.duration);
           assert(withinStorageQuota(owner,owner.used_bytes+reservedEpisodeUploadBytes(series.creator_id,latest.id)+media.bytes),413,'QUOTA_EXCEEDED','Not enough storage. Request an increase.');
           assert(!one('SELECT id FROM episodes WHERE series_id=? AND number=?',series.id,latest.number),409,'EPISODE_EXISTS','An episode with this number already exists.');
           run('INSERT INTO episodes (id,series_id,title,number,duration,bytes,storage_key,original_name) VALUES (?,?,?,?,?,?,?,?)',latest.episode_id,series.id,latest.title,latest.number,legacyEpisodeDuration(media.duration),media.bytes,latest.object_key,latest.filename);writeEpisodeDuration(latest.episode_id,media.duration);

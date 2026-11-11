@@ -6,7 +6,7 @@ import {Modal} from '../ui';
 import '../upload-guide.css';
 
 /** A localized diagram: filenames and instructions stay readable at any screen size. */
-export function UploadGuide(){
+export function UploadGuide({maxEpisodeSeconds=MAX_EPISODE_SECONDS}:{maxEpisodeSeconds?:number|null}){
   const[open,setOpen]=useState(false);const{t}=useI18n();
   const close=()=>setOpen(false);
   const filenames=['My_Series_1.mp4','My_Series_2.mp4','My_Series_10.mp4'];
@@ -20,7 +20,7 @@ export function UploadGuide(){
     <Modal open={open} onClose={close} title={t('uploadGuideTitle')} wide>
       <div className="upload-guide">
         <p className="upload-guide-intro">{t('uploadGuideIntro')}</p>
-        <div className="upload-guide-limits"><span><Timer size={17} aria-hidden="true"/>{t('uploadGuideDuration').replace('{minutes}',String(MAX_EPISODE_SECONDS/60))}</span><span><HardDrive size={17} aria-hidden="true"/>{t('uploadGuideSize').replace('{size}',String(MAX_EPISODE_BYTES/1024/1024))}</span></div>
+        <div className="upload-guide-limits"><span><Timer size={17} aria-hidden="true"/>{maxEpisodeSeconds===null?t('ownerEpisodeUnlimitedDuration'):t('uploadGuideDuration').replace('{minutes}',String(maxEpisodeSeconds/60))}</span><span><HardDrive size={17} aria-hidden="true"/>{t('uploadGuideSize').replace('{size}',String(MAX_EPISODE_BYTES/1024/1024))}</span></div>
         <ol className="upload-guide-diagram" aria-label={t('uploadGuideTitle')}>{steps.map((step,index)=><li key={index}>
           <h3><span className="upload-guide-step" aria-hidden="true">{index+1}</span>{step.title}</h3>
           <div className="upload-guide-art" aria-hidden="true">{step.art}</div><p>{step.body}</p>

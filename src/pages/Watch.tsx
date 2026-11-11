@@ -18,9 +18,9 @@ export function Watch(){
   const{id,episodeId}=useParams();const{t,locale}=useI18n();const{user,setUser,toast}=useApp();const navigate=useNavigate();const{data,loading,error,refresh}=useApi<{series:Series;episodes:Episode[]}>(`/api/series/${id}`);
   const[confirm,setConfirm]=useState(false);const[busy,setBusy]=useState(false);const[videoError,setVideoError]=useState(false);const[playRevision,setPlayRevision]=useState(0);const videoRef=useRef<HTMLVideoElement>(null);const lastSaved=useRef(0);
   const ep=data?.episodes.find(e=>e.id===episodeId);const current=data?.episodes.findIndex(e=>e.id===episodeId)??-1;const locked=ep?!ep.free&&!ep.unlocked:true;const next=data?.episodes[current+1];const previous=data?.episodes[current-1];
-  usePlaybackAnalytics(videoRef,ep?.id,!!ep&&!locked,user?.id,playRevision);
+  usePlaybackAnalytics(videoRef,ep?.id,!!ep&&!locked,user?.id,playRevision,ep?.duration);
   useEffect(()=>{setConfirm(false);setVideoError(false);lastSaved.current=0;},[episodeId]);
-  const saveProgress=()=>{const seconds=videoRef.current?.currentTime||0;if(!user||!ep||seconds-lastSaved.current<5)return;lastSaved.current=seconds;post(`/api/episodes/${ep.id}/progress`,{seconds:Math.min(MAX_EPISODE_SECONDS,seconds)}).catch(()=>{});};
+  const saveProgress=()=>{const seconds=videoRef.current?.currentTime||0;if(!user||!ep||seconds-lastSaved.current<5)return;lastSaved.current=seconds;const duration=Number.isFinite(ep.duration)&&ep.duration>0?ep.duration:MAX_EPISODE_SECONDS;post(`/api/episodes/${ep.id}/progress`,{seconds:Math.min(duration,seconds)}).catch(()=>{});};
   const unlock=async()=>{if(!ep)return;setBusy(true);try{const result=await post(`/api/episodes/${ep.id}/unlock`);setUser(result.user);setConfirm(false);toast(t('purchaseSuccess'));refresh();}catch(e){toast((e as Error).message,true);}finally{setBusy(false);}};
   if(loading&&!data)return <Loading/>;if(error)return <ErrorState error={error} retry={refresh}/>;if(!data||!ep)return <ErrorState error={new Error(t('noEpisodes'))}/>;
   const series=data.series;const price=series.price_cents*10000;const insufficient=(user?.wallet_micros||0)<price;

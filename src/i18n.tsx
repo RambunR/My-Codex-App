@@ -1,5 +1,6 @@
 import {wechatVerificationEnglish,wechatVerificationMessages} from './wechat-verification-locales';
 import {seriesTitleAvailabilityEnglish,seriesTitleAvailabilityMessages} from './series-title-availability-locales';
+import {ownerEpisodeEnglish,ownerEpisodeMessages} from './owner-episode-locales';
 import {wechatAuthEnglish,wechatAuthMessages} from './wechat-auth-locales';
 import {wechatEnglish,wechatMessages} from './wechat-pay-locales';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
@@ -28,6 +29,7 @@ import {transactionFeeEnglish,transactionFeeMessages} from './transaction-fee-lo
 import {testPayoutEnglish,testPayoutMessages} from './test-payout-locales';
 
 const en = {
+  ...ownerEpisodeEnglish,
   ...seriesTitleAvailabilityEnglish,
   ...wechatVerificationEnglish,
   ...wechatAuthEnglish,
@@ -213,6 +215,7 @@ for(const language of LANGUAGES)if(language.code!=='en')Object.assign(dictionari
 for(const language of LANGUAGES)if(language.code!=='en')Object.assign(dictionaries[language.code],wechatAuthMessages[language.code]);
 for(const language of LANGUAGES)if(language.code!=='en')Object.assign(dictionaries[language.code],wechatVerificationMessages[language.code]);
 for(const language of LANGUAGES)Object.assign(dictionaries[language.code],seriesTitleAvailabilityMessages[language.code]);
+for(const language of LANGUAGES)Object.assign(dictionaries[language.code],ownerEpisodeMessages[language.code]);
 const uploadConfirmationMessages:Record<Locale,string>={
   en:'Upload confirmation was interrupted. Refresh this series before retrying the file.',
   'zh-TW':'上傳確認中斷。請重新整理此系列，再重試上傳檔案。',

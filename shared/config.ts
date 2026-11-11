@@ -29,6 +29,9 @@ import type {CoverAspectRatio} from './cover-layout.js';
 import type {SeriesAccessType} from './catalog-access.js';
 export type {SeriesAccessType} from './catalog-access.js';
 export const MAX_EPISODE_SECONDS = 300;
+// Numeric representation bound for playback milliseconds, not an upload policy.
+// The configured owner's duration policy is unlimited; other creators get 300s.
+export const MAX_TRACKED_EPISODE_SECONDS = Math.floor(Number.MAX_SAFE_INTEGER / 1000);
 export const MAX_EPISODE_BYTES = 200 * 1024 * 1024;
 export const DEFAULT_QUOTA_BYTES = 10 * 1024 * 1024 * 1024;
 export const USD_MICROS = 1_000_000;
@@ -54,6 +57,7 @@ export interface User extends StorageUsage {
   stripe_account_id?: string; connected?: boolean;
   test_withdrawal_unlimited?:boolean;
   creator_display_name?: string;
+  max_episode_seconds?: number|null;
   email_verified?: boolean;
   payment_review?: boolean;
   dramio_pass?: {active:boolean;test:boolean;purchased_at:string|null};

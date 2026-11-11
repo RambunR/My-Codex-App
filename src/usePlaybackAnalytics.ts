@@ -5,10 +5,11 @@ import {MAX_EPISODE_SECONDS} from '../shared/config';
 
 // Media requests can be preloads and seeks. Measure visible, advancing playback
 // instead, and flush on pause/navigation so short episodes still report time.
-export function usePlaybackAnalytics(videoRef:RefObject<HTMLVideoElement|null>,episodeId:string|undefined,enabled:boolean,userId:string|undefined,revision:number){
+export function usePlaybackAnalytics(videoRef:RefObject<HTMLVideoElement|null>,episodeId:string|undefined,enabled:boolean,userId:string|undefined,revision:number,episodeDuration=MAX_EPISODE_SECONDS){
   useEffect(()=>{
     const video=videoRef.current;
     if(!video||!episodeId||!enabled)return;
+    const durationMs=Number.isFinite(episodeDuration)&&episodeDuration>0?Math.floor(episodeDuration*1000):MAX_EPISODE_SECONDS*1000;
     let disposed=false,excluded=false,starting=false,sessionId='',baselineMs=0,activeMs=0,sentMs=-1;
     let visible=document.visibilityState==='visible',advancing=false;
     let lastTime=video.currentTime,lastClock=performance.now();
@@ -22,7 +23,7 @@ export function usePlaybackAnalytics(videoRef:RefObject<HTMLVideoElement|null>,e
     };
     const flush=(keepalive=false)=>{
       if(!sessionId||excluded)return;
-      const watchedMs=Math.min(MAX_EPISODE_SECONDS*1000,Math.floor(baselineMs+activeMs));
+      const watchedMs=Math.min(durationMs,Math.floor(baselineMs+activeMs));
       if(watchedMs<=sentMs)return;
       const priorSent=sentMs;sentMs=watchedMs;
       const targetSession=sessionId;
@@ -83,5 +84,5 @@ export function usePlaybackAnalytics(videoRef:RefObject<HTMLVideoElement|null>,e
       document.removeEventListener('visibilitychange',onVisibility);
       window.removeEventListener('pagehide',onPageHide);
     };
-  },[videoRef,episodeId,enabled,userId,revision]);
+  },[videoRef,episodeId,enabled,userId,revision,episodeDuration]);
 }

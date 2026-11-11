@@ -9,7 +9,7 @@ import sharp from 'sharp';
 import type { Request, Response } from 'express';
 import { config } from './config.js';
 import { assert, AppError } from './errors.js';
-import { MAX_EPISODE_SECONDS } from '../shared/config.js';
+import { MAX_EPISODE_BYTES,MAX_EPISODE_SECONDS,MAX_TRACKED_EPISODE_SECONDS } from '../shared/config.js';
 
 const exec = promisify(execFile);
 export async function removeTempFile(file:string){await fs.rm(file,{force:true});}
@@ -23,21 +23,23 @@ async function withVideoSlot<T>(work:()=>Promise<T>):Promise<T>{
 const bucket = process.env.S3_BUCKET;
 const s3 = bucket ? new S3Client({ region: process.env.S3_REGION || 'auto', endpoint: process.env.S3_ENDPOINT, forcePathStyle: true,
   credentials: { accessKeyId: process.env.S3_ACCESS_KEY_ID || '', secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || '' } }) : null;
-export async function probeVideo(file: string) {
+export async function probeVideo(file: string,maxSeconds:number|null=MAX_EPISODE_SECONDS) {
   const { stdout } = await exec(config.ffprobe, ['-v', 'error', '-protocol_whitelist','file,pipe','-format_whitelist','mov,matroska,webm','-show_entries', 'format=duration:stream=codec_type,width,height,duration', '-of', 'json', file], { timeout: 20000, maxBuffer: 1024 * 1024 }).catch(()=>{throw new AppError(422,'INVALID_VIDEO','Please choose a valid MP4, MOV, or WebM video.');});
   const metadata = JSON.parse(stdout); const video = metadata.streams?.find((s: any) => s.codec_type === 'video');
   const durations=[Number(metadata.format?.duration),...(metadata.streams||[]).filter((stream:any)=>stream.codec_type==='video'||stream.codec_type==='audio').map((stream:any)=>Number(stream.duration))].filter(value=>Number.isFinite(value)&&value>0);
   const duration = Math.max(...durations);
-  assert(video && Number.isFinite(duration) && duration > 0, 422, 'INVALID_VIDEO', 'This file does not contain a readable video.');
-  assert(duration <= MAX_EPISODE_SECONDS, 422, 'VIDEO_TOO_LONG', `Episodes must be ${MAX_EPISODE_SECONDS/60} minutes or less.`);
+  assert(video && Number.isFinite(duration) && duration > 0 && duration<=MAX_TRACKED_EPISODE_SECONDS, 422, 'INVALID_VIDEO', 'This file does not contain a safely readable video duration.');
+  if(maxSeconds!==null)assert(duration <= maxSeconds, 422, 'VIDEO_TOO_LONG', `Episodes must be ${maxSeconds/60} minutes or less.`);
   assert(video.width <= 7680 && video.height <= 7680, 422, 'INVALID_VIDEO', 'Video dimensions are too large.');
   return { duration, width: video.width, height: video.height };
 }
-export async function prepareVideo(input: string) { return withVideoSlot(async()=>{
-  const info = await probeVideo(input); const output = path.join(config.dataDir, 'tmp', `${crypto.randomUUID()}.mp4`);
+export async function prepareVideo(input: string,maxSeconds:number|null=MAX_EPISODE_SECONDS) { return withVideoSlot(async()=>{
+  const info = await probeVideo(input,maxSeconds); const output = path.join(config.dataDir, 'tmp', `${crypto.randomUUID()}.mp4`);
   try {
     await exec(config.ffmpeg, ['-nostdin', '-y','-protocol_whitelist','file,pipe','-format_whitelist','mov,matroska,webm','-threads','2', '-i', input, '-map', '0:v:0', '-map', '0:a:0?','-map_metadata','-1', '-vf', "scale='min(1280,iw)':'min(1280,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2", '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '25', '-maxrate', '2400k', '-bufsize', '4800k', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', '-threads', '2', '-metadata', 'comment=', output], { timeout: 180000, maxBuffer: 2 * 1024 * 1024 });
-    return { path: output, duration: info.duration, bytes: (await fs.stat(output)).size };
+    const bytes=(await fs.stat(output)).size;
+    assert(bytes<=MAX_EPISODE_BYTES,413,'FILE_TOO_LARGE',`Episodes must be ${MAX_EPISODE_BYTES/1024**2} MiB or less after processing.`);
+    return { path: output, duration: info.duration, bytes };
   } catch (error) { await fs.rm(output, { force: true }); throw error; }
 });}
 export async function prepareCover(input: string) {
