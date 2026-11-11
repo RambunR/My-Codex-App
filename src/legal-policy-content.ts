@@ -11,7 +11,7 @@ export interface LegalPolicyCopy{
 }
 
 const en:LegalPolicyCopy={
-  effective:'Effective date',date:'11 November 2026',version:'Version',contents:'On this page',summary:'Key points',contact:'Contact the company',languages:'Policy language',related:'Related policies',
+  effective:'Effective date',date:'12 November 2026',version:'Version',contents:'On this page',summary:'Key points',contact:'Contact the company',languages:'Policy language',related:'Related policies',
   fallback:'This policy is available in English, Traditional Chinese and Simplified Chinese. English is shown for your selected interface language.',
   terms:{title:'Terms of Use',intro:`These Terms describe the conditions for using LingYing, operated by ${COMPANY_NAME} (the “Company”, “we” or “us”). They apply to the extent they form a valid agreement with you. Read them before registering, purchasing a Dramio Pass or publishing content. Your rights that cannot legally be excluded continue to apply.`,
     summary:[
@@ -58,6 +58,7 @@ const en:LegalPolicyCopy={
         'There is no blanket waiver of refund, chargeback or other consumer rights. Failed, duplicate, unauthorised or disputed payments and loss of paid access are reviewed on their facts. A content removal or account closure does not automatically create or automatically defeat a refund claim.',
       ],contact:true},
       {id:'creator-earnings',title:'8. Creator revenue, fees and withdrawals',paragraphs:[
+        'When a user unlocks an entire series through Lucky Draw, the creator receives no payment or revenue share for that free series unlock or for that user’s viewing under the award, including any future episodes covered by it. The 70% creator share applies only to valid paid episode unlocks. A Lucky Draw award does not reduce earnings already accrued from completed paid purchases or revenue from other users’ valid paid unlocks of the same series.',
         'For valid paid episode unlocks, the creator is allocated 70% and the platform 30% before actual Stripe or other transaction-provider fees. Actual provider fees are borne within the creator’s 70% share; they vary and may include fixed charges, conversion and bank costs. They are not a guaranteed 1% or an additional fixed LingYing fee. Displayed estimates are not a promise of the final bank amount. Test or simulated balances and payouts are not real earnings.',
         'New withdrawal requests currently have a US$10 minimum and no platform withdrawal fee. Processing is stated as 3–5 days after submission, subject to review, available earnings, required verification, lawful holds and provider availability; bank receipt may take longer. Existing requests keep their saved transaction terms. Creator payouts may be paused independently of customer card payments, and buying a Pass does not activate or guarantee payouts.',
         'Application view and watch-time figures are estimates of recorded playback activity, not audited unique audience counts or guaranteed revenue. Corrections, invalid activity, refunds, chargebacks or rights disputes can require review and lawful adjustments supported by evidence. Legitimate accrued amounts are not arbitrarily confiscated because the Company removes a product or a creator raises a complaint. We may apply proportionate review holds while determining the amount properly payable. You are responsible for your own tax and reporting obligations.',
@@ -133,7 +134,7 @@ const en:LegalPolicyCopy={
 };
 
 const zhTW:LegalPolicyCopy={
-  effective:'生效日期',date:'2026年11月11日',version:'版本',contents:'本頁內容',summary:'重點摘要',contact:'聯絡公司',languages:'政策語言',related:'相關政策',fallback:en.fallback,
+  effective:'生效日期',date:'2026年11月12日',version:'版本',contents:'本頁內容',summary:'重點摘要',contact:'聯絡公司',languages:'政策語言',related:'相關政策',fallback:en.fallback,
   terms:{title:'使用條款',intro:`本條款說明使用 LingYing 靈映的條件。平台由 ${COMPANY_NAME}（下稱「公司」、「我們」）營運，並在與您構成有效協議的範圍內適用。請在註冊、購買 Dramio Pass 或發布內容前閱讀本條款。法律規定不得排除的權利仍然適用。`,summary:[
     'Dramio Pass 提供發布功能的使用權。購買通行證不保證內容獲批、宣傳、觀看次數、銷售、營收或收入；收益可能為零。',
     '您必須擁有上傳內容所需的全部權利。公司可限制或移除侵權、違法或不適當的內容。',
@@ -178,6 +179,7 @@ const zhTW:LegalPolicyCopy={
       '本條款不概括豁免退款、拒付或其他消費者權利。失敗、重複、未經授權或有爭議的付款，以及喪失已付款存取權，均按實際情況覆核。內容下架或帳戶結束，不會自動成立或自動否定退款申請。',
     ],contact:true},
     {id:'creator-earnings',title:'8. 創作者營收、費用及提領',paragraphs:[
+      '如用戶透過幸運抽獎解鎖整部劇集，創作者不會因該次免費解鎖，或該用戶憑中獎權益觀看劇集而獲得付款或收益分成，包括中獎權益涵蓋的日後新增集數。創作者70%的分成只適用於有效的付費集數解鎖。幸運抽獎中獎不會扣減已完成付費購買所累積的收益，也不影響其他用戶有效付費解鎖同一劇集所產生的營收。',
       '有效付費集數解鎖在扣除實際 Stripe 或其他交易服務商費用前，按70%分配予創作者、30%分配予平台。實際服務商費用由創作者70%的份額內承擔，可能包括固定費、匯兌及銀行費用。費用並非保證為1%，也不是額外固定的 LingYing 費用。顯示的估算不保證最終銀行到帳金額。測試或模擬餘額及提領並非真實收益。',
       '新提領申請目前最低為10美元，不另收平台提領費。處理時間為提交後3至5天，但受覆核、可用收益、必要驗證、合法保留及服務商可用性影響；銀行到帳可能需更長時間。現有申請保留其已儲存的交易條款。創作者提領可獨立於顧客刷卡付款而暫停；購買通行證不會啟用或保證提領。',
       '平台觀看及觀看時間數字是所記錄播放活動的估算，並非經審計的獨立觀眾人數或收益保證。錯誤更正、無效活動、退款、拒付或權利爭議，可能須根據證據覆核及依法調整。公司不會僅因下架作品或創作者提出投訴而任意沒收合法已累積款項；釐定應付款項期間，可作相稱的覆核保留。您須自行履行稅務及申報義務。',
@@ -253,7 +255,7 @@ const zhTW:LegalPolicyCopy={
 };
 
 const zhCN:LegalPolicyCopy={
-  effective:'生效日期',date:'2026年11月11日',version:'版本',contents:'本页内容',summary:'重点摘要',contact:'联系公司',languages:'政策语言',related:'相关政策',fallback:en.fallback,
+  effective:'生效日期',date:'2026年11月12日',version:'版本',contents:'本页内容',summary:'重点摘要',contact:'联系公司',languages:'政策语言',related:'相关政策',fallback:en.fallback,
   terms:{title:'使用条款',intro:`本条款说明使用 LingYing 灵映的条件。平台由 ${COMPANY_NAME}（下称“公司”“我们”）运营，并在与您构成有效协议的范围内适用。请在注册、购买 Dramio Pass 或发布内容前阅读本条款。法律规定不得排除的权利仍然适用。`,summary:[
     'Dramio Pass 提供发布功能的使用权。购买通行证不保证内容获批、宣传、观看次数、销售、营收或收入；收益可能为零。',
     '您必须拥有上传内容所需的全部权利。公司可限制或移除侵权、违法或不适当的内容。',
@@ -298,6 +300,7 @@ const zhCN:LegalPolicyCopy={
       '本条款不概括豁免退款、拒付或其他消费者权利。失败、重复、未经授权或有争议的付款，以及丧失已付款访问权，均按实际情况复核。内容下架或账户结束，不会自动成立或自动否定退款申请。',
     ],contact:true},
     {id:'creator-earnings',title:'8. 创作者营收、费用及提现',paragraphs:[
+      '如用户通过幸运抽奖解锁整部剧集，创作者不会因该次免费解锁，或该用户凭中奖权益观看剧集而获得付款或收益分成，包括中奖权益涵盖的以后新增集数。创作者70%的分成只适用于有效的付费集数解锁。幸运抽奖中奖不会扣减已完成付费购买所累积的收益，也不影响其他用户有效付费解锁同一剧集所产生的营收。',
       '有效付费集数解锁在扣除实际 Stripe 或其他交易服务商费用前，按70%分配予创作者、30%分配予平台。实际服务商费用由创作者70%的份额内承担，可能包括固定费、汇兑及银行费用。费用并非保证为1%，也不是额外固定的 LingYing 费用。显示的估算不保证最终银行到账金额。测试或模拟余额及提现并非真实收益。',
       '新提现申请目前最低为10美元，不另收平台提现费。处理时间为提交后3至5天，但受复核、可用收益、必要验证、合法保留及服务商可用性影响；银行到账可能需更长时间。现有申请保留其已存储的交易条款。创作者提现可独立于顾客刷卡付款而暂停；购买通行证不会启用或保证提现。',
       '平台观看及观看时间数字是所记录播放活动的估算，并非经审计的独立观众人数或收益保证。错误更正、无效活动、退款、拒付或权利争议，可能须根据证据复核及依法调整。公司不会仅因下架作品或创作者提出投诉而任意没收合法已累积款项；厘定应付款项期间，可作相称的复核保留。您须自行履行税务及申报义务。',

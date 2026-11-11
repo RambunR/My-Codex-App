@@ -142,7 +142,7 @@ try{
   const spokenCodes=cfg.spokenLanguages.map(item=>item.code),interfaceCodes=cfg.languages.map(item=>item.code);
   assert.equal(spokenCodes.length,21);assert.ok(spokenCodes.includes('cmn')&&spokenCodes.includes('yue'));assert.ok(!spokenCodes.includes('zh-TW')&&!spokenCodes.includes('zh-CN'));
   assert.equal(interfaceCodes.length,21);assert.ok(interfaceCodes.includes('zh-TW')&&interfaceCodes.includes('zh-CN'));assert.ok(!interfaceCodes.includes('cmn')&&!interfaceCodes.includes('yue'));
-  assert.deepEqual(cfg.creatorPassConsent,{policyVersion:'2026-11-11',disclosureVersion:'creator-pass-ack-v2'});
+  assert.deepEqual(cfg.creatorPassConsent,{policyVersion:'2026-11-12',disclosureVersion:'creator-pass-ack-v2'});
   const creatorConsent={accepted:true,policy_version:cfg.creatorPassConsent.policyVersion,disclosure_version:cfg.creatorPassConsent.disclosureVersion};
   assert.equal(cfg.limits.quotaBytes,10*1024**3);
   assert.equal(cfg.limits.minimumPriceUsd,0.1);assert.equal(cfg.limits.maximumPriceUsd,1);
