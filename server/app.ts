@@ -1,3 +1,5 @@
+import {registerLuckyDraw} from './lucky-draw.js';
+import {hasLuckyDrawAccess} from './lucky-draw-access.js';
 import {registerWechatAuth,wechatAuthEnabled} from './wechat-auth.js';
 import {registerSearchDiscovery} from './search-discovery.js';
 import {wechatPayEnabled,createWechatFundingQuote} from './wechat-pay.js';
@@ -88,7 +90,7 @@ function serializeSeries(s: Record<string, any>, userId?: string, privateView=fa
     liked:!!(userId&&one('SELECT 1 FROM series_likes WHERE user_id=? AND series_id=?',userId,s.id)),
     saved: !!(userId && one('SELECT 1 FROM saves WHERE user_id=? AND series_id=?', userId, s.id)) };
 }
-function canWatch(userId: string | undefined, e: any) { return !!e.free || e.creator_id === userId || !!(userId && hasEpisodePurchase(userId,e.id)); }
+function canWatch(userId: string | undefined, e: any) { return !!e.free || e.creator_id === userId || !!(userId && (hasEpisodePurchase(userId,e.id)||hasLuckyDrawAccess(userId,e.series_id))); }
 function episodeRow(episodeId: string) { return one(`SELECT e.*,${episodeDurationSql('e')} AS duration,${episodeFreeSql()} AS free,s.free_episodes,s.creator_id,s.status FROM episodes e JOIN series s ON s.id=e.series_id WHERE e.id=?`, episodeId); }
 function playbackViewer(req:Request,res:Response,create=false):string|undefined {
   if(req.user)return crypto.createHash('sha256').update('user:'+req.user.id).digest('hex');
@@ -191,6 +193,7 @@ export function createApp() {
   registerAppleAuth(app);
   registerEmailAuth(app);
   registerPublisherProfiles(app,{catalogSelect,serializeSeries});
+  registerLuckyDraw(app,{catalogSelect,serializeSeries});
   app.get('/api/health', (_req,res) => res.setHeader('X-LingYing-Upload-Policy','owner-duration-v1').json({ ok: true, database: !!one('SELECT 1 AS ready') }));
   app.get('/api/config', async (_req,res) => {initializePromotions();if(config.payments==='stripe'&&stripeConfigured())await ensureStripeWebhookReady(stripe);return res.json({ brand: 'LingYing', languages: LANGUAGES, spokenLanguages:SPOKEN_LANGUAGES, genres: GENRES,standardGenres:STANDARD_GENRES,storyThemes:STORY_THEMES,formats:SERIES_FORMATS,creationTypes:CREATION_TYPES, passPromotion:{enabled:true},creatorPassConsent:{policyVersion:LEGAL_POLICY_VERSION,disclosureVersion:CREATOR_PASS_DISCLOSURE_VERSION},paymentMethods:{wechatPay:wechatPayEnabled()},paymentsMode: config.payments,paymentsReady:paymentsReady(),paymentsConfigured:stripeConfigured(),paymentSetup:stripeWebhookReadiness(),sandbox:config.sandbox,paymentsTestMode:stripeTestPayments()||config.payments==='demo',payoutsEnabled:config.payoutsEnabled&&!stripeTestPayments(),uploadsEnabled:!config.sandbox,usdToHkd: config.usdToHkd,
     limits: { maxEpisodeSeconds: MAX_EPISODE_SECONDS, maxEpisodeBytes: MAX_EPISODE_BYTES, quotaBytes: DEFAULT_QUOTA_BYTES, activationHkd: 88, minimumPriceUsd: MIN_PRICE_CENTS/100,maximumPriceUsd:MAX_PRICE_CENTS/100, creatorShare: 0.7, minimumPayoutUsd: WITHDRAWAL_POLICY.minimumCents/100,minWalletFundingUsd:MIN_WALLET_FUNDING_CENTS/100,maxWalletFundingUsd:MAX_WALLET_FUNDING_CENTS/100 },withdrawalPolicy:WITHDRAWAL_POLICY,walletFunding:WALLET_FUNDING_OPTIONS, demo: config.seed,episodeUpload:{mode:chunkedEpisodeUploadsEnabled()?'chunked':'multipart',chunkBytes:EPISODE_UPLOAD_CHUNK_BYTES}, runtime: (config as any).runtime || 'node', videoFormats: (config as any).videoFormats || ['mp4','mov','webm','m4v'], auth:{wechat:wechatAuthEnabled(),google:googleEnabled(),apple:appleEnabled(),email:emailAuthEnabled()} });});

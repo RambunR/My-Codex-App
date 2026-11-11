@@ -1,3 +1,4 @@
+import {LuckyDrawPage} from './pages/LuckyDraw';
 import React,{lazy,Suspense} from 'react';
 import ReactDOM from 'react-dom/client';
 import { createBrowserRouter,createRoutesFromElements,RouterProvider,Route } from 'react-router-dom';
@@ -23,7 +24,7 @@ window.addEventListener('appinstalled',()=>{(window as any).aidramioInstallEvent
 
 const router=createBrowserRouter(createRoutesFromElements(<Route element={<I18nProvider><AppProvider><Layout/></AppProvider></I18nProvider>} errorElement={<I18nProvider><PageRecovery standalone/></I18nProvider>}>
   <Route index element={<Home/>}/><Route path="browse" element={<Browse/>}/><Route path="rankings" element={<Rankings/>}/><Route path="series/:id" element={<SeriesDetail/>}/><Route path="watch/:id/:episodeId" element={<Watch/>}/><Route path="publishers/:id" element={<Publisher/>}/>
-  <Route path="library" element={<Library/>}/><Route path="auth" element={<Auth/>}/><Route path="wallet" element={<WalletPage/>}/><Route path="account" element={<Account/>}/>
+  <Route path="lucky-draw" element={<LuckyDrawPage/>}/><Route path="library" element={<Library/>}/><Route path="auth" element={<Auth/>}/><Route path="wallet" element={<WalletPage/>}/><Route path="account" element={<Account/>}/>
   <Route path="studio" errorElement={<PageRecovery/>} element={<Suspense fallback={<Loading/>}><Studio/></Suspense>}/><Route path="studio/new" errorElement={<PageRecovery/>} element={<Suspense fallback={<Loading/>}><SeriesEditor/></Suspense>}/><Route path="studio/series/:id" errorElement={<PageRecovery/>} element={<Suspense fallback={<Loading/>}><SeriesEditor/></Suspense>}/><Route path="admin" errorElement={<PageRecovery/>} element={<Suspense fallback={<Loading/>}><Admin/></Suspense>}/>
   <Route path="help" element={<InfoPage type="help"/>}/><Route path="terms" element={<InfoPage type="terms"/>}/><Route path="privacy" element={<InfoPage type="privacy"/>}/>
   <Route path="*" element={<Empty title="404" action={<a href="/" className="button primary">LingYing →</a>}/>}/>

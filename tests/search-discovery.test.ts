@@ -68,7 +68,7 @@ test('unavailable and malformed series return real 404 metadata; private HTML re
   for(const id of ['missing','draft','archived','empty','taken-down','deleted','retired','foo.json']){
     const response=await fetch(base+'/api/discovery/document?path='+encodeURIComponent('/series/'+id));assert.equal(response.status,404,id);const document=await response.json();assert.match(document.robots,/noindex/u);assert.equal(document.schema,null);assert.equal(document.snapshotHtml.includes('Private'),false);
   }
-  for(const route of ['/auth','/account','/wallet','/library','/studio','/admin','/watch/visible/episode','/auth/foo.ext']){
+  for(const route of ['/auth','/account','/wallet','/lucky-draw','/library','/studio','/admin','/watch/visible/episode','/auth/foo.ext']){
     const document=searchDocumentForPath(route);assert.equal(document.status,200);assert.match(document.robots,/noindex/u);assert.equal(document.schema,null);
   }
   assert.equal(searchRoute('/series/%2Fsecret').kind,'missing');assert.equal(searchRoute('//attacker.test').kind,'missing');assert.equal(searchRoute('/series/%ZZ').kind,'missing');

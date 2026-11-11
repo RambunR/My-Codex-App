@@ -11,7 +11,7 @@ export interface LegalPolicyCopy{
 }
 
 const en:LegalPolicyCopy={
-  effective:'Effective date',date:'8 November 2026',version:'Version',contents:'On this page',summary:'Key points',contact:'Contact the company',languages:'Policy language',related:'Related policies',
+  effective:'Effective date',date:'11 November 2026',version:'Version',contents:'On this page',summary:'Key points',contact:'Contact the company',languages:'Policy language',related:'Related policies',
   fallback:'This policy is available in English, Traditional Chinese and Simplified Chinese. English is shown for your selected interface language.',
   terms:{title:'Terms of Use',intro:`These Terms describe the conditions for using LingYing, operated by ${COMPANY_NAME} (the “Company”, “we” or “us”). They apply to the extent they form a valid agreement with you. Read them before registering, purchasing a Dramio Pass or publishing content. Your rights that cannot legally be excluded continue to apply.`,
     summary:[
@@ -52,6 +52,7 @@ const en:LegalPolicyCopy={
         'We may restrict the material while reviewing the complaint and seek information from the uploader. The uploader may provide evidence of a licence, ownership, consent or another lawful basis. We will consider relevant evidence and applicable law; restoration is not guaranteed. Necessary complaint information may be shared for a fair response, with appropriate protection of personal data. This procedure does not replace any statutory notice process or court remedy.',
       ],contact:true},
       {id:'purchases-refunds',title:'7. Prices, wallet credit, episode access and refunds',paragraphs:[
+      'Lucky Draw is a free account promotion, not a paid entry or cash prize. Each account receives one welcome chance; administrators may grant additional free chances. Each draw chooses one currently eligible series uniformly, excluding previous wins, the creator’s own series and series whose paid episodes the account already purchased in full. It unlocks current and future episodes while the series is available. An empty eligible pool uses no chance. Removing a series from the pool does not revoke a win, but publication, rights and moderation restrictions still apply. Existing purchases and refund rights are unchanged; awards create no paid sale or creator earnings.',
         'Review the price, currency, promotion and service description before confirming payment. Creators may set a paid episode price from US$0.10 to US$1.00 per episode. Wallet credit and episode prices are accounted for in USD; wallet credit is for purchases on LingYing and is not a cash-withdrawal facility. Price changes, including a reduction to comply with the current maximum, apply to future unlocks and do not rewrite completed purchase receipts, their original amounts or existing entitlements. Applicable tax, exchange or payment-provider charges are governed by the information shown for the transaction and applicable law.',
         'A Pass fee buys publishing access rather than a particular commercial outcome. Disappointing views or earnings alone do not create a promised-results refund entitlement. This does not exclude a refund or other remedy required by law, including where a paid service was not supplied or was misdescribed. Contact us with the receipt or payment reference and the problem so we can review an appropriate remedy. Do not send full card details.',
         'There is no blanket waiver of refund, chargeback or other consumer rights. Failed, duplicate, unauthorised or disputed payments and loss of paid access are reviewed on their facts. A content removal or account closure does not automatically create or automatically defeat a refund claim.',
@@ -84,6 +85,7 @@ const en:LegalPolicyCopy={
   ],sections:[
     {id:'data-controller',title:'1. Who is responsible and how to contact us',paragraphs:[`The service is operated by ${COMPANY_NAME}. Contact ${CONTACT_EMAIL} for privacy questions, access or correction requests, account closure requests, or concerns about an upload containing personal data. Explain the request without sending passwords or full payment-card details.`],contact:true},
     {id:'data-collected',title:'2. Information collected',paragraphs:[
+      'For Lucky Draw we store the account-linked remaining/used chances, administrator grants and reasons, selected series, request references and server date/time of each win. Results are visible to the account and authorised administrators; the public draw pool contains only available published series. We use these records to provide series access and prevent duplicate draws.',
       'Account and identity information includes your name, email address, language, account role and status, authentication-provider identifiers, timestamps and storage allowance. Password registration uses a salted password hash rather than a stored plain-text password. Google or Apple sign-in can supply an account identifier, name and email, including an Apple relay email; we do not request your Google or Apple password, Gmail messages, contacts or Drive files, and do not store their access or refresh tokens for sign-in.',
       'When configured and selected, WeChat sign-in supplies an application-scoped OpenID, an optional UnionID and nickname. We retain these identifiers to recognise or explicitly link your account, not your WeChat password, messages, contacts or sign-in access/refresh tokens. WeChat does not supply your email; new users provide a contact email separately and prove access with an emailed verification code before an account is created. WeChat authorisation itself does not verify that email. Pending registration authorisations expire after ten minutes. Email verification is separate and depends on the configured delivery service.',
       'Content and activity information includes uploaded video, artwork, titles, descriptions, classifications and declared languages; public publisher-profile information; likes, saved stories, watch progress, playback events, viewing time and related aggregate statistics. Account-linked or random guest identifiers are hashed for playback measurement. A hash is a protective measure, not a promise that the data is completely anonymous.',
@@ -96,7 +98,7 @@ const en:LegalPolicyCopy={
     ]},
     {id:'cookies',title:'4. Cookies, browser storage and location-related display',paragraphs:[
       'The application uses a secure, HTTP-only session cookie for sign-in and a separate random guest-viewer cookie when guest playback begins. These application cookies currently have a 30-day lifetime. Short-lived sign-in cookies help bind Google, Apple or WeChat authentication attempts to your browser. WeChat also uses a short-lived, HTTP-only cookie to complete registration. Cookie expiry is not the retention period for the associated business or playback records.',
-      'Browser local storage remembers your interface language; session storage may temporarily retain a deliberately entered promotion code during registration. Browser or installed-app storage may also hold static application files. You can clear browser storage or manage cookies in your browser, but sign-in, purchases, preferences and some measurement or app features may stop working.',
+      'Browser local storage remembers your interface language; session storage may temporarily retain a deliberately entered promotion code during registration, pending Lucky Draw request references and administrator chance-grant form details to recover interrupted requests. Browser or installed-app storage may also hold static application files. You can clear browser storage or manage cookies in your browser, but sign-in, purchases, preferences and some measurement or app features may stop working.',
       'Cloudflare may provide coarse country information to show an indicative local-currency price. This does not require GPS location. The exchange-rate service receives the currency pair needed for the estimate, not your LingYing account details. Hosting, delivery and security providers may also use their own operational measurement and logs. Our application playback measurement is described here separately from those provider services.',
     ]},
     {id:'providers-transfers',title:'5. Service providers, disclosures and international processing',paragraphs:[
@@ -131,7 +133,7 @@ const en:LegalPolicyCopy={
 };
 
 const zhTW:LegalPolicyCopy={
-  effective:'生效日期',date:'2026年11月8日',version:'版本',contents:'本頁內容',summary:'重點摘要',contact:'聯絡公司',languages:'政策語言',related:'相關政策',fallback:en.fallback,
+  effective:'生效日期',date:'2026年11月11日',version:'版本',contents:'本頁內容',summary:'重點摘要',contact:'聯絡公司',languages:'政策語言',related:'相關政策',fallback:en.fallback,
   terms:{title:'使用條款',intro:`本條款說明使用 LingYing 靈映的條件。平台由 ${COMPANY_NAME}（下稱「公司」、「我們」）營運，並在與您構成有效協議的範圍內適用。請在註冊、購買 Dramio Pass 或發布內容前閱讀本條款。法律規定不得排除的權利仍然適用。`,summary:[
     'Dramio Pass 提供發布功能的使用權。購買通行證不保證內容獲批、宣傳、觀看次數、銷售、營收或收入；收益可能為零。',
     '您必須擁有上傳內容所需的全部權利。公司可限制或移除侵權、違法或不適當的內容。',
@@ -170,6 +172,7 @@ const zhTW:LegalPolicyCopy={
       '覆核期間，我們可限制有關內容，並向上傳者查詢。上傳者可提供授權、擁有權、同意或其他合法依據的證據。我們會考慮相關證據及適用法律，但不保證恢復內容。為公平回應投訴，必要資料可能在適當保障個人資料的情況下與相關人士分享。本程序不取代任何法定通知程序或法院救濟。',
     ],contact:true},
     {id:'purchases-refunds',title:'7. 價格、錢包、集數存取及退款',paragraphs:[
+      '幸運抽獎是免費帳戶優惠，並非付費抽獎或現金獎項。每個帳戶獲一次迎新機會；管理員可額外贈送免費次數。每次從當時符合資格的劇集中等機會隨機選取一部，排除曾中獎、自己上傳，以及已購齊付費集數的劇集。中獎可解鎖該劇現有及日後新增的集數，但仍以作品可供觀看為前提。沒有符合資格的作品時不扣次數。移出劇池不會取消中獎；發布狀態、權利限制及內容審核仍適用。既有購買及退款權利不變，免費中獎不產生付費銷售或創作者收益。',
       '確認付款前，請查閱價格、貨幣、優惠及服務描述。創作者可將付費集數價格設定為每集US$0.10至US$1.00。錢包額度及集數價格以美元記帳；錢包僅供在 LingYing 購物，不提供現金提領功能。價格變動（包括為符合現行上限而降價）只適用於之後的解鎖，不會改寫已完成購買的收據、原有金額或既有權益。適用稅項、匯兌或支付服務商費用，以交易所展示的資料及適用法律為準。',
       '通行證費用購買的是發布權限，而非指定商業成果。觀看或收益未如理想，本身不會產生「保證成果」的退款權利。但本條款不排除法律要求的退款或其他救濟，包括已付款服務未獲提供或描述失實。請提供收據或付款編號及問題，讓我們覆核適當處理方式；請勿提供完整卡號。',
       '本條款不概括豁免退款、拒付或其他消費者權利。失敗、重複、未經授權或有爭議的付款，以及喪失已付款存取權，均按實際情況覆核。內容下架或帳戶結束，不會自動成立或自動否定退款申請。',
@@ -202,6 +205,7 @@ const zhTW:LegalPolicyCopy={
   ],sections:[
     {id:'data-controller',title:'1. 責任主體及聯絡方式',paragraphs:[`服務由 ${COMPANY_NAME} 營運。如有私隱問題、查閱或更正要求、結束帳戶要求，或擔心上傳內容包含個人資料，請聯絡 ${CONTACT_EMAIL}。說明要求時，請勿提供密碼或完整付款卡資料。`],contact:true},
     {id:'data-collected',title:'2. 所收集的資料',paragraphs:[
+      '幸運抽獎會儲存與帳戶連結的剩餘及已用次數、管理員贈送次數及原因、所選劇集、請求識別碼及每次中獎的伺服器日期時間。結果僅供該帳戶及獲授權管理員查看；公開劇池只包含可觀看的已發布劇集。這些紀錄用於提供觀看權限及防止重複抽獎。',
       '帳戶及身份資料包括姓名、電郵、語言、帳戶角色及狀態、身份驗證服務商識別碼、時間紀錄及儲存額度。密碼註冊使用加鹽雜湊值，不儲存明文密碼。Google 或 Apple 登入可提供帳戶識別碼、姓名及電郵，包括 Apple 轉送電郵；我們不要求 Google 或 Apple 密碼、Gmail 郵件、通訊錄或 Drive 檔案，也不為登入儲存其存取或更新權杖。',
       '如已配置並由您選用，微信登入會提供應用程式範圍內的OpenID、可選的UnionID及暱稱。我們保留這些識別資料以識別或經明確操作連結您的帳戶，不保留微信密碼、訊息、通訊錄或登入存取／更新權杖。微信不會提供電郵；新用戶須另行提供聯絡電郵，並在建立帳戶前以電郵驗證碼確認可存取該郵箱。微信授權本身並不驗證該電郵。待完成的註冊授權於10分鐘後失效。電郵驗證另行處理，並取決於已配置的傳送服務。',
       '內容及活動資料包括上傳影片、美術、標題、描述、分類及所聲明的語言；公開發布者資料；讚好、片單、觀看進度、播放事件、觀看時間及相關整體統計。與帳戶相關或隨機訪客識別碼會經雜湊處理作播放統計用途。雜湊是一項保障措施，並非資料完全匿名的保證。',
@@ -214,7 +218,7 @@ const zhTW:LegalPolicyCopy={
     ]},
     {id:'cookies',title:'4. Cookie、瀏覽器儲存及地區價格顯示',paragraphs:[
       '應用程式以安全、HTTP-only工作階段Cookie維持登入，並在訪客開始播放時使用獨立的隨機訪客Cookie。這些應用程式Cookie目前有效期為30天。短期登入Cookie會將 Google、Apple 或微信身份驗證嘗試與瀏覽器連結。微信亦會使用短期、HTTP-only Cookie完成註冊。Cookie到期日並不是相關商業或播放紀錄的保留期限。',
-      '瀏覽器本機儲存記憶介面語言；工作階段儲存可能在註冊期間暫存您主動輸入的優惠碼。瀏覽器或已安裝應用程式亦可能儲存靜態檔案。您可透過瀏覽器清除儲存或管理Cookie，但登入、購買、偏好及部分統計或功能可能無法正常使用。',
+      '瀏覽器本機儲存記憶介面語言；工作階段儲存可能在註冊期間暫存您主動輸入的優惠碼，以及待處理抽獎請求識別碼與管理員贈送次數的表單資料，以便恢復中斷的請求。瀏覽器或已安裝應用程式亦可能儲存靜態檔案。您可透過瀏覽器清除儲存或管理Cookie，但登入、購買、偏好及部分統計或功能可能無法正常使用。',
       'Cloudflare 可能提供概略國家資料，以顯示本地貨幣價格估算；這不需要GPS定位。匯率服務只取得估算所需的貨幣組合，不會收到您的 LingYing 帳戶資料。託管、傳送及安全供應商亦可能使用自身的營運統計及紀錄；其服務與本政策所述的應用程式播放統計分開說明。',
     ]},
     {id:'providers-transfers',title:'5. 服務供應商、披露及跨境處理',paragraphs:[
@@ -249,7 +253,7 @@ const zhTW:LegalPolicyCopy={
 };
 
 const zhCN:LegalPolicyCopy={
-  effective:'生效日期',date:'2026年11月8日',version:'版本',contents:'本页内容',summary:'重点摘要',contact:'联系公司',languages:'政策语言',related:'相关政策',fallback:en.fallback,
+  effective:'生效日期',date:'2026年11月11日',version:'版本',contents:'本页内容',summary:'重点摘要',contact:'联系公司',languages:'政策语言',related:'相关政策',fallback:en.fallback,
   terms:{title:'使用条款',intro:`本条款说明使用 LingYing 灵映的条件。平台由 ${COMPANY_NAME}（下称“公司”“我们”）运营，并在与您构成有效协议的范围内适用。请在注册、购买 Dramio Pass 或发布内容前阅读本条款。法律规定不得排除的权利仍然适用。`,summary:[
     'Dramio Pass 提供发布功能的使用权。购买通行证不保证内容获批、宣传、观看次数、销售、营收或收入；收益可能为零。',
     '您必须拥有上传内容所需的全部权利。公司可限制或移除侵权、违法或不适当的内容。',
@@ -288,6 +292,7 @@ const zhCN:LegalPolicyCopy={
       '复核期间，我们可限制有关内容，并向上传者查询。上传者可提供授权、所有权、同意或其他合法依据的证据。我们会考虑相关证据及适用法律，但不保证恢复内容。为公平回应投诉，必要资料可能在适当保护个人资料的情况下与相关人士分享。本程序不取代任何法定通知程序或法院救济。',
     ],contact:true},
     {id:'purchases-refunds',title:'7. 价格、钱包、集数访问及退款',paragraphs:[
+      '幸运抽奖是免费账户优惠，并非付费抽奖或现金奖项。每个账户获一次迎新机会；管理员可额外赠送免费次数。每次从当时符合资格的剧集中等机会随机选取一部，排除曾中奖、自己上传，以及已购齐付费集数的剧集。中奖可解锁该剧现有及以后新增的集数，但仍以作品可供观看为前提。没有符合资格的作品时不扣次数。移出剧池不会取消中奖；发布状态、权利限制及内容审核仍适用。既有购买及退款权利不变，免费中奖不产生付费销售或创作者收益。',
       '确认付款前，请查阅价格、货币、优惠及服务描述。创作者可将付费集数价格设定为每集US$0.10至US$1.00。钱包额度及集数价格以美元记账；钱包仅供在 LingYing 购物，不提供现金提现功能。价格变动（包括为符合现行上限而降价）只适用于之后的解锁，不会改写已完成购买的收据、原有金额或既有权益。适用税项、汇兑或支付服务商费用，以交易所展示的资料及适用法律为准。',
       '通行证费用购买的是发布权限，而非指定商业成果。观看或收益未如理想，本身不会产生“保证成果”的退款权利。但本条款不排除法律要求的退款或其他救济，包括已付款服务未获提供或描述失实。请提供收据或付款编号及问题，让我们复核适当处理方式；请勿提供完整卡号。',
       '本条款不概括豁免退款、拒付或其他消费者权利。失败、重复、未经授权或有争议的付款，以及丧失已付款访问权，均按实际情况复核。内容下架或账户结束，不会自动成立或自动否定退款申请。',
@@ -320,6 +325,7 @@ const zhCN:LegalPolicyCopy={
   ],sections:[
     {id:'data-controller',title:'1. 责任主体及联系方式',paragraphs:[`服务由 ${COMPANY_NAME} 运营。如有隐私问题、查阅或更正要求、结束账户要求，或担心上传内容包含个人资料，请联系 ${CONTACT_EMAIL}。说明要求时，请勿提供密码或完整付款卡资料。`],contact:true},
     {id:'data-collected',title:'2. 所收集的资料',paragraphs:[
+      '幸运抽奖会保存与账户关联的剩余及已用次数、管理员赠送次数及原因、所选剧集、请求标识码及每次中奖的服务器日期时间。结果仅供该账户及获授权管理员查看；公开剧池只包含可观看的已发布剧集。这些记录用于提供观看权限及防止重复抽奖。',
       '账户及身份资料包括姓名、电邮、语言、账户角色及状态、身份验证服务商识别码、时间记录及存储额度。密码注册使用加盐哈希值，不存储明文密码。Google 或 Apple 登录可提供账户识别码、姓名及电邮，包括 Apple 转发电邮；我们不要求 Google 或 Apple 密码、Gmail 邮件、通讯录或 Drive 文件，也不为登录存储其访问或刷新令牌。',
       '如已配置并由您选用，微信登录会提供应用程序范围内的OpenID、可选的UnionID及昵称。我们保留这些标识资料以识别或经明确操作关联您的账户，不保留微信密码、消息、通讯录或登录访问／刷新令牌。微信不会提供邮箱；新用户须另行提供联系邮箱，并在创建账户前以邮件验证码确认可访问该邮箱。微信授权本身并不验证该邮箱。待完成的注册授权于10分钟后失效。邮箱验证另行处理，并取决于已配置的发送服务。',
       '内容及活动资料包括上传视频、美术、标题、描述、分类及所声明的语言；公开发布者资料；点赞、片单、观看进度、播放事件、观看时间及相关整体统计。与账户相关或随机访客识别码会经哈希处理作播放统计用途。哈希是一项保护措施，并非资料完全匿名的保证。',
@@ -332,7 +338,7 @@ const zhCN:LegalPolicyCopy={
     ]},
     {id:'cookies',title:'4. Cookie、浏览器存储及地区价格显示',paragraphs:[
       '应用程序以安全、HTTP-only会话Cookie维持登录，并在访客开始播放时使用独立的随机访客Cookie。这些应用程序Cookie目前有效期为30天。短期登录Cookie会将 Google、Apple 或微信身份验证尝试与浏览器关联。微信也会使用短期、HTTP-only Cookie完成注册。Cookie到期日并不是相关商业或播放记录的保留期限。',
-      '浏览器本地存储记忆界面语言；会话存储可能在注册期间暂存您主动输入的优惠码。浏览器或已安装应用程序也可能存储静态文件。您可通过浏览器清除存储或管理Cookie，但登录、购买、偏好及部分统计或功能可能无法正常使用。',
+      '浏览器本地存储记忆界面语言；会话存储可能在注册期间暂存您主动输入的优惠码，以及待处理抽奖请求标识码与管理员赠送次数的表单资料，以便恢复中断的请求。浏览器或已安装应用程序也可能存储静态文件。您可通过浏览器清除存储或管理Cookie，但登录、购买、偏好及部分统计或功能可能无法正常使用。',
       'Cloudflare 可能提供概略国家资料，以显示本地货币价格估算；这不需要GPS定位。汇率服务只取得估算所需的货币组合，不会收到您的 LingYing 账户资料。托管、传送及安全供应商也可能使用自身的运营统计及记录；其服务与本政策所述的应用程序播放统计分开说明。',
     ]},
     {id:'providers-transfers',title:'5. 服务供应商、披露及跨境处理',paragraphs:[

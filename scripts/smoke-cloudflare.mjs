@@ -5,7 +5,7 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {spawn,execFileSync} from 'node:child_process';
 import {once} from 'node:events';
-import {randomBytes,createHmac,createHash} from 'node:crypto';
+import {randomUUID,randomBytes,createHmac,createHash} from 'node:crypto';
 
 // Entirely local: Miniflare emulates Durable Objects and R2. Never deploys or charges money.
 const dir=await mkdtemp(path.join(tmpdir(),'aidramio-cloudflare-test-'));
@@ -142,7 +142,7 @@ try{
   const spokenCodes=cfg.spokenLanguages.map(item=>item.code),interfaceCodes=cfg.languages.map(item=>item.code);
   assert.equal(spokenCodes.length,21);assert.ok(spokenCodes.includes('cmn')&&spokenCodes.includes('yue'));assert.ok(!spokenCodes.includes('zh-TW')&&!spokenCodes.includes('zh-CN'));
   assert.equal(interfaceCodes.length,21);assert.ok(interfaceCodes.includes('zh-TW')&&interfaceCodes.includes('zh-CN'));assert.ok(!interfaceCodes.includes('cmn')&&!interfaceCodes.includes('yue'));
-  assert.deepEqual(cfg.creatorPassConsent,{policyVersion:'2026-11-09',disclosureVersion:'creator-pass-ack-v2'});
+  assert.deepEqual(cfg.creatorPassConsent,{policyVersion:'2026-11-11',disclosureVersion:'creator-pass-ack-v2'});
   const creatorConsent={accepted:true,policy_version:cfg.creatorPassConsent.policyVersion,disclosure_version:cfg.creatorPassConsent.disclosureVersion};
   assert.equal(cfg.limits.quotaBytes,10*1024**3);
   assert.equal(cfg.limits.minimumPriceUsd,0.1);assert.equal(cfg.limits.maximumPriceUsd,1);
@@ -460,6 +460,29 @@ try{
   await request(finalePath+'/episodes/batch',{action:'reorder',revision:finaleNewRevision,episode_ids:finaleEpisodes.map(episode=>episode.id),acknowledge_access_change:true},admin);
   assert.equal((await readFinale()).episodes.find(episode=>episode.free).id,finaleEpisodes[2].id);
   console.log('PASS: optional final-episode pricing handles sparse order, guest playback, no-charge unlocks, opt-out/default/omitted metadata and acknowledged reorders.');
+
+  const luckyPage=await fetch(base+'/lucky-draw');assert.equal(luckyPage.status,200);assert.match(await luckyPage.text(),/noindex/);
+  await request('/api/lucky-draw',undefined,'',401);await request('/api/lucky-draw/draw',{request_id:randomUUID()},'',401);await request('/api/admin/lucky-draw/pool',undefined,viewer,403);
+  const luckyRegistration=await request('/api/auth/register',{email:'lucky-draw@example.test',name:'Local Lucky Viewer',password},'',201),luckyViewer=luckyRegistration.cookie,luckyUserId=luckyRegistration.data.user.id;
+  assert.equal((await request('/api/lucky-draw',undefined,luckyViewer)).data.remaining,1);
+  assert.equal((await request('/api/lucky-draw/draw',{request_id:randomUUID()},luckyViewer,409)).data.error.code,'DRAW_POOL_EMPTY');
+  const luckyGrant={amount:2,reason:'Local free promotion test',request_id:randomUUID()};
+  const granted=(await request(`/api/admin/lucky-draw/users/${luckyUserId}/chances`,luckyGrant,admin)).data;
+  assert.equal(granted.remaining,3);assert.deepEqual((await request(`/api/admin/lucky-draw/users/${luckyUserId}/chances`,luckyGrant,admin)).data,granted);
+  await request('/api/admin/lucky-draw/pool/'+finaleId,{enabled:true},admin,200,'PUT');
+  const luckyWalletBefore=(await request('/api/wallet',undefined,luckyViewer)).data,luckyRequestId=randomUUID();
+  const luckyDraw=(await request('/api/lucky-draw/draw',{request_id:luckyRequestId},luckyViewer)).data;
+  assert.equal(luckyDraw.remaining,2);assert.equal(luckyDraw.used,1);assert.equal(luckyDraw.draw.series.id,finaleId);assert.match(luckyDraw.draw.drawn_at,/T.*Z$/);
+  assert.deepEqual((await request('/api/lucky-draw/draw',{request_id:luckyRequestId},luckyViewer)).data,luckyDraw);
+  assert.equal((await request(`/api/lucky-draw/draws/${luckyRequestId}`,undefined,viewer,404)).data.error.code,'DRAW_NOT_FOUND');
+  assert.ok((await request('/api/series/'+finaleId,undefined,luckyViewer)).data.episodes.every(episode=>episode.unlocked));
+  assert.equal((await request(`/api/episodes/${finaleEpisodes[1].id}/unlock`,{},luckyViewer)).data.alreadyUnlocked,true);
+  const luckyStream=await fetch(base+`/api/episodes/${finaleEpisodes[1].id}/stream`,{headers:{Cookie:luckyViewer,Range:'bytes=0-15'}});assert.equal(luckyStream.status,206);assert.equal((await luckyStream.arrayBuffer()).byteLength,16);
+  await request('/api/admin/lucky-draw/pool/'+finaleId,{enabled:false},admin,200,'PUT');
+  assert.equal((await request('/api/lucky-draw',undefined,luckyViewer)).data.unlocked[0].id,luckyDraw.draw.id);
+  assert.deepEqual((await request('/api/wallet',undefined,luckyViewer)).data,luckyWalletBefore);
+  console.log('PASS: free Lucky Draw uses atomic Durable Object SQL, administrator pool/grants, replay-safe chances, private results and real protected media access without changing wallets.');
+
 
   const liked=(await request(`/api/series/${sid}/like`,{liked:true},viewer,200,'PUT')).data;assert.equal(liked.likes,1);
   const duplicateLike=(await request(`/api/series/${sid}/like`,{liked:true},viewer,200,'PUT')).data;assert.equal(duplicateLike.likes,1);
@@ -808,6 +831,7 @@ try{
   console.log('PASS: signed refund events persist once across Cloudflare SQL restart, unmatched cases stay held, and non-admin/unmapped resolutions are rejected.');
 
   await stop();await start(true);
+  const retainedLucky=(await request('/api/lucky-draw',undefined,luckyViewer)).data;assert.equal(retainedLucky.remaining,2);assert.equal(retainedLucky.used,1);assert.equal(retainedLucky.unlocked[0].id,luckyDraw.draw.id);assert.equal(retainedLucky.unlocked[0].drawn_at,luckyDraw.draw.drawn_at);assert.equal((await request('/api/lucky-draw/draw',{request_id:luckyRequestId},luckyViewer)).data.draw.id,luckyDraw.draw.id);
   assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.quota_bytes,20*1024**3,'A restart must retain the approved higher allowance.');
   const production=(await request('/api/config')).data;assert.equal(production.paymentsMode,'disabled');assert.equal(production.runtime,'cloudflare');assert.equal(production.auth.google,false);
   const retainedFinale=await readFinale();assert.equal(retainedFinale.series.last_episode_free,true);assert.equal(retainedFinale.series.free_episode_count,1);assert.equal(retainedFinale.episodes.find(episode=>episode.free).id,finaleEpisodes[2].id);assert.equal(retainedFinale.series.views,3);assert.deepEqual(retainedFinale.episodes.map(episode=>episode.views),[1,1,1]);

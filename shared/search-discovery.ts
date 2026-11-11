@@ -12,13 +12,13 @@ export function searchRoute(value:string):SearchRoute{
   if(publicPaths[path])return{kind:publicPaths[path],path};
   const match=/^\/(series|publishers)\/([^/]+)\/?$/u.exec(path);
   if(match){try{const id=decodeURIComponent(match[2]);if(!id||id.length>128||/[\/\\\u0000-\u001f]/u.test(id)||id==='.'||id==='..')return{kind:'missing',path:'/404'};return{kind:match[1]==='series'?'series':'publisher',path:`/${match[1]}/${encodeURIComponent(id)}`,id};}catch{return{kind:'missing',path:'/404'};}}
-  if(/^\/(auth|account|wallet|library|studio|admin|watch)(?:\/|$)/u.test(path))return{kind:'private',path};
+  if(/^\/(auth|account|wallet|library|lucky-draw|studio|admin|watch)(?:\/|$)/u.test(path))return{kind:'private',path};
   return{kind:'missing',path};
 }
 /** Application route IDs may contain dots. Recognize them before excluding
  * static asset extensions, so they still receive correct 404/noindex metadata. */
 export function searchPageRequest(pathname:string){
-  if(/^\/(series|publishers|auth|account|wallet|library|studio|admin|watch)(?:\/|$)/u.test(pathname))return true;
+  if(/^\/(series|publishers|auth|account|wallet|library|lucky-draw|studio|admin|watch)(?:\/|$)/u.test(pathname))return true;
   return !pathname.startsWith('/api/')&&!pathname.startsWith('/assets/')&&!pathname.startsWith('/src/')&&!pathname.startsWith('/@')&&!pathname.startsWith('/node_modules/')&&!/\.[A-Za-z0-9]{1,10}$/u.test(pathname);
 }
 export function searchOrigin(value= CUSTOM_SITE_ORIGIN){

@@ -1,3 +1,4 @@
+import {LUCKY_DRAW_SCHEMA} from './lucky-draw-schema.js';
 import {WECHAT_AUTH_SCHEMA} from './wechat-auth-schema.js';
 import {APPLE_AUTH_SCHEMA} from './apple-schema.js';
 import {ACCOUNT_EMAIL_SCHEMA} from './email-schema.js';
@@ -275,6 +276,7 @@ CREATE INDEX IF NOT EXISTS playback_episode_qualified ON playback_sessions(episo
 CREATE INDEX IF NOT EXISTS purchases_episode_created ON purchases(episode_id,created_at,user_id);
 CREATE INDEX IF NOT EXISTS test_purchases_episode_created ON test_purchases(episode_id,created_at,user_id);
 ${WECHAT_AUTH_SCHEMA}
+${LUCKY_DRAW_SCHEMA}
 ${APPLE_AUTH_SCHEMA}
 ${ACCOUNT_EMAIL_SCHEMA}
 ${FUNDING_REWARD_SCHEMA}

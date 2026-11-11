@@ -1,3 +1,4 @@
+import {hasLuckyDrawAccess} from './lucky-draw-access.js';
 import {episodePriceCents} from './episode-pricing.js';
 import type {CheckoutChoice} from '../shared/wechat-pay.js';
 import {wechatPayEnabled,requestedWechatQuote,bindWechatQuote,storeCheckoutMethod,checkoutMethod,verifyWechatSession} from './wechat-pay.js';
@@ -83,7 +84,7 @@ export function unlockEpisode(userId: string, episodeId: string) {
     assert(episode && episode.status === 'published', 404, 'NOT_FOUND', 'Episode not found.');
     assertSeriesAvailable(episode.series_id);
     if (episode.free || episode.creator_id === userId) return { alreadyUnlocked: true };
-    if (hasEpisodePurchase(userId,episodeId)) return { alreadyUnlocked: true };
+    if (hasEpisodePurchase(userId,episodeId)||hasLuckyDrawAccess(userId,episode.series_id)) return { alreadyUnlocked: true };
     const user = financeAccount(userId);
     const cents=episodePriceCents(episode.price_cents);
     const price = cents * 10000;
