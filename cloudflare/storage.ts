@@ -1,12 +1,18 @@
 import {Readable} from 'node:stream';
+import type {R2ObjectBody} from '@cloudflare/workers-types';
 import type {Request,Response} from 'express';
 import {getRuntime,finishInBackground} from './runtime';
 import {AppError,assert} from '../server/errors';
 import {DEMO_PREVIEW_BYTES} from './preview-meta';
 import {MAX_EPISODE_SECONDS,MAX_TRACKED_EPISODE_SECONDS} from '../shared/config';
+import {cachedMp4Playback,type VideoBytePatch} from '../shared/mp4-playback';
+import {compatibleVideoStream} from '../shared/video-stream';
 
 const mime=new Map<string,string>();
-async function range(key:string,offset:number,length:number){const object=await getRuntime().env.MEDIA.get(key,{range:{offset,length}});assert(object,404,'MEDIA_UNAVAILABLE','Media file not found.');return Buffer.from(await object.arrayBuffer());}
+async function range(key:string,offset:number,length:number,etag?:string){
+  const object=await getRuntime().env.MEDIA.get(key,{range:{offset,length},...(etag?{onlyIf:{etagMatches:etag}}:{})});
+  assert(object,404,'MEDIA_UNAVAILABLE','Media file not found.');assert('arrayBuffer'in object,409,'MEDIA_CHANGED','The media changed while loading. Please retry.');return Buffer.from(await object.arrayBuffer());
+}
 interface Box{type:string;start:number;length:number;header:number;data:Buffer}
 function boxes(buffer:Buffer):Box[]{
   const result:Box[]=[];let offset=0;
@@ -101,5 +107,13 @@ export async function serveObject(key:string,req:Request,res:Response,type:strin
   const bucket=getRuntime().env.MEDIA;const head=await bucket.head(key);assert(head,404,'MEDIA_UNAVAILABLE','Media file is unavailable.');
   let start=0,end=head.size-1;const requested=req.headers.range;
   if(requested){const m=/^bytes=(\d*)-(\d*)$/.exec(requested);if(!m||(!m[1]&&!m[2])){res.status(416).setHeader('Content-Range',`bytes */${head.size}`);res.end();return;}start=m[1]?Number(m[1]):Math.max(0,head.size-Number(m[2]));end=m[1]?(m[2]?Math.min(Number(m[2]),head.size-1):head.size-1):head.size-1;if(start>end||start>=head.size){res.status(416).setHeader('Content-Range',`bytes */${head.size}`);res.end();return;}}
-  const object=await bucket.get(key,{range:{offset:start,length:end-start+1}});assert(object,404,'MEDIA_UNAVAILABLE','Media file is unavailable.');res.setHeader('Cache-Control','private, no-store');res.setHeader('Accept-Ranges','bytes');res.type(object.httpMetadata?.contentType||type);res.setHeader('Content-Length',end-start+1);if(requested){res.status(206);res.setHeader('Content-Range',`bytes ${start}-${end}/${head.size}`);}const stream=Readable.fromWeb(object.body as any);res.once('close',()=>stream.destroy());stream.on('error',error=>res.destroy(error));stream.pipe(res);
+  const patches:VideoBytePatch[]=type==='video/mp4'?await cachedMp4Playback(key,head.etag,head.size,(offset,length)=>range(key,offset,length,head.etag)):[];
+  const object=req.method==='HEAD'?undefined:await bucket.get(key,{range:{offset:start,length:end-start+1},...(head.etag?{onlyIf:{etagMatches:head.etag}}:{})});
+  if(req.method!=='HEAD'){assert(object,404,'MEDIA_UNAVAILABLE','Media file is unavailable.');assert('body'in object,409,'MEDIA_CHANGED','The media changed while loading. Please retry.');}
+  res.setHeader('Cache-Control','private, no-store');res.setHeader('Accept-Ranges','bytes');res.type(object?.httpMetadata?.contentType||head.httpMetadata?.contentType||type);res.setHeader('Content-Length',end-start+1);
+  if(type==='video/mp4'){res.setHeader('X-LingYing-Playback','h264-compat-v1');res.setHeader('X-LingYing-Video-Compatibility',patches.length?'normalized':'original');}
+  if(requested){res.status(206);res.setHeader('Content-Range',`bytes ${start}-${end}/${head.size}`);}
+  if(req.method==='HEAD'){res.end();return;}
+  const input=Readable.fromWeb((object as R2ObjectBody).body as any),stream=compatibleVideoStream(input,start,patches);
+  res.once('close',()=>{stream.destroy();input.destroy();});stream.on('error',error=>res.destroy(error));stream.pipe(res);
 }

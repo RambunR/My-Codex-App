@@ -925,6 +925,30 @@ try{
   assert.equal((await request(longSeriesPath,undefined,admin)).data.episodes[0].duration,7200);
   assert.equal((await request('/api/history',undefined,viewer)).data.history.find(row=>row.id===longSeriesId).seconds,601);
   console.log('PASS: only the pinned owner and their managed profiles accept two-hour direct/chunked episodes; ordinary creators and admin edits remain five minutes, with long duration/progress retained after restart.');
+  const safariSource=path.join(dir,'safari-export.mp4'),safariExpected=path.join(dir,'safari-reference.mp4');
+  execFileSync('ffmpeg',['-v','error','-f','lavfi','-i','testsrc2=s=128x224:r=30','-f','lavfi','-i','sine=frequency=440:sample_rate=44100','-t','4','-c:v','libx264','-threads','1','-pix_fmt','yuv420p','-profile:v','high','-level:v','6.2','-bsf:v','h264_metadata=tick_rate=32000/1','-c:a','aac','-movflags','+faststart','-y',safariSource]);
+  execFileSync('ffmpeg',['-v','error','-i',safariSource,'-c','copy','-bsf:v','h264_metadata=level=4.1:tick_rate=60/1','-movflags','+faststart','-y',safariExpected]);
+  const safariOriginal=await readFile(safariSource),safariReference=await readFile(safariExpected);
+  const safariSeries=(await request('/api/studio/series',{...body,title:'Safari legacy export regression',free_episodes:1},admin,201)).data.id,safariPath=`/api/studio/series/${safariSeries}`;
+  await upload(safariPath+'/cover',cover,'safari.jpg',admin,{},'cover',200);
+  const safariEpisode=await upload(safariPath+'/episodes',safariOriginal,'legacy-export.mp4',admin,{title:'Safari decoder regression',number:1});
+  await request(`/api/episodes/${safariEpisode.id}/stream`,undefined,'',404);
+  const usedBefore=(await request('/api/auth/me',undefined,admin)).data.user.used_bytes;
+  const safariPrivate=await fetch(base+`/api/admin/episodes/${safariEpisode.id}/stream`,{headers:{Cookie:admin}});
+  assert.equal(safariPrivate.status,200);assert.equal(safariPrivate.headers.get('x-lingying-playback'),'h264-compat-v1');assert.equal(safariPrivate.headers.get('x-lingying-video-compatibility'),'normalized');
+  const safariRendered=Buffer.from(await safariPrivate.arrayBuffer());assert.equal(safariRendered.length,safariOriginal.length);
+  const avcc=buffer=>{const at=buffer.indexOf('avcC');assert.ok(at>4);return buffer.subarray(at-4,at-4+buffer.readUInt32BE(at-4));};
+  assert.deepEqual(avcc(safariRendered),avcc(safariReference),'Delivery must match independently corrected FFmpeg codec metadata.');
+  const mdat=safariOriginal.indexOf('mdat');assert.ok(mdat>0);assert.deepEqual(safariRendered.subarray(mdat),safariOriginal.subarray(mdat),'Encoded pictures/audio remain byte-identical.');
+  assert.equal((await request('/api/auth/me',undefined,admin)).data.user.used_bytes,usedBefore);
+  await request(safariPath+'/status',{status:'published'},admin);
+  for(const [range,start,end]of [['bytes=0-1',0,1],[`bytes=${safariOriginal.indexOf('avcC')}-${safariOriginal.indexOf('avcC')+45}`,safariOriginal.indexOf('avcC'),safariOriginal.indexOf('avcC')+45],['bytes=-19',safariOriginal.length-19,safariOriginal.length-1]]){
+    const part=await fetch(base+`/api/episodes/${safariEpisode.id}/stream`,{headers:{Range:range}});assert.equal(part.status,206);assert.equal(part.headers.get('content-range'),`bytes ${start}-${end}/${safariOriginal.length}`);assert.deepEqual(Buffer.from(await part.arrayBuffer()),safariRendered.subarray(start,end+1));
+  }
+  const safariHead=await fetch(base+`/api/episodes/${safariEpisode.id}/stream`,{method:'HEAD',headers:{Range:'bytes=0-1'}});assert.equal(safariHead.status,206);assert.equal(safariHead.headers.get('content-range'),`bytes 0-1/${safariOriginal.length}`);assert.equal((await safariHead.arrayBuffer()).byteLength,0);
+  await stop();await start(true);
+  const safariRestart=await fetch(base+`/api/episodes/${safariEpisode.id}/stream`);assert.equal(safariRestart.headers.get('x-lingying-video-compatibility'),'normalized');assert.deepEqual(Buffer.from(await safariRestart.arrayBuffer()),safariRendered);
+  console.log('PASS: Safari AVC delivery corrects the reproduced clock/level defect, matches FFmpeg, preserves encoded pictures/audio and quota, respects private access and byte ranges, and survives restart.');
   console.log('Cloudflare local integration smoke passed. No Cloudflare account resources were created.');
 }catch(error){console.error(error);console.error(logs.slice(-12000));process.exitCode=1;}
 finally{await stop();await rm(dir,{recursive:true,force:true});}

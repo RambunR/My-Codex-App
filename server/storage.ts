@@ -10,6 +10,8 @@ import type { Request, Response } from 'express';
 import { config } from './config.js';
 import { assert, AppError } from './errors.js';
 import { MAX_EPISODE_BYTES,MAX_EPISODE_SECONDS,MAX_TRACKED_EPISODE_SECONDS } from '../shared/config.js';
+import {cachedMp4Playback,type VideoBytePatch} from '../shared/mp4-playback.js';
+import {compatibleVideoStream} from '../shared/video-stream.js';
 
 const exec = promisify(execFile);
 export async function removeTempFile(file:string){await fs.rm(file,{force:true});}
@@ -71,7 +73,11 @@ export async function serveObject(key: string, req: Request, res: Response, type
   if (s3 && bucket && !key.startsWith('demo/')) { res.redirect(await getSignedUrl(s3, new GetObjectCommand({ Bucket: bucket, Key: key, ResponseContentType: type }), { expiresIn: 120 })); return; }
   const file = objectPath(key); assert(existsSync(file), 404, 'MEDIA_UNAVAILABLE', 'This media file is unavailable.');
   const stat = await fs.stat(file); const range = req.headers.range;
+  const patches:VideoBytePatch[]=type==='video/mp4'?await cachedMp4Playback(file,`${stat.size}:${stat.mtimeMs}:${stat.ctimeMs}`,stat.size,async(offset,length)=>{
+    const handle=await fs.open(file,'r');try{const bytes=Buffer.alloc(length),result=await handle.read(bytes,0,length,offset);return bytes.subarray(0,result.bytesRead);}finally{await handle.close();}
+  }):[];
   res.type(type); res.setHeader('Accept-Ranges', 'bytes');
+  if(type==='video/mp4'){res.setHeader('X-LingYing-Playback','h264-compat-v1');res.setHeader('X-LingYing-Video-Compatibility',patches.length?'normalized':'original');}
   if (range) {
     const match = /^bytes=(\d*)-(\d*)$/.exec(range);
     if (!match || (!match[1] && !match[2])) { res.status(416).setHeader('Content-Range', `bytes */${stat.size}`); res.end(); return; }
@@ -79,6 +85,7 @@ export async function serveObject(key: string, req: Request, res: Response, type
     const end = match[1] ? (match[2] ? Math.min(Number(match[2]), stat.size - 1) : stat.size - 1) : stat.size - 1;
     if (start > end || start >= stat.size) { res.status(416).setHeader('Content-Range', `bytes */${stat.size}`); res.end(); return; }
     res.status(206); res.setHeader('Content-Range', `bytes ${start}-${end}/${stat.size}`); res.setHeader('Content-Length', end - start + 1);
-    const stream=createReadStream(file,{start,end});res.once('close',()=>stream.destroy());stream.on('error',error=>res.destroy(error));stream.pipe(res);
-  } else { res.setHeader('Content-Length', stat.size); const stream=createReadStream(file);res.once('close',()=>stream.destroy());stream.on('error',error=>res.destroy(error));stream.pipe(res); }
+    if(req.method==='HEAD'){res.end();return;}
+    const input=createReadStream(file,{start,end}),stream=compatibleVideoStream(input,start,patches);res.once('close',()=>{stream.destroy();input.destroy();});stream.on('error',error=>res.destroy(error));stream.pipe(res);
+  } else { res.setHeader('Content-Length', stat.size);if(req.method==='HEAD'){res.end();return;}const input=createReadStream(file),stream=compatibleVideoStream(input,0,patches);res.once('close',()=>{stream.destroy();input.destroy();});stream.on('error',error=>res.destroy(error));stream.pipe(res); }
 }

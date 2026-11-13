@@ -123,6 +123,10 @@ Spoken dialogue uses `SPOKEN_LANGUAGES`, including Mandarin (`cmn`) and Cantones
 
 The shared story-theme vocabulary contains 26 stable IDs, including Entrepreneurship and nine other additions documented in [series classification](docs/SERIES_CLASSIFICATION.md). Keep all 21 taxonomy dictionaries complete and in shared-ID order, preserve existing saved themes and browse URLs, and retain the five-theme selection limit. Extending the vocabulary must not automatically tag existing uploads or change the separate genre, format or production-method fields.
 
+## Safari playback
+
+For iPhone Safari playback, preserve the guarded delivery-only AVC correction in `shared/mp4-playback.ts` and both storage adapters. Some real uploads declare Level 6.2 and an implausible non-fixed VUI clock while their MP4 timelines are 25/30/60 fps. Only normalize verified 8-bit progressive High Profile exports within Level 4.1/4.2 complexity bounds and with unchanged escaped SPS length. Never blindly lower a codec level, rewrite original objects, change presentation timestamps, bypass paid/Lucky Draw access, or introduce a paid transcoding service as a shortcut. Retain ETag/file-version cache invalidation, bounded reads/sample loops, coherent GET/HEAD/ranges, stream cancellation, actual MIME types and original quota. Run `npm run test:safari` plus the media and Cloudflare regressions; Linux WebKit is not physical iPhone validation. Browser storage denial must not crash language initialization. See [Safari playback](docs/SAFARI_PLAYBACK.md).
+
 ## Cover artwork
 
 Media saving deterrents apply only to `CoverArtwork` images and `BrandedVideo` media: suppress default context menus and dragging, keep `nodownload` in supported native video controls, and retain playback callbacks, seeking, fullscreen and picture-in-picture. Keep normal page text selection, form inputs, browser shortcuts and episode reordering available. These browser hints and display watermarks are not DRM and cannot prevent screenshots, recording or retrieval by authorized viewers; do not claim otherwise or weaken server access checks. See [media saving controls](docs/MEDIA_SAVING.md).

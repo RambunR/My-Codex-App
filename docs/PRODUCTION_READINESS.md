@@ -1,5 +1,7 @@
 # LingYing production readiness — 31 October 2026
 
+This file preserves the historical 31 October release evidence. For the 14 November iPhone Safari playback investigation, current checks and remaining readiness limits, see [Safari playback](SAFARI_PLAYBACK.md). Features including moderation controls and translated policies were added after this historical baseline.
+
 31 October 2026 (Hong Kong time). Current public site: https://lingyingdrama.com . Historical audit baseline source: `6a6bb43e9f7f51adfea41f0b34662f6fc3996247`.
 
 **Status: live card Checkout is deployed with public configuration and live account/endpoint readiness verified. The complete paid creator service is not release-ready.** The requested live-card mode keeps creator payouts independently paused and adds refund/dispute risk holds. Credential presence and a successful unpaid Checkout do not prove live settlement, provider delivery or full operational readiness.

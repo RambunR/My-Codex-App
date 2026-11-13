@@ -251,8 +251,8 @@ const I18nContext=createContext<{locale:Locale;setLocale:(l:Locale)=>void;t:(key
 export const baseMessages=en;
 export const localeMessages=dictionaries;
 export function I18nProvider({children}:{children:ReactNode}){
-  const [locale,set]=useState<Locale>(()=>{const stored=localStorage.getItem('drama-language');return LANGUAGES.some(x=>x.code===stored)?stored as Locale:'en';});
-  useEffect(()=>{localStorage.setItem('drama-language',locale);document.documentElement.lang=locale;document.documentElement.dir=['ar','ur'].includes(locale)?'rtl':'ltr';},[locale]);
+  const [locale,set]=useState<Locale>(()=>{try{const stored=localStorage.getItem('drama-language');return LANGUAGES.some(x=>x.code===stored)?stored as Locale:'en';}catch{return'en';}});
+  useEffect(()=>{try{localStorage.setItem('drama-language',locale);}catch{/* Browsing stays available when Safari blocks persistent storage. */}document.documentElement.lang=locale;document.documentElement.dir=['ar','ur'].includes(locale)?'rtl':'ltr';},[locale]);
   const t=(key:Key)=>dictionaries[locale]?.[key]||en[key];
   return <I18nContext.Provider value={{locale,setLocale:set,t}}>{children}</I18nContext.Provider>;
 }

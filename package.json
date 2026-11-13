@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
     "test:e2e": "playwright test",
+    "test:safari": "playwright test --config playwright.safari.config.ts",
     "seed": "tsx server/seed.ts",
     "admin:create": "tsx server/create-admin.ts",
     "test:production": "node scripts/smoke-production.mjs",
