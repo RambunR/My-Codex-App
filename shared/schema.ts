@@ -15,6 +15,7 @@ import {WECHAT_PAY_SCHEMA} from './wechat-pay-schema.js';
 import {CREATOR_PASS_CONSENT_SCHEMA} from './creator-pass-consent-schema.js';
 import {DEFAULT_QUOTA_BYTES} from './config.js';
 import {EPISODE_LIMITS_SCHEMA} from './episode-limits-schema.js';
+import {DRIVE_IMPORT_SCHEMA} from './drive-import-schema.js';
 
 export const DATABASE_SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -291,4 +292,5 @@ ${TEST_PAYOUT_SCHEMA}
 ${CREATOR_PASS_CONSENT_SCHEMA}
 ${WECHAT_PAY_SCHEMA}
 ${EPISODE_LIMITS_SCHEMA}
+${DRIVE_IMPORT_SCHEMA}
 `;

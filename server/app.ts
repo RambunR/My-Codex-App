@@ -1,3 +1,4 @@
+import {registerDriveImportApi} from './drive-import-api.js';
 import {registerLuckyDraw} from './lucky-draw.js';
 import {hasLuckyDrawAccess} from './lucky-draw-access.js';
 import {registerWechatAuth,wechatAuthEnabled} from './wechat-auth.js';
@@ -193,8 +194,9 @@ export function createApp() {
   registerAppleAuth(app);
   registerEmailAuth(app);
   registerPublisherProfiles(app,{catalogSelect,serializeSeries});
+  registerDriveImportApi(app);
   registerLuckyDraw(app,{catalogSelect,serializeSeries});
-  app.get('/api/health', (_req,res) => res.setHeader('X-LingYing-Upload-Policy','owner-duration-v1').json({ ok: true, database: !!one('SELECT 1 AS ready') }));
+  app.get('/api/health', (_req,res) => res.setHeader('X-LingYing-Upload-Policy','owner-duration-v1').setHeader('X-LingYing-Drive-Import','manifest-v1').json({ ok: true, database: !!one('SELECT 1 AS ready') }));
   app.get('/api/config', async (_req,res) => {initializePromotions();if(config.payments==='stripe'&&stripeConfigured())await ensureStripeWebhookReady(stripe);return res.json({ brand: 'LingYing', languages: LANGUAGES, spokenLanguages:SPOKEN_LANGUAGES, genres: GENRES,standardGenres:STANDARD_GENRES,storyThemes:STORY_THEMES,formats:SERIES_FORMATS,creationTypes:CREATION_TYPES, passPromotion:{enabled:true},creatorPassConsent:{policyVersion:LEGAL_POLICY_VERSION,disclosureVersion:CREATOR_PASS_DISCLOSURE_VERSION},paymentMethods:{wechatPay:wechatPayEnabled()},paymentsMode: config.payments,paymentsReady:paymentsReady(),paymentsConfigured:stripeConfigured(),paymentSetup:stripeWebhookReadiness(),sandbox:config.sandbox,paymentsTestMode:stripeTestPayments()||config.payments==='demo',payoutsEnabled:config.payoutsEnabled&&!stripeTestPayments(),uploadsEnabled:!config.sandbox,usdToHkd: config.usdToHkd,
     limits: { maxEpisodeSeconds: MAX_EPISODE_SECONDS, maxEpisodeBytes: MAX_EPISODE_BYTES, quotaBytes: DEFAULT_QUOTA_BYTES, activationHkd: 88, minimumPriceUsd: MIN_PRICE_CENTS/100,maximumPriceUsd:MAX_PRICE_CENTS/100, creatorShare: 0.7, minimumPayoutUsd: WITHDRAWAL_POLICY.minimumCents/100,minWalletFundingUsd:MIN_WALLET_FUNDING_CENTS/100,maxWalletFundingUsd:MAX_WALLET_FUNDING_CENTS/100 },withdrawalPolicy:WITHDRAWAL_POLICY,walletFunding:WALLET_FUNDING_OPTIONS, demo: config.seed,episodeUpload:{mode:chunkedEpisodeUploadsEnabled()?'chunked':'multipart',chunkBytes:EPISODE_UPLOAD_CHUNK_BYTES}, runtime: (config as any).runtime || 'node', videoFormats: (config as any).videoFormats || ['mp4','mov','webm','m4v'], auth:{wechat:wechatAuthEnabled(),google:googleEnabled(),apple:appleEnabled(),email:emailAuthEnabled()} });});
   app.get('/api/auth/me', (req,res) => res.json({ user: req.user || null }));

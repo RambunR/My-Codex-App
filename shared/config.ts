@@ -58,6 +58,7 @@ export interface User extends StorageUsage {
   test_withdrawal_unlimited?:boolean;
   creator_display_name?: string;
   max_episode_seconds?: number|null;
+  drive_import_unread?: number;
   email_verified?: boolean;
   payment_review?: boolean;
   dramio_pass?: {active:boolean;test:boolean;purchased_at:string|null};

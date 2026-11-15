@@ -3,6 +3,7 @@ import {luckyDrawEnglish,luckyDrawMessages} from './lucky-draw-locales';
 import {wechatVerificationEnglish,wechatVerificationMessages} from './wechat-verification-locales';
 import {seriesTitleAvailabilityEnglish,seriesTitleAvailabilityMessages} from './series-title-availability-locales';
 import {ownerEpisodeEnglish,ownerEpisodeMessages} from './owner-episode-locales';
+import {driveImportEnglish,driveImportMessages} from './drive-import-locales';
 import {wechatAuthEnglish,wechatAuthMessages} from './wechat-auth-locales';
 import {wechatEnglish,wechatMessages} from './wechat-pay-locales';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
@@ -34,6 +35,7 @@ const en = {
   ...luckyRevealEnglish,
   ...luckyDrawEnglish,
   ...ownerEpisodeEnglish,
+  ...driveImportEnglish,
   ...seriesTitleAvailabilityEnglish,
   ...wechatVerificationEnglish,
   ...wechatAuthEnglish,
@@ -222,6 +224,7 @@ for(const language of LANGUAGES)if(language.code!=='en')Object.assign(dictionari
 for(const language of LANGUAGES)if(language.code!=='en')Object.assign(dictionaries[language.code],luckyRevealMessages[language.code]);
 for(const language of LANGUAGES)Object.assign(dictionaries[language.code],seriesTitleAvailabilityMessages[language.code]);
 for(const language of LANGUAGES)Object.assign(dictionaries[language.code],ownerEpisodeMessages[language.code]);
+for(const language of LANGUAGES)Object.assign(dictionaries[language.code],driveImportMessages[language.code]);
 const uploadConfirmationMessages:Record<Locale,string>={
   en:'Upload confirmation was interrupted. Refresh this series before retrying the file.',
   'zh-TW':'上傳確認中斷。請重新整理此系列，再重試上傳檔案。',

@@ -21,6 +21,9 @@ import {canonicalApiRedirect,canonicalPageRedirect} from './routing';
 import {responseSecurityHeaders} from '../shared/security-headers';
 import {displayCurrencyResponse} from './display-currency';
 import {searchDiscoveryResponse} from './search-discovery';
+import {runDriveImportTick} from './drive-import-runtime';
+import {scheduleMediaCleanup} from './background';
+import {blocksPublicDriveTick,isInternalDriveTick,dispatchDriveTick} from './drive-import-dispatch';
 
 let listening=false;
 export class AIDramioApp {
@@ -52,7 +55,8 @@ export class AIDramioApp {
     bindRuntime(this.ctx.storage,this.env,p=>this.ctx.waitUntil(p));
     // A failed private-object deletion remains durable and continues retrying
     // even when the creator closes the browser or this object is evicted.
-    await cleanupSeriesMedia(undefined,20);await cleanupExpiredEpisodeUploads(8);
+    try{await cleanupSeriesMedia(undefined,20);await cleanupExpiredEpisodeUploads(8);}
+    finally{const tick=await runDriveImportTick({scanRoot:false});if(tick.wakeInMs!==undefined)await scheduleMediaCleanup(tick.wakeInMs);}
   }
   private seedCatalogue(){transaction(()=>{
     const creator='catalog-publisher';run("INSERT INTO users (id,email,name,password_hash,role) VALUES (?,?,?,?, 'publisher')",creator,'catalog@aidramio.invalid','Studio Afterglow',randomBytes(64).toString('hex'));
@@ -64,12 +68,22 @@ export class AIDramioApp {
   });}
   async fetch(request:Request){
     bindRuntime(this.ctx.storage,this.env,p=>this.ctx.waitUntil(p));
+    if(isInternalDriveTick(request)){
+      const tick=await runDriveImportTick({scanRoot:true});
+      if(tick.wakeInMs!==undefined)await scheduleMediaCleanup(tick.wakeInMs);
+      return Response.json({ok:true});
+    }
     if(!this.env.APP_URL&&config.appUrl==='https://aidramio.example')config.appUrl=new URL(request.url).origin;
     return handleAsNodeRequest(8080,request);
   }
 }
 export default {
+  async scheduled(_event:unknown,env:Env,ctx:{waitUntil:(promise:Promise<unknown>)=>void}){
+    const stub=env.APP.get(env.APP.idFromName('platform'));
+    ctx.waitUntil(dispatchDriveTick({fetch:request=>stub.fetch(request as any)}));
+  },
   async fetch(request:Request,env:Env){
+    if(blocksPublicDriveTick(request))return new Response('Not found.',{status:404,headers:{'Cache-Control':'no-store'}});
     const url=new URL(request.url);
     if(env.ENVIRONMENT==='sandbox'&&url.origin!==env.APP_URL)return new Response('This payment sandbox is available only on its isolated origin.',{status:403});
     const canonical=canonicalApiRedirect(request,env)||canonicalPageRedirect(request,env);if(canonical)return canonical;

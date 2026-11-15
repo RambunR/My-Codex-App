@@ -27,6 +27,7 @@ export const config = {
   ...selectStripeSettings(process.env,process.env.STRIPE_TEST_MODE==='true'),
   wechatAppId: process.env.WECHAT_APP_ID || '',
   wechatAppSecret: process.env.WECHAT_APP_SECRET || '',
+  driveImportCredentials: process.env.GOOGLE_DRIVE_IMPORT_CREDENTIALS || '',
   googleClientId: process.env.GOOGLE_CLIENT_ID || '',
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
   appleClientId: process.env.APPLE_CLIENT_ID || '',

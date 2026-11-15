@@ -59,6 +59,7 @@
     "PUBLIC_APP_URL": "https://lingyingdrama.com",
     "STRIPE_SITE_ORIGIN": "https://aidramio.jimmy-tsoi2001.workers.dev"
   },
+  "triggers": {"crons": ["*/5 * * * *"]},
   "observability": {
     "enabled": true
   },

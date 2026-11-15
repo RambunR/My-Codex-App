@@ -2,8 +2,8 @@ import path from 'node:path';
 import {mkdir,readFile,writeFile} from 'node:fs/promises';
 const root=process.cwd();
 const destination=path.join(root,'dist/cloudflare/server');await mkdir(destination,{recursive:true});
-const adapters=['db','config','storage','uploads','background','chunked-storage'];
-for(const name of ['lucky-draw','lucky-draw-access','app','auth','storage-quota','owner','episode-upload-policy','cover-layout','subtitle-languages','publisher-profiles','publisher-profile-sql','catalog-access','catalog-retirement','search-discovery','series-titles','series-lifecycle','episode-batch','episode-access','episode-upload-sessions','episode-duration','episode-pricing','playback-times','moderation','taxonomy','origins','google','wechat-auth','apple','email-auth','mail','finance','creator-pass-consent','test-payouts','test-payout-access','withdrawal-terms','funding-rewards','wechat-pay','promotions','payment-state','payment-risk','stripe-event-context','stripe-readiness','analytics','errors']){
+const adapters=['db','config','storage','uploads','background','chunked-storage','drive-import-runtime'];
+for(const name of ['google-drive-import','drive-import-store','drive-import-api','drive-import-engine','lucky-draw','lucky-draw-access','app','auth','storage-quota','owner','episode-upload-policy','cover-layout','subtitle-languages','publisher-profiles','publisher-profile-sql','catalog-access','catalog-retirement','search-discovery','series-titles','series-lifecycle','episode-batch','episode-access','episode-upload-sessions','episode-duration','episode-pricing','playback-times','moderation','taxonomy','origins','google','wechat-auth','apple','email-auth','mail','finance','creator-pass-consent','test-payouts','test-payout-access','withdrawal-terms','funding-rewards','wechat-pay','promotions','payment-state','payment-risk','stripe-event-context','stripe-readiness','analytics','errors']){
   let code=await readFile(path.join(root,'server',`${name}.ts`),'utf8');
   for(const adapter of adapters)code=code.replaceAll(`'./${adapter}.js'`,`'../../../cloudflare/${adapter}'`);
   code=code.replaceAll("'../shared/","'../../../shared/");

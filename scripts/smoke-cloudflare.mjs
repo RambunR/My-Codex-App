@@ -17,7 +17,7 @@ const maxEpisodeBytes=200*1024**2,chunkBytes=5*1024**2;
 let child,logs='',durationOwnerId='';
 async function start(production=false,testStripe=false,publicOrigin=base,missingTestPair=false,wechatLogin=false){
   logs='';
-  const args=['node_modules/wrangler/bin/wrangler.js','dev','--config',runtimeConfigPath,'--tsconfig',path.resolve('tsconfig.cloudflare.json'),'--local','--port',String(port),'--local-upstream',new URL(base).host,'--upstream-protocol','http','--inspector-port',String(port+400),'--persist-to',path.join(dir,'state'),
+  const args=['node_modules/wrangler/bin/wrangler.js','dev','--config',runtimeConfigPath,'--tsconfig',path.resolve('tsconfig.cloudflare.json'),'--local','--test-scheduled','--port',String(port),'--local-upstream',new URL(base).host,'--upstream-protocol','http','--inspector-port',String(port+400),'--persist-to',path.join(dir,'state'),
     '--var',`ENVIRONMENT:${production?'production':'development'}`,'--var',`PAYMENTS_MODE:${testStripe?'stripe':production?'disabled':'demo'}`,'--var',`STRIPE_TEST_MODE:${testStripe}`,'--var',`APP_URL:${base}`,'--var',`PUBLIC_APP_URL:${publicOrigin}`,'--var',`STRIPE_SITE_ORIGIN:${base}`,'--var',`BOOTSTRAP_TOKEN:${bootstrap}`];
   if(!production||testStripe)args.push('--var','GOOGLE_CLIENT_ID:local-test.apps.googleusercontent.com','--var','GOOGLE_CLIENT_SECRET:local-test-only-google-secret');
   if(testStripe){
@@ -114,6 +114,14 @@ try{
   const currencyWrite=await fetch(base+'/api/display-currency',{method:'POST'});assert.equal(currencyWrite.status,405);await currencyWrite.body.cancel();
   console.log('PASS: local display-currency fallback is private, read-only, ignores spoofed country inputs and does not call an external provider.');
   assert.equal((await request('/api/health')).headers.get('x-lingying-upload-policy'),'owner-duration-v1');
+  assert.equal((await request('/api/health')).headers.get('x-lingying-drive-import'),'manifest-v1');
+  for(const method of ['GET','POST','OPTIONS']){
+    const blocked=await fetch(base+'/_lingying_internal/drive_tick?scan=1',{method,redirect:'manual'});
+    assert.equal(blocked.status,404);assert.equal(blocked.headers.get('cache-control'),'no-store');await blocked.body.cancel();
+  }
+  await request('/api/admin/drive-imports',undefined,'',401);
+  console.log('PASS: Drive importer public dispatch is blocked and private controls require authentication.');
+  const manifestTool=await fetch(base+'/downloads/create-lingying-drive-manifests.mjs');assert.equal(manifestTool.status,200);assert.ok(!manifestTool.headers.get('content-type')?.includes('text/html'));assert.equal(await manifestTool.text(),await readFile('scripts/create-drive-manifests.mjs','utf8'));
   for(const route of ['/','/?search-source=fixture']){
     const home=await fetch(base+route);
     assert.equal(home.status,200);assert.equal(home.headers.get('link'),`<${base}/>; rel="canonical"`);
@@ -898,6 +906,17 @@ try{
   assert.equal((await request('/api/auth/me',undefined,admin)).data.user.max_episode_seconds,300);
   durationOwnerId=adminBeforeProfiles.id;await stop();await start(true);
   assert.equal((await request('/api/auth/me',undefined,admin)).data.user.max_episode_seconds,null);
+  const driveStatus=(await request('/api/admin/drive-imports',undefined,admin)).data;
+  assert.equal(driveStatus.settings.enabled,false);assert.equal(driveStatus.settings.verifiedAt,null);assert.equal(driveStatus.connection.runtimeAvailable,true);assert.equal(driveStatus.connection.configured,false);
+  assert.deepEqual(driveStatus.jobs,[]);assert.deepEqual(driveStatus.notifications,[]);
+  const cron=await fetch(base+'/__scheduled?cron='+encodeURIComponent('*/5 * * * *'));assert.equal(cron.status,200);await cron.body.cancel();
+  assert.deepEqual((await request('/api/admin/drive-imports',undefined,admin)).data.jobs,[]);
+  assert.equal((await request('/api/auth/me',undefined,admin)).data.user.drive_import_unread,0);
+  await request('/api/admin/drive-imports',{enabled:true},admin,409,'PATCH');
+  await request('/api/admin/drive-imports/connection',{},admin,409);
+  await request('/api/admin/drive-imports',undefined,publisher,403);
+  assert.equal((await request('/api/admin/drive-imports',undefined,admin)).data.settings.enabled,false);
+  console.log('PASS: real local Cloudflare adapter stays disabled without private credentials; owner-only controls cannot enable it accidentally.');
   assert.equal((await request('/api/auth/me',undefined,publisher)).data.user.max_episode_seconds,300);
   assert.equal((await request(`/api/studio/series/${sid}`,undefined,admin)).data.owner_upload_limits.maxEpisodeSeconds,300);
   const longPath=path.join(dir,'owner-two-hours.mp4');

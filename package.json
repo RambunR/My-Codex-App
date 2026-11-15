@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch server/index.ts",
-    "build": "tsc --noEmit && vite build && esbuild server/index.ts --bundle --platform=node --packages=external --format=esm --outfile=dist/server.js",
+    "build": "tsc --noEmit && vite build && node scripts/export-drive-import-tool.mjs && esbuild server/index.ts --bundle --platform=node --packages=external --format=esm --outfile=dist/server.js",
     "start": "NODE_ENV=production node dist/server.js",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
@@ -14,7 +14,7 @@
     "seed": "tsx server/seed.ts",
     "admin:create": "tsx server/create-admin.ts",
     "test:production": "node scripts/smoke-production.mjs",
-    "build:cloudflare": "node scripts/build-cloudflare.mjs && tsc --noEmit && tsc -p tsconfig.cloudflare.json && vite build",
+    "build:cloudflare": "node scripts/build-cloudflare.mjs && tsc --noEmit && tsc -p tsconfig.cloudflare.json && vite build && node scripts/export-drive-import-tool.mjs",
     "dev:cloudflare": "XDG_CONFIG_HOME=/tmp/aidramio-cf-config WRANGLER_SEND_METRICS=false wrangler dev",
     "deploy:cloudflare": "node scripts/deploy-cloudflare.mjs",
     "admin:cloudflare": "node scripts/cloudflare-admin.mjs",
@@ -23,7 +23,8 @@
     "stripe:catalog:test": "node scripts/provision-stripe-test.mjs",
     "stripe:connect:sandbox": "node scripts/connect-stripe-sandbox.mjs",
     "stripe:connect:test": "node scripts/connect-stripe-main-test.mjs",
-    "deploy:sandbox": "CLOUDFLARE_ACCOUNT_ID=95040c4f244233138195b80657887486 XDG_CONFIG_HOME=/tmp/aidramio-cf-config WRANGLER_SEND_METRICS=false wrangler deploy --config wrangler.sandbox.jsonc --keep-vars"
+    "deploy:sandbox": "CLOUDFLARE_ACCOUNT_ID=95040c4f244233138195b80657887486 XDG_CONFIG_HOME=/tmp/aidramio-cf-config WRANGLER_SEND_METRICS=false wrangler deploy --config wrangler.sandbox.jsonc --keep-vars",
+    "drive:manifests": "node scripts/create-drive-manifests.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1000.0",
