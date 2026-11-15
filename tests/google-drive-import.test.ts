@@ -59,3 +59,16 @@ test('bounded pagination rejects repeated continuation tokens and excessive entr
   await assert.rejects(listDriveFolderFiles(reader,'folder-root'),rejection('DRIVE_SOURCE_CHANGED'));
   const tooMany={listChildren:async()=>({files:[{id:'one'},{id:'two'}]})} as unknown as DriveReader;await assert.rejects(listDriveFolderFiles(tooMany,'folder-root',1),rejection('DRIVE_SOURCE_CHANGED'));
 });
+
+
+test('Drive int64 sizes are parsed exactly and support-asset ranges remain bounded above the episode-size limit',async()=>{
+  const large=5*1024**3;
+  const f=fixture(url=>url.searchParams.get('alt')==='media'?new Response('12345',{status:206,headers:{'Content-Range':`bytes ${large-5}-${large-1}/${large}`}}):Response.json(meta({size:String(large)})));
+  assert.equal((await f.reader.getFile('file-one')).size,large);
+  assert.deepEqual(await f.reader.readRange('file-one',large-5,5,large),new TextEncoder().encode('12345'));
+  for(const size of ['9007199254740993','9223372036854775807','1e3',' 15','0x10','1.5','-1']){
+    const bad=fixture(()=>Response.json(meta({size})));await assert.rejects(bad.reader.getFile('file-one'),rejection('DRIVE_SOURCE_CHANGED'));
+  }
+  const invalid=fixture(()=>{throw new Error('Unsafe range must not request data.');});
+  await assert.rejects(invalid.reader.readRange('file-one',Number.MAX_SAFE_INTEGER,5,Number.MAX_SAFE_INTEGER),rejection('DRIVE_SOURCE_CHANGED'));assert.equal(invalid.calls.length,0);
+});

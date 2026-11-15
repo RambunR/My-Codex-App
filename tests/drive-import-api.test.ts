@@ -148,3 +148,11 @@ test('audit events remain append-only and redacted when the schema is reapplied'
   assert.throws(()=>run('UPDATE drive_import_events SET action=? WHERE id=?','tampered',id),/append-only/);assert.throws(()=>run('DELETE FROM drive_import_events WHERE id=?',id),/append-only/);
   db.exec(DRIVE_IMPORT_SCHEMA);run('INSERT OR REPLACE INTO drive_import_events (id,actor_type,action,summary_json) VALUES (?,\'SYSTEM\',\'replacement\',\'{}\')',id);assert.deepEqual(one('SELECT * FROM drive_import_events WHERE id=?',id),before);
 });
+
+
+test('ClipWeave progress counts required support assets as well as episode media',async()=>{
+  const id=job('validating');staged(id);
+  run('INSERT INTO drive_import_clipweave_jobs (job_id,owner_id,export_folder_id,export_id,source_id) VALUES (?,?,?,?,?)',id,actors.owner,'export-folder','export-one','source-one');
+  for(let n=0;n<3;n++)run('INSERT INTO drive_import_clipweave_assets (id,job_id,path,role,kind,drive_file_id,parent_id,drive_version,bytes,sha256,verified) VALUES (?,?,?,?,?,?,?,?,?,?,?)',randomUUID(),id,'asset-'+n,n===0?'clip':'clip_caption_srt',n===0?'media':'support','source-'+n,'parent','v1',4,'a'.repeat(64),Number(n<2));
+  const state=(await request()).data.jobs.find((item:any)=>item.id===id);assert.equal(state.episodeCount,1);assert.equal(state.totalFiles,3);assert.equal(state.finishedFiles,2);
+});

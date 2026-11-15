@@ -2,7 +2,6 @@ import {createHash} from 'node:crypto';
 import {importPKCS8,SignJWT} from 'jose';
 import type {DriveFile,DrivePage,DriveReader} from '../shared/drive-import-types.js';
 import {validDriveId,MAX_DRIVE_MANIFEST_BYTES} from '../shared/drive-import-manifest.js';
-import {MAX_EPISODE_BYTES} from '../shared/config.js';
 
 const TOKEN_ENDPOINT='https://oauth2.googleapis.com/token';
 const FILES_ENDPOINT='https://www.googleapis.com/drive/v3/files';
@@ -48,7 +47,9 @@ function fileMetadata(value:any,expectedId?:string):DriveFile{
   // Native Google documents have no binary size. Keep them in listings so
   // unrelated Docs/Sheets can be ignored; they can never satisfy media input.
   const native=typeof value?.mimeType==='string'&&value.mimeType.startsWith('application/vnd.google-apps.');
-  const size=value?.size===undefined&&native?0:Number(value?.size);
+  const rawSize=value?.size;
+  const exactSize=typeof rawSize==='string'&&/^(?:0|[1-9]\d{0,18})$/u.test(rawSize)?BigInt(rawSize):undefined;
+  const size=rawSize===undefined&&native?0:exactSize!==undefined&&exactSize<=BigInt(Number.MAX_SAFE_INTEGER)?Number(exactSize):typeof rawSize==='number'&&Number.isSafeInteger(rawSize)?rawSize:NaN;
   if(!validDriveId(value?.id)||expectedId&&value.id!==expectedId||typeof value.name!=='string'||value.name.length<1||value.name.length>1024||typeof value.mimeType!=='string'||value.mimeType.length>200||!Number.isSafeInteger(size)||size<0||typeof value.version!=='string'||!/^\d{1,30}$/u.test(value.version)||typeof value.modifiedTime!=='string'||!Number.isFinite(Date.parse(value.modifiedTime))||value.parents!==undefined&&(!Array.isArray(value.parents)||value.parents.length>20||value.parents.some((id:unknown)=>!validDriveId(id))))fail('DRIVE_SOURCE_CHANGED','Drive returned incomplete or invalid file metadata.',422);
   if(value.md5Checksum!==undefined&&(typeof value.md5Checksum!=='string'||!/^[a-f0-9]{32}$/iu.test(value.md5Checksum)))fail('DRIVE_SOURCE_CHANGED','Drive returned an invalid checksum.',422);
   if(value.sha256Checksum!==undefined&&(typeof value.sha256Checksum!=='string'||!/^[a-f0-9]{64}$/iu.test(value.sha256Checksum)))fail('DRIVE_SOURCE_CHANGED','Drive returned an invalid checksum.',422);
@@ -116,7 +117,7 @@ export function createGoogleDriveReader(raw:string,options:GoogleDriveReaderOpti
       try{return new TextDecoder('utf-8',{fatal:true}).decode(bytes);}catch{fail('DRIVE_SOURCE_CHANGED','The ready manifest must be UTF-8 JSON.',422);}
     },
     async readRange(id,offset,length,totalBytes){
-      if(!Number.isSafeInteger(offset)||offset<0||!Number.isSafeInteger(length)||length<1||length>MAX_RANGE_BYTES||!Number.isSafeInteger(totalBytes)||totalBytes<1||totalBytes>MAX_EPISODE_BYTES||offset+length>totalBytes)fail('DRIVE_SOURCE_CHANGED','Invalid bounded Drive media range.',422);
+      if(!Number.isSafeInteger(offset)||offset<0||!Number.isSafeInteger(length)||length<1||length>MAX_RANGE_BYTES||!Number.isSafeInteger(totalBytes)||totalBytes<1||offset>totalBytes-length)fail('DRIVE_SOURCE_CHANGED','Invalid bounded Drive media range.',422);
       const url=fileURL(id);url.search=new URLSearchParams({alt:'media',supportsAllDrives:'true'}).toString();const end=offset+length-1;
       const response=await get(url,{Accept:'application/octet-stream',Range:`bytes=${offset}-${end}`});
       if(response.status!==206||response.headers.get('Content-Range')!==`bytes ${offset}-${end}/${totalBytes}`){await response.body?.cancel();fail('DRIVE_SOURCE_CHANGED','Drive did not honor the requested media range.',422);}

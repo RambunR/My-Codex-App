@@ -114,7 +114,7 @@ try{
   const currencyWrite=await fetch(base+'/api/display-currency',{method:'POST'});assert.equal(currencyWrite.status,405);await currencyWrite.body.cancel();
   console.log('PASS: local display-currency fallback is private, read-only, ignores spoofed country inputs and does not call an external provider.');
   assert.equal((await request('/api/health')).headers.get('x-lingying-upload-policy'),'owner-duration-v1');
-  assert.equal((await request('/api/health')).headers.get('x-lingying-drive-import'),'manifest-v1');
+  assert.equal((await request('/api/health')).headers.get('x-lingying-drive-import'),'clipweave-v1');
   for(const method of ['GET','POST','OPTIONS']){
     const blocked=await fetch(base+'/_lingying_internal/drive_tick?scan=1',{method,redirect:'manual'});
     assert.equal(blocked.status,404);assert.equal(blocked.headers.get('cache-control'),'no-store');await blocked.body.cancel();
@@ -122,6 +122,7 @@ try{
   await request('/api/admin/drive-imports',undefined,'',401);
   console.log('PASS: Drive importer public dispatch is blocked and private controls require authentication.');
   const manifestTool=await fetch(base+'/downloads/create-lingying-drive-manifests.mjs');assert.equal(manifestTool.status,200);assert.ok(!manifestTool.headers.get('content-type')?.includes('text/html'));assert.equal(await manifestTool.text(),await readFile('scripts/create-drive-manifests.mjs','utf8'));
+  const sealedTool=await fetch(base+'/downloads/verify-clipweave-export.mjs');assert.equal(sealedTool.status,200);assert.ok(!sealedTool.headers.get('content-type')?.includes('text/html'));assert.equal(await sealedTool.text(),await readFile('dist/client/downloads/verify-clipweave-export.mjs','utf8'));
   for(const route of ['/','/?search-source=fixture']){
     const home=await fetch(base+route);
     assert.equal(home.status,200);assert.equal(home.headers.get('link'),`<${base}/>; rel="canonical"`);

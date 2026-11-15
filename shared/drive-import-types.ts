@@ -1,6 +1,6 @@
 export const DRIVE_IMPORT_MANIFEST_NAME='lingying-ready.json';
 export const DEFAULT_DRIVE_IMPORT_FOLDER='1zEO-UFQpVMu7GnYNB4mM-M_3__IwhPHo';
-export const DRIVE_IMPORT_POLICY='manifest-v1';
+export const DRIVE_IMPORT_POLICY='clipweave-v1';
 export interface DriveManifestFile {name:string;bytes:number;sha256:string}
 export interface DriveManifestEpisode extends DriveManifestFile {number:number;title?:string}
 export interface DriveSeriesManifest {version:1;series:{title:string;description:string;language:string;genres:string[];creation_type:'human'|'ai-assisted'|'ai-generated'};episodes:DriveManifestEpisode[];cover?:DriveManifestFile}

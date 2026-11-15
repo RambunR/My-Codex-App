@@ -17,7 +17,7 @@ export const driveImportEnglish={
   "driveImportDisable": "Turn off watcher",
   "driveImportCheckNow": "Check now",
   "driveImportQueued": "A folder check has been queued.",
-  "driveImportManifest": "Each numbered series folder needs lingying-ready.json listing expected episode files, sizes and SHA-256 checksums. Each video must be 200 MiB or less.",
+  "driveImportManifest": "ClipWeave exports use EXPORT_FINALIZED.json and upload_manifest.json to verify every required file against its exact SHA-256. Manual flat series folders use lingying-ready.json. Imported episodes must be 200 MiB or less. The verifier is read-only and never creates a seal.",
   "driveImportDrafts": "Imported drafts stay unpublished. Review their titles, descriptions and languages in Creator Studio. Website edits are preserved.",
   "driveImportJobs": "Series import activity",
   "driveImportNoJobs": "No series have been discovered yet.",
@@ -41,7 +41,7 @@ export const driveImportEnglish={
   "driveImportStatusCancelled": "Cancelled",
   "driveImportStatusReview": "Source changed — review required",
   "driveImportSetupGuide": "Drive setup and manifest guide",
-  "driveImportDownloadTool": "Download manifest tool",
+  "driveImportDownloadTool": "Download ClipWeave verifier (read-only)",
   "driveImportsTitle": "Drive imports"
 } as const;
 type Messages=Record<keyof typeof driveImportEnglish,string>;
@@ -65,7 +65,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportDisable": "關閉自動監察",
     "driveImportCheckNow": "立即檢查",
     "driveImportQueued": "已將資料夾檢查加入佇列。",
-    "driveImportManifest": "每個編號劇集資料夾都需要 lingying-ready.json，列出預期的單集檔案、大小及 SHA-256 校驗值。每段影片必須為 200 MiB 或以下。",
+    "driveImportManifest": "ClipWeave 匯出使用 EXPORT_FINALIZED.json 及 upload_manifest.json，逐一核對所有必需檔案的 SHA-256。手動建立且不含子資料夾的劇集資料夾使用 lingying-ready.json。匯入的每集影片不得超過 200 MiB。驗證工具僅供讀取，不會建立完成標記檔案。",
     "driveImportDrafts": "匯入的草稿不會自動發佈。請在創作者工作室檢查標題、簡介和語言。網站上的編輯內容會保留。",
     "driveImportJobs": "劇集匯入記錄",
     "driveImportNoJobs": "尚未發現任何劇集。",
@@ -89,7 +89,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusCancelled": "已取消",
     "driveImportStatusReview": "來源已變更，請檢查",
     "driveImportSetupGuide": "Drive 設定及清單指南",
-    "driveImportDownloadTool": "下載清單產生工具",
+    "driveImportDownloadTool": "下載 ClipWeave 驗證工具（唯讀）",
     "driveImportsTitle": "Drive 匯入"
   },
   "zh-CN":{
@@ -109,7 +109,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportDisable": "关闭自动监测",
     "driveImportCheckNow": "立即检查",
     "driveImportQueued": "文件夹检查已加入队列。",
-    "driveImportManifest": "每个编号剧集文件夹都需要 lingying-ready.json，列出预期的单集文件、大小及 SHA-256 校验值。每段视频必须为 200 MiB 或以下。",
+    "driveImportManifest": "ClipWeave 导出使用 EXPORT_FINALIZED.json 及 upload_manifest.json，逐一核对所有必需文件的 SHA-256。手动创建且不含子文件夹的剧集文件夹使用 lingying-ready.json。导入的每集视频不得超过 200 MiB。验证工具仅供读取，不会创建完成标记文件。",
     "driveImportDrafts": "导入的草稿不会自动发布。请在创作者工作室检查标题、简介和语言。网站上的编辑内容会保留。",
     "driveImportJobs": "剧集导入记录",
     "driveImportNoJobs": "尚未发现任何剧集。",
@@ -133,7 +133,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusCancelled": "已取消",
     "driveImportStatusReview": "来源已更改，请检查",
     "driveImportSetupGuide": "Drive 设置及清单指南",
-    "driveImportDownloadTool": "下载清单生成工具",
+    "driveImportDownloadTool": "下载 ClipWeave 验证工具（只读）",
     "driveImportsTitle": "Drive 导入"
   },
   "ja":{
@@ -153,7 +153,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportDisable": "自動監視をオフにする",
     "driveImportCheckNow": "今すぐ確認",
     "driveImportQueued": "フォルダの確認をキューに追加しました。",
-    "driveImportManifest": "番号付きの各シリーズフォルダには、予定するエピソードファイル、サイズ、SHA-256 チェックサムを記載した lingying-ready.json が必要です。動画は1本につき 200 MiB 以下にしてください。",
+    "driveImportManifest": "ClipWeave の書き出しでは EXPORT_FINALIZED.json と upload_manifest.json を使い、必須ファイルすべての SHA-256 を正確に照合します。サブフォルダーを使わず手動でまとめたシリーズフォルダには lingying-ready.json を使います。取り込む各エピソードは 200 MiB 以下にしてください。検証ツールは読み取り専用で、完了マーカーを作成しません。",
     "driveImportDrafts": "取り込んだ下書きは未公開のままです。クリエイタースタジオでタイトル、説明、言語を確認してください。サイト上の編集内容は保持されます。",
     "driveImportJobs": "シリーズのインポート履歴",
     "driveImportNoJobs": "シリーズはまだ見つかっていません。",
@@ -177,7 +177,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusCancelled": "キャンセル済み",
     "driveImportStatusReview": "ソースが変更されました。確認が必要です",
     "driveImportSetupGuide": "Drive 設定とマニフェストのガイド",
-    "driveImportDownloadTool": "マニフェスト作成ツールをダウンロード",
+    "driveImportDownloadTool": "ClipWeave 検証ツールをダウンロード（読み取り専用）",
     "driveImportsTitle": "Drive インポート"
   },
   "ko":{
@@ -197,7 +197,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportDisable": "자동 감시 끄기",
     "driveImportCheckNow": "지금 확인",
     "driveImportQueued": "폴더 확인이 대기열에 추가되었습니다.",
-    "driveImportManifest": "번호가 지정된 각 시리즈 폴더에는 예상 에피소드 파일, 크기 및 SHA-256 체크섬을 나열한 lingying-ready.json이 필요합니다. 각 영상은 200 MiB 이하여야 합니다.",
+    "driveImportManifest": "ClipWeave 내보내기는 EXPORT_FINALIZED.json과 upload_manifest.json을 사용하여 모든 필수 파일의 SHA-256을 정확히 확인합니다. 수동으로 정리한 단일 계층 시리즈 폴더는 lingying-ready.json을 사용합니다. 가져오는 각 에피소드는 200 MiB 이하여야 합니다. 검증 도구는 읽기 전용이며 완료 표시 파일을 생성하지 않습니다.",
     "driveImportDrafts": "가져온 초안은 미공개로 유지됩니다. 크리에이터 스튜디오에서 제목, 설명 및 언어를 검토하세요. 웹사이트에서 편집한 내용은 보존됩니다.",
     "driveImportJobs": "시리즈 가져오기 기록",
     "driveImportNoJobs": "아직 발견된 시리즈가 없습니다.",
@@ -221,7 +221,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusCancelled": "취소됨",
     "driveImportStatusReview": "원본이 변경되어 검토가 필요합니다",
     "driveImportSetupGuide": "Drive 설정 및 매니페스트 안내",
-    "driveImportDownloadTool": "매니페스트 도구 다운로드",
+    "driveImportDownloadTool": "ClipWeave 검증 도구 다운로드 (읽기 전용)",
     "driveImportsTitle": "Drive 가져오기"
   },
   "hi":{
@@ -241,7 +241,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportDisable": "निगरानी बंद करें",
     "driveImportCheckNow": "अभी जाँचें",
     "driveImportQueued": "फ़ोल्डर की जाँच कतार में जोड़ दी गई है।",
-    "driveImportManifest": "हर क्रमांकित सीरीज़ फ़ोल्डर में lingying-ready.json होना चाहिए, जिसमें अपेक्षित एपिसोड फ़ाइलें, आकार और SHA-256 चेकसम हों। हर वीडियो 200 MiB या उससे छोटा होना चाहिए।",
+    "driveImportManifest": "ClipWeave एक्सपोर्ट में EXPORT_FINALIZED.json और upload_manifest.json से हर आवश्यक फ़ाइल का सटीक SHA-256 मिलाया जाता है। हाथ से व्यवस्थित एक-स्तरीय सीरीज़ फ़ोल्डर lingying-ready.json का उपयोग करते हैं। आयात किया जाने वाला हर एपिसोड 200 MiB या उससे छोटा होना चाहिए। जाँच उपकरण केवल पढ़ता है और पूर्णता की सील नहीं बनाता।",
     "driveImportDrafts": "आयात किए गए ड्राफ़्ट अप्रकाशित रहते हैं। क्रिएटर स्टूडियो में शीर्षक, विवरण और भाषाएँ जाँचें। वेबसाइट पर किए गए संपादन सुरक्षित रहते हैं।",
     "driveImportJobs": "सीरीज़ आयात गतिविधि",
     "driveImportNoJobs": "अभी तक कोई सीरीज़ नहीं मिली है।",
@@ -265,7 +265,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusCancelled": "रद्द किया गया",
     "driveImportStatusReview": "स्रोत बदल गया है — समीक्षा ज़रूरी है",
     "driveImportSetupGuide": "Drive सेटअप और मैनिफ़ेस्ट गाइड",
-    "driveImportDownloadTool": "मैनिफ़ेस्ट टूल डाउनलोड करें",
+    "driveImportDownloadTool": "ClipWeave जाँच उपकरण डाउनलोड करें (केवल पढ़ने के लिए)",
     "driveImportsTitle": "Drive आयात"
   },
   "id":{
@@ -285,7 +285,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportDisable": "Matikan pemantauan",
     "driveImportCheckNow": "Periksa sekarang",
     "driveImportQueued": "Pemeriksaan folder telah masuk antrean.",
-    "driveImportManifest": "Setiap folder seri bernomor memerlukan lingying-ready.json yang mencantumkan berkas episode yang diharapkan, ukuran, dan checksum SHA-256. Setiap video harus berukuran 200 MiB atau kurang.",
+    "driveImportManifest": "Ekspor ClipWeave memakai EXPORT_FINALIZED.json dan upload_manifest.json untuk mencocokkan SHA-256 setiap berkas wajib secara tepat. Folder seri datar yang disiapkan manual memakai lingying-ready.json. Setiap episode yang diimpor harus berukuran paling besar 200 MiB. Pemeriksa hanya membaca dan tidak pernah membuat segel penyelesaian.",
     "driveImportDrafts": "Draf yang diimpor tetap belum diterbitkan. Tinjau judul, deskripsi, dan bahasa di Studio Kreator. Perubahan di situs tetap dipertahankan.",
     "driveImportJobs": "Aktivitas impor seri",
     "driveImportNoJobs": "Belum ada seri yang ditemukan.",
@@ -309,7 +309,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusCancelled": "Dibatalkan",
     "driveImportStatusReview": "Sumber berubah — perlu ditinjau",
     "driveImportSetupGuide": "Panduan penyiapan Drive dan manifes",
-    "driveImportDownloadTool": "Unduh alat manifes",
+    "driveImportDownloadTool": "Unduh pemeriksa ClipWeave (hanya baca)",
     "driveImportsTitle": "Impor Drive"
   },
   "pt-BR":{
@@ -329,7 +329,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportDisable": "Desativar monitoramento",
     "driveImportCheckNow": "Verificar agora",
     "driveImportQueued": "Uma verificação da pasta foi adicionada à fila.",
-    "driveImportManifest": "Cada pasta de série numerada precisa de um arquivo lingying-ready.json com os arquivos de episódios esperados, tamanhos e somas de verificação SHA-256. Cada vídeo deve ter até 200 MiB.",
+    "driveImportManifest": "As exportações do ClipWeave usam EXPORT_FINALIZED.json e upload_manifest.json para conferir o SHA-256 exato de cada arquivo obrigatório. Pastas de séries organizadas manualmente, sem subpastas, usam lingying-ready.json. Cada episódio importado deve ter até 200 MiB. O verificador é somente leitura e nunca cria um selo de conclusão.",
     "driveImportDrafts": "Os rascunhos importados permanecem não publicados. Revise os títulos, as descrições e os idiomas no Estúdio do Criador. As edições feitas no site são preservadas.",
     "driveImportJobs": "Atividade de importação de séries",
     "driveImportNoJobs": "Nenhuma série foi encontrada ainda.",
@@ -353,7 +353,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusCancelled": "Cancelado",
     "driveImportStatusReview": "Origem alterada — revisão necessária",
     "driveImportSetupGuide": "Guia de configuração do Drive e manifesto",
-    "driveImportDownloadTool": "Baixar ferramenta de manifesto",
+    "driveImportDownloadTool": "Baixar verificador ClipWeave (somente leitura)",
     "driveImportsTitle": "Importações do Drive"
   },
   "es":{
@@ -373,7 +373,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportDisable": "Desactivar supervisión",
     "driveImportCheckNow": "Comprobar ahora",
     "driveImportQueued": "La comprobación de la carpeta se ha añadido a la cola.",
-    "driveImportManifest": "Cada carpeta de serie numerada necesita un archivo lingying-ready.json con los archivos de episodios esperados, sus tamaños y las sumas de comprobación SHA-256. Cada vídeo debe ocupar 200 MiB o menos.",
+    "driveImportManifest": "Las exportaciones de ClipWeave usan EXPORT_FINALIZED.json y upload_manifest.json para cotejar el SHA-256 exacto de cada archivo obligatorio. Las carpetas de series organizadas manualmente, sin subcarpetas, usan lingying-ready.json. Cada episodio importado debe ocupar 200 MiB o menos. El verificador es de solo lectura y nunca crea un sello de finalización.",
     "driveImportDrafts": "Los borradores importados permanecen sin publicar. Revisa los títulos, las descripciones y los idiomas en el Estudio de Creadores. Se conservan los cambios hechos en la web.",
     "driveImportJobs": "Actividad de importación de series",
     "driveImportNoJobs": "Todavía no se ha encontrado ninguna serie.",
@@ -397,7 +397,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusCancelled": "Cancelado",
     "driveImportStatusReview": "El origen ha cambiado; es necesario revisarlo",
     "driveImportSetupGuide": "Guía de configuración de Drive y del manifiesto",
-    "driveImportDownloadTool": "Descargar herramienta de manifiesto",
+    "driveImportDownloadTool": "Descargar verificador ClipWeave (solo lectura)",
     "driveImportsTitle": "Importaciones de Drive"
   },
   "ar":{
@@ -417,7 +417,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportDisable": "إيقاف المراقبة",
     "driveImportCheckNow": "الفحص الآن",
     "driveImportQueued": "أُضيف فحص المجلد إلى قائمة الانتظار.",
-    "driveImportManifest": "يحتاج كل مجلد مسلسل مرقّم إلى lingying-ready.json يسرد ملفات الحلقات المتوقعة وأحجامها وقيم التحقق SHA-256. يجب ألا يتجاوز حجم كل فيديو 200 MiB.",
+    "driveImportManifest": "تستخدم صادرات ClipWeave الملفين EXPORT_FINALIZED.json وupload_manifest.json لمطابقة قيمة SHA-256 الدقيقة لكل ملف مطلوب. تستخدم مجلدات المسلسلات المسطحة المعدّة يدويًا lingying-ready.json. يجب ألا يتجاوز حجم كل حلقة مستوردة 200 MiB. أداة التحقق للقراءة فقط ولا تنشئ ختم اكتمال.",
     "driveImportDrafts": "تبقى المسودات المستوردة غير منشورة. راجع العناوين والأوصاف واللغات في استوديو المبدعين. تُحفظ التعديلات التي أُجريت على الموقع.",
     "driveImportJobs": "نشاط استيراد المسلسلات",
     "driveImportNoJobs": "لم يُعثر على أي مسلسل بعد.",
@@ -441,7 +441,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusCancelled": "تم الإلغاء",
     "driveImportStatusReview": "تغيّر المصدر — تلزم المراجعة",
     "driveImportSetupGuide": "دليل إعداد Drive وملف البيان",
-    "driveImportDownloadTool": "تنزيل أداة البيان",
+    "driveImportDownloadTool": "تنزيل أداة تحقق ClipWeave (للقراءة فقط)",
     "driveImportsTitle": "الاستيراد من Drive"
   },
   "bn":{
@@ -461,7 +461,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportDisable": "পর্যবেক্ষণ বন্ধ করুন",
     "driveImportCheckNow": "এখনই পরীক্ষা করুন",
     "driveImportQueued": "ফোল্ডার পরীক্ষাটি সারিতে যোগ করা হয়েছে।",
-    "driveImportManifest": "প্রতিটি নম্বরযুক্ত সিরিজ ফোল্ডারে lingying-ready.json থাকতে হবে, যাতে প্রত্যাশিত পর্বের ফাইল, আকার ও SHA-256 চেকসাম থাকবে। প্রতিটি ভিডিও 200 MiB বা তার কম হতে হবে।",
+    "driveImportManifest": "ClipWeave এক্সপোর্টে EXPORT_FINALIZED.json ও upload_manifest.json দিয়ে প্রতিটি প্রয়োজনীয় ফাইলের সঠিক SHA-256 মিলিয়ে দেখা হয়। হাতে সাজানো এক স্তরের সিরিজ ফোল্ডারে lingying-ready.json ব্যবহৃত হয়। আমদানি করা প্রতিটি পর্ব 200 MiB বা তার কম হতে হবে। যাচাইকারী কেবল পড়ে এবং কখনও সমাপ্তির সিল তৈরি করে না।",
     "driveImportDrafts": "আমদানি করা খসড়া অপ্রকাশিত থাকে। ক্রিয়েটর স্টুডিওতে শিরোনাম, বিবরণ ও ভাষা পর্যালোচনা করুন। ওয়েবসাইটে করা সম্পাদনা সংরক্ষিত থাকবে।",
     "driveImportJobs": "সিরিজ আমদানির কার্যকলাপ",
     "driveImportNoJobs": "এখনো কোনো সিরিজ পাওয়া যায়নি।",
@@ -485,7 +485,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusCancelled": "বাতিল করা হয়েছে",
     "driveImportStatusReview": "উৎস পরিবর্তিত হয়েছে — পর্যালোচনা প্রয়োজন",
     "driveImportSetupGuide": "Drive সেটআপ ও ম্যানিফেস্ট নির্দেশিকা",
-    "driveImportDownloadTool": "ম্যানিফেস্ট টুল ডাউনলোড করুন",
+    "driveImportDownloadTool": "ClipWeave যাচাইকারী ডাউনলোড করুন (শুধু পড়ার জন্য)",
     "driveImportsTitle": "Drive থেকে আমদানি"
   },
   "ur":{
@@ -505,7 +505,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportDisable": "نگرانی بند کریں",
     "driveImportCheckNow": "ابھی جانچیں",
     "driveImportQueued": "فولڈر کی جانچ قطار میں شامل کر دی گئی ہے۔",
-    "driveImportManifest": "ہر نمبر والے سیریز فولڈر میں lingying-ready.json ہونا چاہیے جس میں متوقع قسطوں کی فائلیں، حجم اور SHA-256 چیک سم درج ہوں۔ ہر ویڈیو 200 MiB یا اس سے کم ہونی چاہیے۔",
+    "driveImportManifest": "ClipWeave ایکسپورٹ میں EXPORT_FINALIZED.json اور upload_manifest.json کے ذریعے ہر مطلوبہ فائل کے عین SHA-256 کا موازنہ ہوتا ہے۔ دستی طور پر مرتب کردہ ایک سطح والے سیریز فولڈر lingying-ready.json استعمال کرتے ہیں۔ ہر درآمد شدہ قسط کا حجم 200 MiB یا اس سے کم ہونا چاہیے۔ تصدیقی ٹول صرف پڑھتا ہے اور تکمیل کی مہر نہیں بناتا۔",
     "driveImportDrafts": "درآمد شدہ مسودے غیر شائع شدہ رہتے ہیں۔ کریئیٹر اسٹوڈیو میں عنوانات، تفصیلات اور زبانیں دیکھیں۔ ویب سائٹ پر کی گئی ترامیم محفوظ رہتی ہیں۔",
     "driveImportJobs": "سیریز درآمد کی سرگرمی",
     "driveImportNoJobs": "ابھی تک کوئی سیریز نہیں ملی۔",
@@ -529,7 +529,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusCancelled": "منسوخ ہو گیا",
     "driveImportStatusReview": "ماخذ بدل گیا ہے — جائزہ ضروری ہے",
     "driveImportSetupGuide": "Drive سیٹ اپ اور مینی فیسٹ کی رہنمائی",
-    "driveImportDownloadTool": "مینی فیسٹ ٹول ڈاؤن لوڈ کریں",
+    "driveImportDownloadTool": "ClipWeave تصدیقی ٹول ڈاؤن لوڈ کریں (صرف پڑھنے کے لیے)",
     "driveImportsTitle": "Drive سے درآمد"
   },
   "vi":{
@@ -549,7 +549,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportDisable": "Tắt theo dõi",
     "driveImportCheckNow": "Kiểm tra ngay",
     "driveImportQueued": "Đã đưa yêu cầu kiểm tra thư mục vào hàng đợi.",
-    "driveImportManifest": "Mỗi thư mục bộ phim được đánh số cần có lingying-ready.json liệt kê các tệp tập phim dự kiến, kích thước và mã kiểm tra SHA-256. Mỗi video phải có kích thước tối đa 200 MiB.",
+    "driveImportManifest": "Bản xuất ClipWeave dùng EXPORT_FINALIZED.json và upload_manifest.json để đối chiếu chính xác SHA-256 của mọi tệp bắt buộc. Thư mục phim phẳng được chuẩn bị thủ công dùng lingying-ready.json. Mỗi tập được nhập phải có kích thước tối đa 200 MiB. Công cụ xác minh chỉ đọc và không bao giờ tạo dấu niêm phong hoàn tất.",
     "driveImportDrafts": "Bản nháp đã nhập vẫn chưa được xuất bản. Kiểm tra tiêu đề, mô tả và ngôn ngữ trong Studio nhà sáng tạo. Các chỉnh sửa trên trang web được giữ nguyên.",
     "driveImportJobs": "Hoạt động nhập bộ phim",
     "driveImportNoJobs": "Chưa tìm thấy bộ phim nào.",
@@ -573,7 +573,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusCancelled": "Đã hủy",
     "driveImportStatusReview": "Nguồn đã thay đổi — cần xem xét",
     "driveImportSetupGuide": "Hướng dẫn thiết lập Drive và tệp kê khai",
-    "driveImportDownloadTool": "Tải công cụ tạo tệp kê khai",
+    "driveImportDownloadTool": "Tải công cụ xác minh ClipWeave (chỉ đọc)",
     "driveImportsTitle": "Nhập từ Drive"
   },
   "th":{
@@ -593,7 +593,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportDisable": "ปิดการเฝ้าดู",
     "driveImportCheckNow": "ตรวจสอบตอนนี้",
     "driveImportQueued": "เพิ่มการตรวจสอบโฟลเดอร์ในคิวแล้ว",
-    "driveImportManifest": "โฟลเดอร์ซีรีส์แต่ละโฟลเดอร์ที่มีหมายเลขต้องมี lingying-ready.json ซึ่งระบุไฟล์ตอนที่คาดไว้ ขนาด และค่า SHA-256 วิดีโอแต่ละไฟล์ต้องมีขนาดไม่เกิน 200 MiB",
+    "driveImportManifest": "ไฟล์ส่งออก ClipWeave ใช้ EXPORT_FINALIZED.json และ upload_manifest.json เพื่อตรวจสอบ SHA-256 ของไฟล์ที่จำเป็นทุกไฟล์ให้ตรงกันทุกประการ โฟลเดอร์ซีรีส์แบบชั้นเดียวที่จัดด้วยตนเองใช้ lingying-ready.json แต่ละตอนที่นำเข้าต้องมีขนาดไม่เกิน 200 MiB เครื่องมือตรวจสอบอ่านอย่างเดียวและไม่สร้างตรายืนยันการส่งออกเสร็จสมบูรณ์",
     "driveImportDrafts": "ฉบับร่างที่นำเข้าจะยังไม่เผยแพร่ โปรดตรวจสอบชื่อ คำอธิบาย และภาษาในสตูดิโอครีเอเตอร์ การแก้ไขบนเว็บไซต์จะยังคงอยู่",
     "driveImportJobs": "กิจกรรมการนำเข้าซีรีส์",
     "driveImportNoJobs": "ยังไม่พบซีรีส์",
@@ -617,7 +617,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusCancelled": "ยกเลิกแล้ว",
     "driveImportStatusReview": "แหล่งข้อมูลเปลี่ยนไป — ต้องตรวจสอบ",
     "driveImportSetupGuide": "คู่มือตั้งค่า Drive และไฟล์รายการ",
-    "driveImportDownloadTool": "ดาวน์โหลดเครื่องมือสร้างไฟล์รายการ",
+    "driveImportDownloadTool": "ดาวน์โหลดเครื่องมือตรวจสอบ ClipWeave (อ่านอย่างเดียว)",
     "driveImportsTitle": "นำเข้าจาก Drive"
   },
   "fil":{
@@ -637,7 +637,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportDisable": "I-off ang pagsubaybay",
     "driveImportCheckNow": "Suriin ngayon",
     "driveImportQueued": "Nakapila na ang pagsusuri sa folder.",
-    "driveImportManifest": "Kailangan ng bawat may numerong folder ng serye ng lingying-ready.json na naglilista ng inaasahang episode file, laki, at SHA-256 checksum. Dapat 200 MiB o mas maliit ang bawat video.",
+    "driveImportManifest": "Gumagamit ang mga export ng ClipWeave ng EXPORT_FINALIZED.json at upload_manifest.json upang itugma ang eksaktong SHA-256 ng bawat kinakailangang file. Gumagamit ng lingying-ready.json ang mga manu-manong inayos na folder ng serye na walang subfolder. Dapat 200 MiB o mas maliit ang bawat ini-import na episode. Read-only ang verifier at hindi ito gumagawa ng selyo ng pagkumpleto.",
     "driveImportDrafts": "Mananatiling hindi nailalathala ang mga na-import na draft. Suriin ang mga pamagat, paglalarawan, at wika sa Creator Studio. Mapapanatili ang mga pag-edit sa website.",
     "driveImportJobs": "Aktibidad ng pag-import ng serye",
     "driveImportNoJobs": "Wala pang nahanap na serye.",
@@ -661,7 +661,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusCancelled": "Nakansela",
     "driveImportStatusReview": "Nagbago ang source — kailangan ng pagsusuri",
     "driveImportSetupGuide": "Gabay sa pag-set up ng Drive at manifest",
-    "driveImportDownloadTool": "I-download ang manifest tool",
+    "driveImportDownloadTool": "I-download ang ClipWeave verifier (read-only)",
     "driveImportsTitle": "Mga import mula sa Drive"
   },
   "tr":{
@@ -681,7 +681,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportDisable": "İzlemeyi kapat",
     "driveImportCheckNow": "Şimdi kontrol et",
     "driveImportQueued": "Klasör kontrolü sıraya alındı.",
-    "driveImportManifest": "Her numaralı dizi klasöründe beklenen bölüm dosyalarını, boyutlarını ve SHA-256 sağlama toplamlarını listeleyen lingying-ready.json bulunmalıdır. Her video en fazla 200 MiB olmalıdır.",
+    "driveImportManifest": "ClipWeave dışa aktarımları, gerekli her dosyanın SHA-256 değerini tam olarak eşleştirmek için EXPORT_FINALIZED.json ve upload_manifest.json kullanır. Elle hazırlanmış, alt klasörsüz dizi klasörleri lingying-ready.json kullanır. İçe aktarılan her bölüm en fazla 200 MiB olmalıdır. Doğrulayıcı salt okunurdur ve tamamlanma mührü oluşturmaz.",
     "driveImportDrafts": "İçe aktarılan taslaklar yayımlanmaz. Başlıkları, açıklamaları ve dilleri İçerik Üretici Stüdyosu'nda inceleyin. Sitede yapılan düzenlemeler korunur.",
     "driveImportJobs": "Dizi içe aktarma etkinliği",
     "driveImportNoJobs": "Henüz hiçbir dizi bulunamadı.",
@@ -705,7 +705,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusCancelled": "İptal edildi",
     "driveImportStatusReview": "Kaynak değişti — inceleme gerekiyor",
     "driveImportSetupGuide": "Drive kurulumu ve bildirim dosyası kılavuzu",
-    "driveImportDownloadTool": "Bildirim dosyası aracını indir",
+    "driveImportDownloadTool": "ClipWeave doğrulayıcısını indir (salt okunur)",
     "driveImportsTitle": "Drive içe aktarımları"
   },
   "ru":{
@@ -725,7 +725,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportDisable": "Отключить наблюдение",
     "driveImportCheckNow": "Проверить сейчас",
     "driveImportQueued": "Проверка папки добавлена в очередь.",
-    "driveImportManifest": "В каждой пронумерованной папке сериала нужен файл lingying-ready.json со списком ожидаемых файлов эпизодов, их размеров и контрольных сумм SHA-256. Размер каждого видео — не более 200 MiB.",
+    "driveImportManifest": "Экспорты ClipWeave используют EXPORT_FINALIZED.json и upload_manifest.json для точного сравнения SHA-256 каждого обязательного файла. Папки сериалов, подготовленные вручную без вложенных папок, используют lingying-ready.json. Размер каждого импортируемого эпизода — не более 200 MiB. Проверяющая программа только читает файлы и никогда не создаёт печать завершения.",
     "driveImportDrafts": "Импортированные черновики остаются неопубликованными. Проверьте названия, описания и языки в Студии автора. Изменения на сайте сохраняются.",
     "driveImportJobs": "История импорта сериалов",
     "driveImportNoJobs": "Сериалы ещё не найдены.",
@@ -749,7 +749,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusCancelled": "Отменено",
     "driveImportStatusReview": "Источник изменился — требуется проверка",
     "driveImportSetupGuide": "Руководство по настройке Drive и манифесту",
-    "driveImportDownloadTool": "Скачать инструмент для манифеста",
+    "driveImportDownloadTool": "Скачать проверку ClipWeave (только чтение)",
     "driveImportsTitle": "Импорт из Drive"
   },
   "fr":{
@@ -769,7 +769,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportDisable": "Désactiver la surveillance",
     "driveImportCheckNow": "Vérifier maintenant",
     "driveImportQueued": "La vérification du dossier a été ajoutée à la file d’attente.",
-    "driveImportManifest": "Chaque dossier de série numéroté doit contenir un fichier lingying-ready.json indiquant les fichiers d’épisodes attendus, leurs tailles et leurs sommes de contrôle SHA-256. Chaque vidéo doit faire au maximum 200 MiB.",
+    "driveImportManifest": "Les exports ClipWeave utilisent EXPORT_FINALIZED.json et upload_manifest.json pour comparer exactement le SHA-256 de chaque fichier requis. Les dossiers de séries préparés manuellement, sans sous-dossiers, utilisent lingying-ready.json. Chaque épisode importé doit faire au maximum 200 MiB. Le vérificateur est en lecture seule et ne crée jamais de sceau de finalisation.",
     "driveImportDrafts": "Les brouillons importés restent non publiés. Vérifiez les titres, descriptions et langues dans le Studio des créateurs. Les modifications effectuées sur le site sont conservées.",
     "driveImportJobs": "Activité d’importation des séries",
     "driveImportNoJobs": "Aucune série n’a encore été détectée.",
@@ -793,7 +793,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusCancelled": "Annulé",
     "driveImportStatusReview": "Source modifiée — vérification nécessaire",
     "driveImportSetupGuide": "Guide de configuration de Drive et du manifeste",
-    "driveImportDownloadTool": "Télécharger l’outil de manifeste",
+    "driveImportDownloadTool": "Télécharger le vérificateur ClipWeave (lecture seule)",
     "driveImportsTitle": "Importations Drive"
   },
   "de":{
@@ -813,7 +813,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportDisable": "Überwachung ausschalten",
     "driveImportCheckNow": "Jetzt prüfen",
     "driveImportQueued": "Die Ordnerprüfung wurde in die Warteschlange gestellt.",
-    "driveImportManifest": "Jeder nummerierte Serienordner benötigt eine Datei lingying-ready.json mit den erwarteten Episodendateien, Größen und SHA-256-Prüfsummen. Jedes Video darf höchstens 200 MiB groß sein.",
+    "driveImportManifest": "ClipWeave-Exporte verwenden EXPORT_FINALIZED.json und upload_manifest.json, um den genauen SHA-256-Wert jeder erforderlichen Datei abzugleichen. Manuell angelegte Serienordner ohne Unterordner verwenden lingying-ready.json. Jede importierte Episode darf höchstens 200 MiB groß sein. Das Prüfprogramm liest nur und erstellt niemals ein Abschlusssiegel.",
     "driveImportDrafts": "Importierte Entwürfe bleiben unveröffentlicht. Prüfe Titel, Beschreibungen und Sprachen im Creator Studio. Änderungen auf der Website bleiben erhalten.",
     "driveImportJobs": "Serienimport-Aktivität",
     "driveImportNoJobs": "Es wurden noch keine Serien gefunden.",
@@ -837,7 +837,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusCancelled": "Abgebrochen",
     "driveImportStatusReview": "Quelle geändert — Prüfung erforderlich",
     "driveImportSetupGuide": "Anleitung für Drive-Einrichtung und Manifest",
-    "driveImportDownloadTool": "Manifest-Werkzeug herunterladen",
+    "driveImportDownloadTool": "ClipWeave-Prüfprogramm herunterladen (nur lesen)",
     "driveImportsTitle": "Drive-Importe"
   },
   "ms":{
@@ -857,7 +857,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportDisable": "Matikan pemantauan",
     "driveImportCheckNow": "Semak sekarang",
     "driveImportQueued": "Semakan folder telah dimasukkan ke dalam giliran.",
-    "driveImportManifest": "Setiap folder siri bernombor memerlukan lingying-ready.json yang menyenaraikan fail episod yang dijangka, saiz dan jumlah semak SHA-256. Setiap video mestilah 200 MiB atau kurang.",
+    "driveImportManifest": "Eksport ClipWeave menggunakan EXPORT_FINALIZED.json dan upload_manifest.json untuk memadankan SHA-256 tepat bagi setiap fail wajib. Folder siri rata yang disediakan secara manual menggunakan lingying-ready.json. Setiap episod yang diimport mestilah 200 MiB atau kurang. Pengesah hanya membaca dan tidak pernah mencipta meterai penyiapan.",
     "driveImportDrafts": "Draf yang diimport kekal belum diterbitkan. Semak tajuk, penerangan dan bahasa dalam Studio Pencipta. Suntingan pada laman web dikekalkan.",
     "driveImportJobs": "Aktiviti import siri",
     "driveImportNoJobs": "Belum ada siri yang ditemukan.",
@@ -881,7 +881,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusCancelled": "Dibatalkan",
     "driveImportStatusReview": "Sumber berubah — semakan diperlukan",
     "driveImportSetupGuide": "Panduan persediaan Drive dan manifes",
-    "driveImportDownloadTool": "Muat turun alat manifes",
+    "driveImportDownloadTool": "Muat turun pengesah ClipWeave (baca sahaja)",
     "driveImportsTitle": "Import Drive"
   },
   "ta":{
@@ -901,7 +901,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportDisable": "கண்காணிப்பை நிறுத்து",
     "driveImportCheckNow": "இப்போது சரிபார்",
     "driveImportQueued": "கோப்புறைச் சரிபார்ப்பு வரிசையில் சேர்க்கப்பட்டது.",
-    "driveImportManifest": "எண்ணிடப்பட்ட ஒவ்வொரு தொடர் கோப்புறையிலும் எதிர்பார்க்கப்படும் எபிசோடு கோப்புகள், அளவுகள் மற்றும் SHA-256 சரிபார்ப்புத் தொகைகளைக் குறிப்பிடும் lingying-ready.json இருக்க வேண்டும். ஒவ்வொரு வீடியோவும் 200 MiB அல்லது அதற்குக் குறைவாக இருக்க வேண்டும்.",
+    "driveImportManifest": "ClipWeave ஏற்றுமதிகள் EXPORT_FINALIZED.json மற்றும் upload_manifest.json மூலம் தேவையான ஒவ்வொரு கோப்பின் துல்லியமான SHA-256 மதிப்பையும் ஒப்பிடுகின்றன. துணைக்கோப்புறைகள் இல்லாமல் கையால் அமைக்கப்பட்ட தொடர் கோப்புறைகள் lingying-ready.json பயன்படுத்துகின்றன. இறக்குமதி செய்யப்படும் ஒவ்வொரு எபிசோடும் 200 MiB அல்லது அதற்குக் குறைவாக இருக்க வேண்டும். சரிபார்ப்புக் கருவி படிப்பதற்கு மட்டுமே; நிறைவுச் சீலை உருவாக்காது.",
     "driveImportDrafts": "இறக்குமதி செய்த வரைவுகள் வெளியிடப்படாது. படைப்பாளர் ஸ்டுடியோவில் தலைப்புகள், விளக்கங்கள் மற்றும் மொழிகளைச் சரிபார்க்கவும். இணையதளத்தில் செய்த திருத்தங்கள் பாதுகாக்கப்படும்.",
     "driveImportJobs": "தொடர் இறக்குமதிச் செயல்பாடு",
     "driveImportNoJobs": "இதுவரை எந்தத் தொடரும் கண்டறியப்படவில்லை.",
@@ -925,7 +925,7 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusCancelled": "ரத்துசெய்யப்பட்டது",
     "driveImportStatusReview": "மூலம் மாறியுள்ளது — மதிப்பாய்வு தேவை",
     "driveImportSetupGuide": "Drive அமைப்பு மற்றும் கோப்புப் பட்டியல் வழிகாட்டி",
-    "driveImportDownloadTool": "கோப்புப் பட்டியல் கருவியைப் பதிவிறக்கு",
+    "driveImportDownloadTool": "ClipWeave சரிபார்ப்புக் கருவியைப் பதிவிறக்கு (படிக்க மட்டும்)",
     "driveImportsTitle": "Drive இறக்குமதிகள்"
   }
 };

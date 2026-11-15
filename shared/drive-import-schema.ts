@@ -34,6 +34,28 @@ CREATE TABLE IF NOT EXISTS drive_import_files (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS drive_import_object_key ON drive_import_files(object_key) WHERE object_key<>'';
 CREATE INDEX IF NOT EXISTS drive_import_files_job ON drive_import_files(job_id,status);
+CREATE TABLE IF NOT EXISTS drive_import_clipweave_schedule (id INTEGER PRIMARY KEY CHECK(id=1),next_discovery_at INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS drive_import_clipweave_exports (
+ id TEXT PRIMARY KEY,root_folder_id TEXT NOT NULL,export_folder_id TEXT NOT NULL,owner_id TEXT NOT NULL,
+ config_revision INTEGER NOT NULL,next_check_at INTEGER NOT NULL DEFAULT 0,message TEXT NOT NULL DEFAULT '',
+ UNIQUE(root_folder_id,export_folder_id)
+);
+CREATE TABLE IF NOT EXISTS drive_import_clipweave_jobs (
+ job_id TEXT PRIMARY KEY REFERENCES drive_import_jobs(id) ON DELETE CASCADE,owner_id TEXT NOT NULL,
+ export_folder_id TEXT NOT NULL,export_id TEXT NOT NULL,source_id TEXT NOT NULL,
+ snapshot_json TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(snapshot_json)),
+ original_series_complete INTEGER,UNIQUE(owner_id,export_id,source_id)
+);
+CREATE TABLE IF NOT EXISTS drive_import_clipweave_assets (
+ id TEXT PRIMARY KEY,job_id TEXT NOT NULL REFERENCES drive_import_jobs(id) ON DELETE CASCADE,
+ path TEXT NOT NULL,role TEXT NOT NULL,kind TEXT NOT NULL CHECK(kind IN('media','support')),
+ drive_file_id TEXT NOT NULL,parent_id TEXT NOT NULL,drive_version TEXT NOT NULL,
+ bytes INTEGER NOT NULL CHECK(bytes>0),sha256 TEXT NOT NULL,drive_sha256 TEXT NOT NULL DEFAULT '',
+ media_file_id TEXT,expected_duration REAL,verified INTEGER NOT NULL DEFAULT 0 CHECK(verified IN(0,1)),
+ offset INTEGER NOT NULL DEFAULT 0,hash_state_json TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(hash_state_json)),
+ UNIQUE(job_id,path),UNIQUE(job_id,drive_file_id)
+);
+CREATE INDEX IF NOT EXISTS drive_import_clipweave_assets_pending ON drive_import_clipweave_assets(job_id,kind,verified);
 CREATE TABLE IF NOT EXISTS drive_import_notifications (
  id TEXT PRIMARY KEY,job_id TEXT REFERENCES drive_import_jobs(id) ON DELETE CASCADE,owner_id TEXT NOT NULL,event_key TEXT NOT NULL UNIQUE,
  kind TEXT NOT NULL CHECK(kind IN('complete','error','attention')),title TEXT NOT NULL,message TEXT NOT NULL,

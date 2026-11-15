@@ -52,7 +52,7 @@ test('missing Drive credentials keep imports disabled without collecting a priva
   const check=await fixture(page,{status}),panel=await openPanel(page);
   await expect(panel).toContainText('GOOGLE_DRIVE_IMPORT_CREDENTIALS');await expect(panel).toContainText('lingying-ready.json');await expect(panel).toContainText('200 MiB');
   await expect(panel.getByRole('link',{name:localeMessages.en.driveImportSetupGuide!,exact:true})).toHaveAttribute('href','https://github.com/RambunR/My-Codex-App/blob/main/docs/GOOGLE_DRIVE_IMPORT.md');
-  const download=panel.getByRole('link',{name:localeMessages.en.driveImportDownloadTool!,exact:true});await expect(download).toHaveAttribute('href','/downloads/create-lingying-drive-manifests.mjs');await expect(download).toHaveAttribute('download','');
+  const download=panel.getByRole('link',{name:localeMessages.en.driveImportDownloadTool!,exact:true});await expect(download).toHaveAttribute('href','/downloads/verify-clipweave-export.mjs');await expect(download).toHaveAttribute('download','');
   for(const key of ['driveImportVerify','driveImportEnable','driveImportCheckNow'] as const)await expect(panel.getByRole('button',{name:localeMessages.en[key],exact:true})).toBeDisabled();
   await expect(panel.locator('textarea,input[type="password"]')).toHaveCount(0);expect(check.writes).toEqual([]);check.assertClean();
 });

@@ -24,7 +24,8 @@
     "stripe:connect:sandbox": "node scripts/connect-stripe-sandbox.mjs",
     "stripe:connect:test": "node scripts/connect-stripe-main-test.mjs",
     "deploy:sandbox": "CLOUDFLARE_ACCOUNT_ID=95040c4f244233138195b80657887486 XDG_CONFIG_HOME=/tmp/aidramio-cf-config WRANGLER_SEND_METRICS=false wrangler deploy --config wrangler.sandbox.jsonc --keep-vars",
-    "drive:manifests": "node scripts/create-drive-manifests.mjs"
+    "drive:manifests": "node scripts/create-drive-manifests.mjs",
+    "drive:verify": "node scripts/verify-clipweave-export.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1000.0",

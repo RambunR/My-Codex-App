@@ -21,6 +21,16 @@ const fingerprint=s=>[s.dev,s.ino,s.size,s.mtimeMs,s.ctimeMs].join(':');
 const check=(condition,message)=>{if(!condition)throw new Error(message);};
 const same=(a,b)=>fingerprint(a)===fingerprint(b);
 async function optionalStat(file){try{return await lstat(file);}catch(error){if(error.code==='ENOENT')return null;throw error;}}
+async function assertManualExport(folder){
+  // ClipWeave's producer seal is authoritative. Synthesizing a simpler marker
+  // from a partial tree would bypass its sidecars, timing and batch checks.
+  for(let current=path.resolve(folder);;){
+    const known=/^ClipWeave[_ -]/iu.test(path.basename(current));
+    const controls=await Promise.all(['upload_manifest.json','EXPORT_FINALIZED.json','EXPORT_SUMMARY.txt'].map(name=>optionalStat(path.join(current,name))));
+    check(!known&&!controls.some(Boolean),'This is a ClipWeave export. Use the sealed ClipWeave verifier; do not generate a legacy readiness manifest. Older exports without producer seals remain unverified.');
+    const parent=path.dirname(current);if(parent===current)break;current=parent;
+  }
+}
 
 async function hashFile(folder,name,maxBytes){
   check(safeName(name),'A media filename is invalid or exceeds 255 characters.');
@@ -78,6 +88,7 @@ async function inspectDirectory(folder){
   return{info,names:sorted(entries.filter(entry=>entry.isFile()&&!entry.name.startsWith('.')).map(entry=>entry.name))};
 }
 export async function createDriveManifest(folder,overrides={}){
+  await assertManualExport(folder);
   const initial=await inspectDirectory(folder),target=path.join(folder,MANIFEST),old=await optionalStat(target);
   check(!old?.isSymbolicLink(),'The existing manifest must not be a symbolic link.');
   if(old&&!overrides.overwrite)return{folder:path.basename(folder),status:'retained',message:'Existing manifest retained. Use --overwrite to refresh it after source changes.'};
@@ -112,6 +123,7 @@ export async function main(args=process.argv.slice(2)){
   if(values.help){console.log('Usage: node create-drive-manifests.mjs <parent-folder-or-001_clip> [--language en] [--genre drama] [--creation-type ai-generated] [--title "One series title"] [--description "Synopsis"] [--cover poster.jpg] [--overwrite]\n\nRequires Node 18+. Reads direct MP4 episodes in numbered folders, preserving unique trailing episode numbers. Writes lingying-ready.json atomically. Videos are never changed or uploaded. Existing manifests are retained unless --overwrite is specified; existing series metadata is preserved during overwrite unless explicitly overridden. Review the manifest metadata before uploading it with the complete series.');return;}
   check(positionals.length===1,'Provide one local parent folder or one numbered series folder. Use --help for details.');
   const root=path.resolve(positionals[0]),rootInfo=await lstat(root);check(rootInfo.isDirectory()&&!rootInfo.isSymbolicLink(),'The input must be a real local directory.');
+  await assertManualExport(root);
   let folders;
   if(seriesName(path.basename(root)))folders=[root];
   else{const entries=await readdir(root,{withFileTypes:true});check(entries.length<=20000,'The parent folder contains too many entries.');check(!entries.some(entry=>entry.isSymbolicLink()&&seriesName(entry.name)),'A numbered series folder is a symbolic link.');folders=sorted(entries.filter(entry=>entry.isDirectory()&&seriesName(entry.name)).map(entry=>entry.name)).map(name=>path.join(root,name));}

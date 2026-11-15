@@ -10,7 +10,7 @@ The [Terms of Use](https://lingyingdrama.com/terms) and [Privacy Policy](https:/
 
 **Local Pass prices:** Dramio Pass shows an approximate price in the visitor's detected country currency (for example, NT$ in Taiwan), alongside the actual HKD billing amount. Discounted prices and the Account card use the same display quote. See [local currency display](docs/LOCAL_CURRENCY_DISPLAY.md) for rate freshness, fallbacks and the unchanged HKD settlement boundary.
 
-**Private Drive imports:** the owner can connect a read-only service account, verify checksum manifests and automatically stage complete series as editable unpublished drafts, with admin notifications. The watcher starts disabled until private access is configured and verified. See [setup and operation](docs/GOOGLE_DRIVE_IMPORT.md).
+**Private Drive imports:** the owner can connect a read-only service account, verify sealed ClipWeave inventories with nested episodes/captions or manual flat-series manifests and automatically stage intact generated series as editable unpublished drafts, with admin notifications. The watcher starts disabled until private access is configured and verified. See [setup and operation](docs/GOOGLE_DRIVE_IMPORT.md).
 
 **WeChat sign-in:** website QR login, contact-email completion for new registrations, and explicit Account linking are implemented. New registration verifies a contact email with an inbox code and needs the account-email sending service. Activation needs a separately approved WeChat Open Platform Website Application and the encrypted `WECHAT_APP_ID` / `WECHAT_APP_SECRET` pair; Stripe WeChat Pay approval does not enable login. See [setup and verification](docs/WECHAT_SIGN_IN.md).
 

@@ -1,3 +1,6 @@
+import {loadClipWeaveExport,resolveClipWeaveSeries,revalidateClipWeaveSnapshot,hasClipWeaveControls,isClipWeaveExportFolderName,type ClipWeaveDriveSnapshot} from './clipweave-drive.js';
+import {selectReadyClipWeaveSeries,clipWeaveSourceIdentity} from '../shared/clipweave-export.js';
+import {createSha256State,updateSha256State,finishSha256State} from '../shared/resumable-sha256.js';
 import {createHash,randomUUID} from 'node:crypto';
 import {one,all,run,transaction} from './db.js';
 import {config} from './config.js';
@@ -73,6 +76,7 @@ function failed(job:Row,lease:string,error:unknown,now:number){
     return;
   }
   const code=safeCode(error);
+  if((error as any)?.state==='WAIT'){checkpoint(job,lease,"UPDATE drive_import_jobs SET next_check_at=?,message='Waiting for every required file in the sealed ClipWeave export.',updated_at=datetime('now')",now+WAIT_MS);return;}
   const transient=['DRIVE_UNAVAILABLE','DRIVE_RATE_LIMITED','DRIVE_AUTH_FAILED'].includes(code);
   if(transient&&current.retry_count<5){
     checkpoint(job,lease,"UPDATE drive_import_jobs SET retry_count=retry_count+1,next_check_at=?,message='Drive is temporarily unavailable. The importer will retry.',updated_at=datetime('now')",now+Math.min(WAIT_MS,15_000*2**current.retry_count));return;
@@ -96,13 +100,126 @@ async function listSeries(drive:DriveReader,folder:string){
   }
   throw new AppError(422,'DRIVE_FILES_AMBIGUOUS','This series folder contains too many files.');
 }
+function clipWeaveJob(jobId:string){return one<Row>('SELECT * FROM drive_import_clipweave_jobs WHERE job_id=?',jobId);}
+function registerClipWeaveExport(root:string,folder:string,owner:string,revision:number){
+  const id=sha256(root+'\0'+folder);
+  run('INSERT OR IGNORE INTO drive_import_clipweave_exports (id,root_folder_id,export_folder_id,owner_id,config_revision) VALUES (?,?,?,?,?)',id,root,folder,owner,revision);
+  // Reverification may safely restart discovery, but never rewrites a mapped
+  // series or silently adopts a different owner/account.
+  run('UPDATE drive_import_clipweave_exports SET config_revision=? WHERE id=? AND owner_id=?',revision,id,owner);
+}
+async function discoverClipWeave(options:DriveImportEngineOptions,now:number){
+  const {owner,settings}=assertBinding(options,undefined,undefined,true);
+  const pending=one<Row>('SELECT * FROM drive_import_clipweave_exports WHERE root_folder_id=? AND owner_id=? AND config_revision=? AND next_check_at<=? ORDER BY next_check_at,id LIMIT 1',settings.folder_id,owner,settings.revision,now);
+  if(!pending)return false;
+  try{
+    const loaded=await loadClipWeaveExport(options.drive!,pending.export_folder_id,{configuredRootId:settings.folder_id});
+    const active=assertBinding(options,undefined,undefined,true);
+    if(active.settings.folder_id!==settings.folder_id||active.settings.revision!==settings.revision)throw new Interrupted();
+    const ready=selectReadyClipWeaveSeries(loaded);
+    transaction(()=>{
+      assertBinding(options,undefined,undefined,true);
+      for(const source of ready){
+        const existing=one<Row>('SELECT c.*,j.root_folder_id,j.config_revision,j.status,j.series_id FROM drive_import_clipweave_jobs c JOIN drive_import_jobs j ON j.id=c.job_id WHERE c.owner_id=? AND c.export_id=? AND c.source_id=?',owner,loaded.seal.export_id,source.source_id);
+        if(existing){
+          if(existing.export_folder_id!==pending.export_folder_id){
+            if(!existing.series_id&&activeStatus(existing.status))run("UPDATE drive_import_jobs SET status='review',cleanup_needed=1,lease_token='',lease_until=0,message='Duplicate sealed export identity found in different Drive folders. Review the source mapping.' WHERE id=?",existing.job_id);
+            notifyDriveImport(existing.job_id,`duplicate-physical-source:${pending.export_folder_id}`,'attention','Duplicate ClipWeave source identity','The same export/source identity appears in another Drive folder. No new series or silent folder reassignment was performed.',existing.series_id);
+          }else if(existing.root_folder_id!==settings.folder_id||existing.config_revision!==settings.revision){
+            notifyDriveImport(existing.job_id,`mapping-review:${settings.folder_id}:${settings.revision}`,'attention','ClipWeave source mapping needs review','This export/source identity was already tracked under an earlier folder configuration. Its destination and source mapping were preserved; review the previous job instead of creating a duplicate.',existing.series_id);
+          }
+          continue;
+        }
+        const id=randomUUID(),folderId='cw-'+sha256(clipWeaveSourceIdentity(loaded.seal.export_id,source.source_id));
+        run('INSERT INTO drive_import_jobs (id,root_folder_id,folder_id,folder_name,owner_id,config_revision,message) VALUES (?,?,?,?,?,?,?)',id,settings.folder_id,folderId,source.name,owner,settings.revision,'Waiting to verify the sealed ClipWeave export.');
+        run('INSERT INTO drive_import_clipweave_jobs (job_id,owner_id,export_folder_id,export_id,source_id,original_series_complete) VALUES (?,?,?,?,?,?)',id,owner,pending.export_folder_id,loaded.seal.export_id,source.source_id,loaded.manifest.original_series_complete===null?null:Number(loaded.manifest.original_series_complete));
+      }
+      run('UPDATE drive_import_clipweave_exports SET next_check_at=?,message=? WHERE id=? AND root_folder_id=? AND config_revision=?',now+WAIT_MS,ready.length?'Sealed ready-series identities discovered.':'No source is in the sealed ready-series set.',pending.id,settings.folder_id,settings.revision);
+    });
+  }catch(error){
+    const state=(error as any)?.state,code=safeCode(error);
+    run('UPDATE drive_import_clipweave_exports SET next_check_at=?,message=? WHERE id=? AND root_folder_id=? AND config_revision=?',now+WAIT_MS,state==='WAIT'?'Waiting for sealed export controls and files.':'The sealed export needs verification or repair.',pending.id,settings.folder_id,settings.revision);
+    if(!(error instanceof Interrupted))notifyDriveImportRoot(`clipweave-export:${pending.id}:${state}:${code}`,state==='WAIT'?'attention':'error',state==='WAIT'?'ClipWeave export is still syncing':'ClipWeave export needs attention',state==='WAIT'?'A discovered ClipWeave export is not yet fully sealed and ready. No drama has been created.':'The discovered export could not pass its sealed inventory checks. No drama has been created.',owner);
+  }
+  return true;
+}
+async function inspectClipWeave(options:DriveImportEngineOptions,job:Row,lease:string,now:number){
+  const mapped=clipWeaveJob(job.id)!;
+  const loaded=await loadClipWeaveExport(options.drive!,mapped.export_folder_id,{configuredRootId:job.root_folder_id});assertBinding(options,job,lease,true);
+  assert(loaded.seal.export_id===mapped.export_id,422,'CLIPWEAVE_SOURCE_CHANGED','The export identity changed.');
+  const resolved=await resolveClipWeaveSeries(options.drive!,loaded,mapped.source_id);assertBinding(options,job,lease,true);
+  const source=resolved.series,snapshot=JSON.stringify(resolved.snapshot);
+  assert(Buffer.byteLength(snapshot)<=1024*1024,422,'CLIPWEAVE_LIMIT','This source snapshot exceeds the safe per-series verification size.');
+  const clips=new Map(source.clips.map(clip=>[clip.file,clip])),covers=resolved.assets.filter(asset=>asset.inventory.role==='series_cover'&&asset.inventory.series_id===mapped.source_id);
+  assert(covers.length<=1,422,'CLIPWEAVE_AMBIGUOUS','A series must have at most one selected cover.');
+  const title=source.name.trim().slice(0,120);
+  const manifest:DriveSeriesManifest={version:1,series:{title,description:'Imported ClipWeave draft. Review the title, synopsis, language and genre before publishing.',language:'en',genres:['drama'],creation_type:'ai-generated'},episodes:[],...(covers.length?{cover:{name:'cover.'+covers[0].file.name.split('.').at(-1)!.toLowerCase(),bytes:covers[0].file.size,sha256:covers[0].inventory.sha256!}}:{})};
+  for(const asset of resolved.assets){
+    if(asset.inventory.role==='clip'&&asset.inventory.series_id===mapped.source_id){
+      const clip=clips.get(asset.path);assert(clip,422,'CLIPWEAVE_INVALID','A clip asset is not in this source sequence.');
+      assert(asset.file.size<=MAX_EPISODE_BYTES,422,'FILE_TOO_LARGE','A ClipWeave episode exceeds 200 MiB.');
+      manifest.episodes.push({name:`episode-${String(clip.index).padStart(3,'0')}.mp4`,bytes:asset.file.size,sha256:asset.inventory.sha256!,number:clip.index,title:`Episode ${String(clip.index).padStart(3,'0')}`});
+    }else if(asset.inventory.role==='series_cover'&&asset.inventory.series_id===mapped.source_id)assert(asset.file.size<=COVER_BYTES,422,'FILE_TOO_LARGE','The ClipWeave cover exceeds 5 MiB.');
+  }
+  manifest.episodes.sort((a,b)=>a.number-b.number);parseDriveManifest(manifest);
+  transaction(()=>{
+    assertBinding(options,job,lease,true);assertSeriesTitleAvailable(title);
+    assert(!one('SELECT 1 FROM drive_import_files WHERE job_id=? LIMIT 1',job.id)&&!one('SELECT 1 FROM drive_import_clipweave_assets WHERE job_id=? LIMIT 1',job.id),409,'INVALID_IMPORT_STATE','A stale ClipWeave checkpoint remains.');
+    for(const asset of resolved.assets){
+      const kind=asset.inventory.series_id===mapped.source_id?(asset.inventory.role==='clip'?'video':asset.inventory.role==='series_cover'?'cover':null):null;
+      let mediaId:string|null=null,expectedDuration:number|null=null;
+      if(kind){
+        mediaId=randomUUID();const clip=clips.get(asset.path);expectedDuration=kind==='video'?clip!.duration:null;
+        const file={id:mediaId,kind},internalName=kind==='video'?`episode-${String(clip!.index).padStart(3,'0')}.mp4`:manifest.cover!.name;run('INSERT INTO drive_import_files (id,job_id,drive_file_id,name,kind,number,bytes,sha256,drive_version,drive_md5,object_key) VALUES (?,?,?,?,?,?,?,?,?,?,?)',mediaId,job.id,asset.file.id,internalName,kind,clip?.index||0,asset.file.size,asset.inventory.sha256,driveFileRevision(asset.file),asset.file.md5Checksum||'',objectKey(job,file));
+      }
+      run('INSERT INTO drive_import_clipweave_assets (id,job_id,path,role,kind,drive_file_id,parent_id,drive_version,bytes,sha256,drive_sha256,media_file_id,expected_duration,hash_state_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',randomUUID(),job.id,asset.path,asset.inventory.role,kind?'media':'support',asset.file.id,asset.parentId,driveFileRevision(asset.file),asset.file.size,asset.inventory.sha256,asset.file.sha256Checksum||'',mediaId,expectedDuration,JSON.stringify(createSha256State()));
+    }
+    run('UPDATE drive_import_clipweave_jobs SET snapshot_json=? WHERE job_id=?',snapshot,job.id);
+    checkpoint(job,lease,"UPDATE drive_import_jobs SET manifest_hash=?,manifest_json=?,status='downloading',message='Checking every required ClipWeave asset before creating a draft.',retry_count=0,next_check_at=?,updated_at=datetime('now')",loaded.manifestSha256,JSON.stringify(manifest),now);
+    recordDriveImportEvent('clipweave-started',job.id,{exportId:mapped.export_id,sourceId:mapped.source_id,episodeCount:source.expected_clip_count,requiredAssets:resolved.assets.length,completenessScope:'generated_export',originalSeriesComplete:loaded.manifest.original_series_complete});
+  });
+}
+async function verifyClipWeaveSupport(options:DriveImportEngineOptions,job:Row,lease:string){
+  if(!clipWeaveJob(job.id))return false;
+  const asset=one<Row>("SELECT * FROM drive_import_clipweave_assets WHERE job_id=? AND kind='support' AND verified=0 ORDER BY path LIMIT 1",job.id);
+  if(!asset)return false;
+  const fresh=async()=>{
+    const remote=await options.drive!.getFile(asset.drive_file_id);assertBinding(options,job,lease,true);
+    assertSnapshotFile(remote,asset.parent_id);assert(remote.size===asset.bytes&&driveFileRevision(remote)===asset.drive_version,422,'CLIPWEAVE_SOURCE_CHANGED','A required support asset changed during verification.');return remote;
+  };
+  const remote=await fresh();
+  if(remote.sha256Checksum){
+    assert(remote.sha256Checksum.toLowerCase()===asset.sha256.toLowerCase(),422,'CLIPWEAVE_CHECKSUM_MISMATCH','A required support asset does not match its inventory.');
+    run('UPDATE drive_import_clipweave_assets SET verified=1,offset=bytes WHERE id=?',asset.id);return true;
+  }
+  let state=JSON.parse(asset.hash_state_json),offset=Number(asset.offset);
+  assert(state.bytes===offset&&offset<=asset.bytes,409,'INVALID_IMPORT_STATE','Invalid support checksum checkpoint.');
+  for(let part=0;part<2&&offset<asset.bytes;part++){
+    const length=Math.min(PART_BYTES,asset.bytes-offset),bytes=await options.drive!.readRange(asset.drive_file_id,offset,length,asset.bytes);assertBinding(options,job,lease,true);
+    assert(bytes.length===length,422,'CLIPWEAVE_SOURCE_CHANGED','Drive returned an incomplete support range.');
+    state=updateSha256State(state,bytes);offset+=bytes.length;
+    run('UPDATE drive_import_clipweave_assets SET offset=?,hash_state_json=? WHERE id=?',offset,JSON.stringify(state),asset.id);
+  }
+  if(offset===asset.bytes){assert(finishSha256State(state)===asset.sha256,422,'CLIPWEAVE_CHECKSUM_MISMATCH','A required support asset does not match its inventory.');await fresh();run('UPDATE drive_import_clipweave_assets SET verified=1 WHERE id=?',asset.id);}
+  return true;
+}
+
 async function discover(options:DriveImportEngineOptions){
   const {settings,owner}=assertBinding(options,undefined,undefined,true);if(!options.drive)return;
   const root=await options.drive.getFile(settings.folder_id);assert(root.mimeType===FOLDER,422,'DRIVE_SOURCE_CHANGED','The configured source is not a Drive folder.');
   const page=await options.drive.listChildren(settings.folder_id,settings.scan_token||undefined);
   const fresh=assertBinding(options);if(fresh.settings.folder_id!==settings.folder_id||fresh.settings.revision!==settings.revision)throw new Interrupted();
+  const sealedRoot=isClipWeaveExportFolderName(root.name)||hasClipWeaveControls(page.files)||!!one('SELECT 1 FROM drive_import_clipweave_exports WHERE root_folder_id=? AND export_folder_id=?',settings.folder_id,root.id);
   transaction(()=>{
+    if(sealedRoot){
+      registerClipWeaveExport(settings.folder_id,root.id,owner,settings.revision);
+      // A sealed-export root cannot be downgraded to old flat-file readiness,
+      // including jobs discovered before the small control files arrived.
+      run("UPDATE drive_import_jobs SET status='cancelled',cleanup_needed=1,message='This root uses sealed ClipWeave verification.',lease_token='',lease_until=0 WHERE root_folder_id=? AND owner_id=? AND series_id IS NULL AND status IN('waiting','downloading','validating') AND NOT EXISTS(SELECT 1 FROM drive_import_clipweave_jobs c WHERE c.job_id=drive_import_jobs.id)",settings.folder_id,owner);
+    }
     for(const file of page.files){
+      if(file.mimeType===FOLDER&&isClipWeaveExportFolderName(file.name)){sourceFolder(file,settings.folder_id);registerClipWeaveExport(settings.folder_id,file.id,owner,settings.revision);continue;}
+      if(sealedRoot)continue;
       if(file.mimeType!==FOLDER||!isDriveSeriesFolderName(file.name))continue;
       sourceFolder(file,settings.folder_id);
       run('INSERT OR IGNORE INTO drive_import_jobs (id,root_folder_id,folder_id,folder_name,owner_id,config_revision) VALUES (?,?,?,?,?,?)',randomUUID(),settings.folder_id,file.id,file.name,owner,settings.revision);
@@ -113,6 +230,7 @@ async function discover(options:DriveImportEngineOptions){
 }
 async function inspect(options:DriveImportEngineOptions,job:Row,lease:string,now:number){
   const drive=options.drive!;
+  if(clipWeaveJob(job.id)){await inspectClipWeave(options,job,lease,now);return;}
   sourceFolder(await drive.getFile(job.folder_id),job.root_folder_id);
   const files=await listSeries(drive,job.folder_id);assertBinding(options,job,lease);
   const manifests=files.filter(file=>file.name===DRIVE_IMPORT_MANIFEST_NAME);
@@ -141,7 +259,8 @@ async function inspect(options:DriveImportEngineOptions,job:Row,lease:string,now
 }
 async function freshFile(options:DriveImportEngineOptions,job:Row,lease:string,file:Row){
   const remote=await options.drive!.getFile(file.drive_file_id);assertBinding(options,job,lease,true);
-  assertSnapshotFile(remote,job.folder_id);assert(driveFileRevision(remote)===file.drive_version&&remote.size===file.bytes,422,'DRIVE_SOURCE_CHANGED','A source file changed during import.');
+  const asset=clipWeaveJob(job.id)?one<Row>('SELECT * FROM drive_import_clipweave_assets WHERE job_id=? AND media_file_id=?',job.id,file.id):undefined;
+  assertSnapshotFile(remote,asset?.parent_id||job.folder_id);assert(driveFileRevision(remote)===file.drive_version&&remote.size===file.bytes,422,'DRIVE_SOURCE_CHANGED','A source file changed during import.');
 }
 async function transfer(options:DriveImportEngineOptions,job:Row,lease:string,file:Row){
   const storage=options.storage;assert(file.object_key===objectKey(job,file),409,'INVALID_IMPORT_STATE','Invalid staged media key.');
@@ -189,10 +308,21 @@ async function validate(options:DriveImportEngineOptions,job:Row,lease:string,fi
   else media=await options.storage.validateCover(file.object_key);
   assertBinding(options,job,lease,true);
   assert(media.bytes===file.bytes&&media.bytes<=(file.kind==='cover'?COVER_BYTES:MAX_EPISODE_BYTES),422,'FILE_TOO_LARGE','Validated media exceeds the website upload limit.');
-  if(duration!==null)assertEpisodeUploadDuration(job.owner_id,duration);
+  if(duration!==null){
+    assertEpisodeUploadDuration(job.owner_id,duration);
+    const expected=one<{expected_duration:number}>('SELECT expected_duration FROM drive_import_clipweave_assets WHERE job_id=? AND media_file_id=?',job.id,file.id)?.expected_duration;
+    if(expected!==undefined&&expected!==null)assert(Math.abs(duration-expected)<=Math.max(1,expected*.02),422,'CLIPWEAVE_DURATION_MISMATCH','The uploaded clip duration does not match the sealed export.');
+  }
   run("UPDATE drive_import_files SET status='validated',duration=?,updated_at=datetime('now') WHERE id=?",duration,file.id);
+  run('UPDATE drive_import_clipweave_assets SET verified=1 WHERE job_id=? AND media_file_id=?',job.id,file.id);
 }
 async function assertFinalSnapshot(options:DriveImportEngineOptions,job:Row,lease:string){
+  const sealed=clipWeaveJob(job.id);
+  if(sealed){
+    assert(!one('SELECT 1 FROM drive_import_clipweave_assets WHERE job_id=? AND verified=0 LIMIT 1',job.id),409,'INVALID_IMPORT_STATE','Required export assets remain unverified.');
+    await revalidateClipWeaveSnapshot(options.drive!,JSON.parse(sealed.snapshot_json));assertBinding(options,job,lease,true);
+    return parseDriveManifest(JSON.parse(job.manifest_json));
+  }
   const snapshot=JSON.parse(job.source_snapshot_json) as Snapshot,manifest=parseDriveManifest(JSON.parse(job.manifest_json));
   sourceFolder(await options.drive!.getFile(job.folder_id),job.root_folder_id);
   const files=await listSeries(options.drive!,job.folder_id);assertBinding(options,job,lease,true);
@@ -224,7 +354,7 @@ async function commit(options:DriveImportEngineOptions,job:Row,lease:string,now:
     for(const episode of manifest.episodes){
       const file=files.find(file=>file.kind==='video'&&file.number===episode.number)!;assertEpisodeUploadDuration(job.owner_id,file.duration);
       const episodeId=randomUUID(),title=episode.title||`Episode ${String(episode.number).padStart(3,'0')}`;
-      run('INSERT INTO episodes (id,series_id,title,number,duration,bytes,storage_key,original_name) VALUES (?,?,?,?,?,?,?,?)',episodeId,id,title,episode.number,legacyEpisodeDuration(file.duration),file.bytes,file.object_key,file.name);
+      run('INSERT INTO episodes (id,series_id,title,number,duration,bytes,storage_key,original_name) VALUES (?,?,?,?,?,?,?,?)',episodeId,id,title,episode.number,legacyEpisodeDuration(file.duration),file.bytes,file.object_key,one<{path:string}>('SELECT path FROM drive_import_clipweave_assets WHERE job_id=? AND media_file_id=?',job.id,file.id)?.path.split('/').at(-1)||file.name);
       writeEpisodeDuration(episodeId,file.duration);
     }
     run('UPDATE users SET used_bytes=used_bytes+? WHERE id=?',total,job.owner_id);
@@ -234,6 +364,15 @@ async function commit(options:DriveImportEngineOptions,job:Row,lease:string,now:
   });
 }
 async function checkCompleted(options:DriveImportEngineOptions,job:Row,now:number){
+  const sealed=clipWeaveJob(job.id);
+  if(sealed){
+    try{await revalidateClipWeaveSnapshot(options.drive!,JSON.parse(sealed.snapshot_json));assertBinding(options);run('UPDATE drive_import_jobs SET next_check_at=? WHERE id=?',now+WAIT_MS,job.id);}
+    catch(error){
+      if(error instanceof Interrupted)throw error;
+      if((error as any)?.state==='REJECT'||(error as any)?.state==='WAIT')transaction(()=>{run("UPDATE drive_import_jobs SET status='review',message='The sealed ClipWeave source changed. Existing website content was preserved.',updated_at=datetime('now') WHERE id=? AND status='complete'",job.id);notifyDriveImport(job.id,'clipweave-source-changed','attention','ClipWeave source needs review','The verified export changed after import. No website edits were overwritten.',job.series_id);});
+      else run('UPDATE drive_import_jobs SET next_check_at=? WHERE id=?',now+WAIT_MS,job.id);
+    }return;
+  }
   // Provenance survives website deletion. Source changes are a review notice,
   // never permission to recreate or overwrite an edited destination.
   const snapshot=JSON.parse(job.source_snapshot_json) as Snapshot;
@@ -283,6 +422,7 @@ async function cleanup(storage:DriveImportStorage,now:number){
     if(referenced){run('DELETE FROM drive_import_files WHERE id=?',file.id);recordDriveImportEvent('cleanup-referenced-object-preserved',job.id);continue;}
     try{if(file.upload_id)await storage.abort(file.object_key,file.upload_id);await storage.remove(file.object_key);run('DELETE FROM drive_import_files WHERE id=?',file.id);}catch{ /* durable journal retries on the next bounded tick */ }
   }
+  run('DELETE FROM drive_import_clipweave_assets WHERE job_id IN(SELECT id FROM drive_import_jobs WHERE cleanup_needed=1 AND series_id IS NULL AND NOT EXISTS(SELECT 1 FROM drive_import_files f WHERE f.job_id=drive_import_jobs.id))');
   run('UPDATE drive_import_jobs SET cleanup_needed=0 WHERE cleanup_needed=1 AND series_id IS NULL AND NOT EXISTS(SELECT 1 FROM drive_import_files f WHERE f.job_id=drive_import_jobs.id)');
 }
 function nextWake(now:number,enabled:boolean){
@@ -290,7 +430,7 @@ function nextWake(now:number,enabled:boolean){
   if(!enabled)return{};
   const settings=getDriveImportSettingsRow();
   const next=one<{due:number}>("SELECT MIN(MAX(next_check_at,lease_until)) AS due FROM drive_import_jobs WHERE owner_id=? AND root_folder_id=? AND config_revision=? AND status IN('waiting','downloading','validating','complete')",config.platformOwnerUserId,settings.folder_id,settings.revision)?.due;
-  if(settings.scan_requested)return{wakeInMs:1_000};
+  if(settings.scan_requested||one('SELECT 1 FROM drive_import_clipweave_exports WHERE root_folder_id=? AND owner_id=? AND config_revision=? AND next_check_at<=? LIMIT 1',settings.folder_id,config.platformOwnerUserId,settings.revision,now))return{wakeInMs:1_000};
   return next===null||next===undefined?{}:{wakeInMs:Math.max(1_000,Math.min(WAIT_MS,next-now))};
 }
 
@@ -319,7 +459,14 @@ export async function runDriveImportEngine(options:DriveImportEngineOptions):Pro
       }
     }
     const {owner,settings:current}=assertBinding(options);
+    if(current.scan_requested)return nextWake(now,true);
     const job=one<Row>("SELECT * FROM drive_import_jobs WHERE owner_id=? AND root_folder_id=? AND config_revision=? AND cleanup_needed=0 AND status IN('waiting','downloading','validating','complete') AND next_check_at<=? AND lease_until<=? ORDER BY next_check_at,created_at,id LIMIT 1",owner,current.folder_id,current.revision,now,now);
+    const nextDiscovery=one<{next_discovery_at:number}>('SELECT next_discovery_at FROM drive_import_clipweave_schedule WHERE id=1')?.next_discovery_at||0;
+    // One discovery step may use a bounded folder-list budget. Interleave it
+    // with transfer ticks so a large queue of exports cannot starve media.
+    if((!job||nextDiscovery<=now)&&await discoverClipWeave(options,now)){
+      run('INSERT INTO drive_import_clipweave_schedule (id,next_discovery_at) VALUES (1,?) ON CONFLICT(id) DO UPDATE SET next_discovery_at=excluded.next_discovery_at',now+10_000);return nextWake(now,true);
+    }
     if(!job)return nextWake(now,true);
     if(job.series_id){await checkCompleted(options,job,now);return nextWake(now,true);}
     const lease=randomUUID();run('UPDATE drive_import_jobs SET lease_token=?,lease_until=? WHERE id=? AND lease_until<=? AND series_id IS NULL',lease,now+LEASE_MS,job.id,now);
@@ -328,12 +475,16 @@ export async function runDriveImportEngine(options:DriveImportEngineOptions):Pro
       assertBinding(options,job,lease,true);
       if(job.status==='waiting')await inspect(options,job,lease,now);
       else{
+        const support=await verifyClipWeaveSupport(options,job,lease);
+        if(support){checkpoint(job,lease,"UPDATE drive_import_jobs SET next_check_at=?,updated_at=datetime('now')",now+1_000);}
+        else {
         const files=filesFor(job.id),file=files.find(item=>item.status!=='validated');
         if(!file)await commit(options,job,lease,now);
         else if(file.status==='assembled'){
           checkpoint(job,lease,"UPDATE drive_import_jobs SET status='validating',message='Checking media and source checksums.',updated_at=datetime('now')");
           await validate(options,job,lease,file);checkpoint(job,lease,"UPDATE drive_import_jobs SET next_check_at=?,retry_count=0,updated_at=datetime('now')",now+1_000);
         }else{await transfer(options,job,lease,file);checkpoint(job,lease,"UPDATE drive_import_jobs SET next_check_at=?,retry_count=0,updated_at=datetime('now')",now+1_000);}
+        }
       }
     }catch(error){failed(job,lease,error,now);}
     finally{run('UPDATE drive_import_jobs SET lease_token=\'\',lease_until=0 WHERE id=? AND lease_token=?',job.id,lease);}
