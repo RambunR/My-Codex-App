@@ -1,0 +1,26 @@
+.series-watch-actions{display:flex;flex-wrap:wrap;gap:8px;min-width:0}
+.series-watch-actions>.button{min-width:0;gap:7px}
+.series-watch-actions>.button>svg{flex-shrink:0}
+.series-unlock-button>span{display:flex;flex-direction:column;min-width:0;gap:2px;line-height:1.4}
+.series-unlock-button small{font-size:12px;font-weight:600;color:var(--accent-soft)}
+.series-unlock-dialog{min-width:0;font-size:14px;line-height:1.7}
+.series-unlock-dialog .unlock-preview>div{min-width:0}
+.series-unlock-dialog .unlock-preview h3{overflow-wrap:anywhere}
+.series-unlock-dialog p{overflow-wrap:anywhere}
+.series-unlock-description{color:#eee3f7}
+.series-unlock-exclusions,.series-unlock-scope{color:var(--muted);font-size:12px;line-height:1.7}
+.series-unlock-dialog .series-unlock-quote-change{border:1px solid #c7a5ff44;border-radius:8px;padding:10px 12px;background:#c7a5ff0c;color:var(--accent-soft);font-size:13px}
+.series-unlock-dialog .series-unlock-wallet>span:first-child,.series-unlock-complete{display:flex;align-items:center;gap:8px}
+.series-unlock-dialog .series-unlock-wallet svg,.series-unlock-complete svg{flex-shrink:0}
+.series-unlock-complete{color:var(--green)}
+.series-unlock-dialog .button{min-height:44px;white-space:normal;overflow-wrap:anywhere}
+.series-unlock-dialog .button>svg{flex-shrink:0}
+.series-unlock-dialog .loading-state{padding:25px 0}
+@media(max-width:640px){
+  .detail-page .detail-info>.detail-actions>.series-watch-actions{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1fr)}
+  .detail-page .detail-info>.detail-actions>.series-watch-actions.has-series-unlock{grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr)}
+  .detail-page .detail-info .series-watch-actions>.button{min-height:48px;font-size:13px;padding:9px 8px;gap:6px;line-height:1.4;white-space:normal;overflow-wrap:anywhere;text-align:center}
+  .detail-page .detail-info .series-watch-actions>.button>svg{width:16px;height:16px}
+  .series-unlock-dialog{font-size:14px}
+  .series-unlock-dialog .checkout-total{gap:12px;flex-wrap:wrap}
+}

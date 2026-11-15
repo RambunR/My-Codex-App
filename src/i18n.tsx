@@ -30,8 +30,10 @@ import {suggestionsEnglish,suggestionsMessages} from './suggestions-locales';
 import {withdrawalEnglish,withdrawalMessages} from './withdrawal-locales';
 import {transactionFeeEnglish,transactionFeeMessages} from './transaction-fee-locales';
 import {testPayoutEnglish,testPayoutMessages} from './test-payout-locales';
+import {viewingEnglish,viewingMessages} from './viewing-locales';
 
 const en = {
+  ...viewingEnglish,
   ...luckyRevealEnglish,
   ...luckyDrawEnglish,
   ...ownerEpisodeEnglish,
@@ -190,6 +192,7 @@ const extra:Record<string,Dictionary>={
 };
 Object.assign(dictionaries['zh-TW'],extra['zh-TW']);
 for(const language of LANGUAGES)Object.assign(dictionaries[language.code],storageUnlimitedMessages[language.code],lastEpisodeFreeMessages[language.code],videoBrandMessages[language.code],uploadLeaveMessages[language.code]);
+for(const language of LANGUAGES)Object.assign(dictionaries[language.code],viewingMessages[language.code]);
 for(const [locale,messages] of Object.entries(additionalMessages))Object.assign(dictionaries[locale],messages);
 for(const language of LANGUAGES){if(!googleAuthMessages[language.code])throw new Error(`Google translations missing: ${language.code}`);Object.assign(dictionaries[language.code],googleAuthMessages[language.code]);}
 for(const language of LANGUAGES){if(!walletFundingMessages[language.code])throw new Error(`Wallet translations missing: ${language.code}`);Object.assign(dictionaries[language.code],walletFundingMessages[language.code]);}

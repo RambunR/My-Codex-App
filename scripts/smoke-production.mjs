@@ -29,7 +29,7 @@ try{
   for(const filename of ['/assets/Studio-retired-release.css','/assets/Studio-retired-release.js']){
     const missing=await fetch(url+filename);assert.equal(missing.status,404);assert.equal(missing.headers.get('cache-control'),'no-store');assert.match(missing.headers.get('content-type'),/^text\/plain/);assert.doesNotMatch(await missing.text(),/id="root"|<!doctype/i);
   }
-  const studio=await fetch(url+'/studio');assert.equal(studio.status,200);assert.equal(studio.headers.get('cache-control'),'no-store');await studio.arrayBuffer();
+  const studio=await fetch(url+'/studio');assert.equal(studio.status,200);assert.equal(studio.headers.get('cache-control'),'private, no-store');assert.match(studio.headers.get('x-robots-tag')||'',/\bnoindex\b/);await studio.arrayBuffer();
   const login=await fetch(url+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});assert.equal(login.status,200);
   const setCookie=login.headers.get('set-cookie');assert.ok(setCookie?.includes('Secure'));assert.ok(setCookie?.includes('HttpOnly'));const cookie=setCookie.split(';')[0];await login.arrayBuffer();
   const headers={'Content-Type':'application/json',Cookie:cookie};
