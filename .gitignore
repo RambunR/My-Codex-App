@@ -14,3 +14,7 @@ test-results/
 
 .npm-cache/
 client_secret*.json
+
+# Downloaded Google service-account keys stay outside source control.
+lingying-drive-import-*.json
+gcp-service-account*.json

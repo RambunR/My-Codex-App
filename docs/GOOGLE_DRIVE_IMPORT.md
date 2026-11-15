@@ -11,6 +11,10 @@ The existing `lingying` Worker has a five-minute scheduled importer. It starts *
 5. In Cloudflare → Workers & Pages → **lingying** → Settings → Variables and Secrets → Add, choose **Secret**, name it `GOOGLE_DRIVE_IMPORT_CREDENTIALS`, and paste the complete JSON file as its value. Save/deploy the settings. Existing Google sign-in credentials are separate and do not grant Drive access.
 6. Sign in as the configured platform owner. Open [Admin → Drive imports](https://lingyingdrama.com/admin?tab=drive-imports), confirm the root folder ID and service account email, then **Verify connection**. Once verification succeeds, enable automatic imports.
 
+The credential is an optional encrypted **Worker Secret**, not a `vars` entry in `wrangler.jsonc`. Use the complete downloaded JSON, including `type`, `client_email` and the full PEM-formatted `private_key`; a private-key body alone is invalid. If a key is exposed in chat or source, delete that key in Google Cloud and create a fresh JSON key before using it. Paste the replacement directly into Cloudflare.
+
+The main Wrangler config tracks `keep_vars: true` so omitted Dashboard-owned variables survive deployment. Existing encrypted Secrets are retained automatically. `STRIPE_TEST_MODE` stays Dashboard-owned; do not copy it or credential values from a Dashboard sync suggestion into tracked `vars`. Explicitly tracked non-secret variables still require comparison with intentional live settings. The importer remains optional and its credential must not be listed in `secrets.required`, which would block unrelated deployments while Drive is unconfigured.
+
 Only the pinned owner with a current administrator role can configure or operate this feature. Verification is bound to that owner, the folder and the credential fingerprint. A folder change disables the watcher. Credential changes require another verification before work resumes. The UI exposes no private key and no key-entry field.
 
 ## Verify ClipWeave exports
