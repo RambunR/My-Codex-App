@@ -21,7 +21,7 @@ import { one, all, run, transaction } from './db.js';
 import { AppError, assert } from './errors.js';
 import { readSession, requireAuth, requirePublisher, requireAdmin, hashPassword, verifyPassword, createSession, destroySession, getUser, rateLimit } from './auth.js';
 import { prepareVideo, prepareCover, putObject, serveObject, removeTempFile } from './storage.js';
-import { createCheckout, cancelCheckout, settlePayment, unlockEpisode, requestWithdrawal,returnWithdrawalFunds, addLedger, stripe,paymentsReady,stripeConfigured,stripeModeMatches,stripeTestPayments,assertPayoutsEnabled } from './finance.js';
+import { createCheckout, cancelCheckout, settlePayment, unlockEpisode, quoteSeriesUnlock, unlockAllEpisodes, requestWithdrawal,returnWithdrawalFunds, addLedger, stripe,paymentsReady,stripeConfigured,stripeModeMatches,stripeTestPayments,assertPayoutsEnabled } from './finance.js';
 import {requireCreatorPassConsent} from './creator-pass-consent.js';
 import {LEGAL_POLICY_VERSION,CREATOR_PASS_DISCLOSURE_VERSION} from '../shared/creator-pass-consent.js';
 import {processRiskEvent,recordPaymentLink,adminPaymentReviews,resolvePaymentReview,assertPaymentAccountClear} from './payment-risk.js';
@@ -281,7 +281,15 @@ export function createApp() {
     const e=episodeRow(session.episode_id);assert(e,404,'NOT_FOUND','Episode not found.');assertSeriesAvailable(e.series_id);assert(canWatch(req.user?.id,e),403,'EPISODE_LOCKED','This episode is unavailable.');
     res.json(recordPlayback(id(req),viewer,watchedMs));
   });
-  app.post('/api/episodes/:id/unlock', requireAuth, (req,res) => res.json({ ...unlockEpisode(req.user!.id,id(req)), user: getUser(req.user!.id) }));
+  app.get('/api/series/:id/unlock-quote',requireAuth,(req,res)=>res.json(quoteSeriesUnlock(req.user!.id,id(req))));
+  app.post('/api/series/:id/unlock-all',requireAuth,rateLimit('series-unlock',60,60_000),(req,res)=>{
+    const body=z.object({revision:z.string().regex(/^[a-f0-9]{64}$/)}).strict().parse(req.body);
+    res.json({...unlockAllEpisodes(req.user!.id,id(req),body.revision),user:getUser(req.user!.id)});
+  });
+  app.post('/api/episodes/:id/unlock',requireAuth,(req,res)=>{
+    const body=z.object({expected_price_cents:z.number().int().min(MIN_PRICE_CENTS).max(MAX_PRICE_CENTS).optional()}).passthrough().parse(req.body??{});
+    res.json({...unlockEpisode(req.user!.id,id(req),body.expected_price_cents),user:getUser(req.user!.id)});
+  });
   app.post('/api/episodes/:id/progress', requireAuth, (req,res) => {
     const e = episodeRow(id(req));assert(e,404,'NOT_FOUND','Episode not found.');assertSeriesAvailable(e.series_id,{viewerId:req.user?.id,allowOwnerPreview:true});assert(canWatch(req.user!.id,e),403,'EPISODE_LOCKED','Unlock this episode to watch.');
     const { seconds } = z.object({ seconds: z.number().min(0).max(Math.max(MAX_EPISODE_SECONDS,e.duration)) }).parse(req.body);
@@ -534,6 +542,7 @@ export function createApp() {
 }
 export function errorHandler(error: any, _req: Request, res: Response, _next: NextFunction) {
   if(res.headersSent)return;
+  if(error?.type==='entity.parse.failed'&&error.status===400){res.status(400).json({error:{code:'VALIDATION',message:'Supply a valid JSON object.'}});return;}
   if(error instanceof ZodError){res.status(400).json({error:{code:'VALIDATION',message:error.issues[0]?.message || 'Check the information you entered.',fields:error.issues.map(x=>({path:x.path.join('.'),message:x.message}))}});return;}
   if(error?.type==='entity.too.large'){res.status(413).json({error:{code:'FILE_TOO_LARGE',message:'This upload part exceeds the 5 MiB limit.'}});return;}
   if(error instanceof multer.MulterError){res.status(413).json({error:{code:'FILE_TOO_LARGE',message:error.code==='LIMIT_FILE_SIZE'?`This file is too large. Episodes: ${MAX_EPISODE_BYTES/1024**2} MiB maximum. Covers: 5 MiB maximum.`:'Upload one file at a time.'}});return;}

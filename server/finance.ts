@@ -1,3 +1,4 @@
+import type {SeriesUnlockQuote} from '../shared/series-unlock.js';
 import {hasLuckyDrawAccess} from './lucky-draw-access.js';
 import {episodePriceCents} from './episode-pricing.js';
 import type {CheckoutChoice} from '../shared/wechat-pay.js';
@@ -7,7 +8,7 @@ import crypto from 'node:crypto';
 import Stripe from 'stripe';
 import { config } from './config.js';
 import {publicAppUrl,stripeSiteOrigin} from './origins.js';
-import { one, run, transaction } from './db.js';
+import { one, all, run, transaction } from './db.js';
 import { AppError,assert } from './errors.js';
 import { ACTIVATION_HKD_CENTS,MIN_WALLET_FUNDING_CENTS,MAX_WALLET_FUNDING_CENTS,LANGUAGES } from '../shared/config.js';
 import {checkoutCopy} from '../shared/checkout-copy.js';
@@ -77,27 +78,70 @@ export function settlePayment(paymentId: string, expected?: { amount: number; cu
     return true;
   });
 }
-export function unlockEpisode(userId: string, episodeId: string) {
-  assertPaymentAccountClear(userId);
-  return transaction(() => {
-    const episode = one(`SELECT e.*,${episodeFreeSql()} AS free,s.creator_id,s.title AS series_title,s.free_episodes,s.price_cents,s.status FROM episodes e JOIN series s ON s.id=e.series_id WHERE e.id=?`, episodeId);
-    assert(episode && episode.status === 'published', 404, 'NOT_FOUND', 'Episode not found.');
-    assertSeriesAvailable(episode.series_id);
-    if (episode.free || episode.creator_id === userId) return { alreadyUnlocked: true };
-    if (hasEpisodePurchase(userId,episodeId)||hasLuckyDrawAccess(userId,episode.series_id)) return { alreadyUnlocked: true };
-    const user = financeAccount(userId);
+interface ChargeEpisode {id:string;number:number;series_title:string}
+/** Balance preflight must not lazily create test accounts on a rejected quote. */
+function unlockBalances(userId:string){
+  return usingTestPaymentState()
+    ?one<{wallet_micros:number;earnings_micros:number}>(`SELECT COALESCE(t.wallet_micros,0) AS wallet_micros,COALESCE(t.earnings_micros,0) AS earnings_micros FROM users u LEFT JOIN test_accounts t ON t.user_id=u.id WHERE u.id=?`,userId)
+    :one<{wallet_micros:number;earnings_micros:number}>('SELECT wallet_micros,earnings_micros FROM users WHERE id=?',userId);
+}
+/** Caller owns the single transaction. Both purchase paths share the exact
+ * receipt and ledger writer; aggregate guards run before the first write. */
+function chargeEpisodes(userId:string,creatorId:string,episodes:readonly ChargeEpisode[],cents:number){
+  const unit=cents*10000,creatorUnit=cents*7000,platformUnit=cents*3000;
+  const total=unit*episodes.length,creatorTotal=creatorUnit*episodes.length,platformTotal=platformUnit*episodes.length;
+  assert(canAdd(0,total)&&canAdd(0,creatorTotal)&&canAdd(0,platformTotal),409,'BALANCE_LIMIT','This purchase exceeds the supported balance range.');
+  const user=unlockBalances(userId),publisher=unlockBalances(creatorId);
+  assert(user&&canAdd(user.wallet_micros,0)&&user.wallet_micros>=total,402,'INSUFFICIENT_FUNDS',`Add funds to your wallet to unlock ${episodes.length===1?'this episode':'these episodes'}.`);
+  assert(publisher&&canAdd(publisher.earnings_micros,creatorTotal),409,'BALANCE_LIMIT','The publisher cannot receive this purchase right now. Your wallet was not charged.');
+  // Lazy initialization is allowed only after every aggregate check succeeds.
+  financeAccount(userId);financeAccount(creatorId);
+  run(`UPDATE ${accountTable()} SET wallet_micros=wallet_micros-? WHERE ${accountIdColumn()}=?`,total,userId);
+  run(`UPDATE ${accountTable()} SET earnings_micros=earnings_micros+? WHERE ${accountIdColumn()}=?`,creatorTotal,creatorId);
+  for(const episode of episodes){
+    const purchaseId=crypto.randomUUID();
+    run(`INSERT INTO ${purchaseTable()} (id,user_id,episode_id,price_micros,creator_micros,platform_micros) VALUES (?,?,?,?,?,?)`,purchaseId,userId,episode.id,unit,creatorUnit,platformUnit);
+    addLedger(userId,'unlock',-unit,purchaseId,`${episode.series_title} · Episode ${episode.number}`);
+    addLedger(creatorId,'earning',creatorUnit,purchaseId,`${episode.series_title} · Episode ${episode.number}`);
+  }
+  return{paid_micros:total,creator_micros:creatorTotal,platform_micros:platformTotal};
+}
+export function unlockEpisode(userId:string,episodeId:string,expectedCents?:number){
+  return transaction(()=>{
+    assertPaymentAccountClear(userId);
+    const episode=one(`SELECT e.*,${episodeFreeSql()} AS free,s.creator_id,s.title AS series_title,s.free_episodes,s.price_cents,s.status FROM episodes e JOIN series s ON s.id=e.series_id WHERE e.id=?`,episodeId);
+    assert(episode&&episode.status==='published',404,'NOT_FOUND','Episode not found.');assertSeriesAvailable(episode.series_id);
+    if(episode.free||episode.creator_id===userId||hasEpisodePurchase(userId,episodeId)||hasLuckyDrawAccess(userId,episode.series_id))return{alreadyUnlocked:true};
     const cents=episodePriceCents(episode.price_cents);
-    const price = cents * 10000;
-    assert(user && user.wallet_micros >= price, 402, 'INSUFFICIENT_FUNDS', 'Add funds to your wallet to unlock this episode.');
-    const creator = cents * 7000; const platform = cents * 3000; const id = crypto.randomUUID();
-    const publisher=financeAccount(episode.creator_id);
-    assert(publisher&&canAdd(publisher.earnings_micros,creator),409,'BALANCE_LIMIT','The publisher cannot receive this purchase right now. Your wallet was not charged.');
-    run(`UPDATE ${accountTable()} SET wallet_micros=wallet_micros-? WHERE ${accountIdColumn()}=?`, price, userId);
-    run(`UPDATE ${accountTable()} SET earnings_micros=earnings_micros+? WHERE ${accountIdColumn()}=?`, creator, episode.creator_id);
-    run(`INSERT INTO ${purchaseTable()} (id,user_id,episode_id,price_micros,creator_micros,platform_micros) VALUES (?,?,?,?,?,?)`, id, userId, episodeId, price, creator, platform);
-    addLedger(userId, 'unlock', -price, id, `${episode.series_title} · Episode ${episode.number}`);
-    addLedger(episode.creator_id, 'earning', creator, id, `${episode.series_title} · Episode ${episode.number}`);
-    return { alreadyUnlocked: false, paid_micros: price, creator_micros: creator, platform_micros: platform };
+    assert(expectedCents===undefined||expectedCents===cents,409,'EPISODE_PRICE_CHANGED','The episode price changed. Review the current price before unlocking.');
+    return{alreadyUnlocked:false,...chargeEpisodes(userId,episode.creator_id,[{id:episode.id,number:episode.number,series_title:episode.series_title}],cents)};
+  });
+}
+/** Read-only snapshot; callers own a transaction so eligibility and revision
+ * use the same database view. Lucky Draw grants retain their separate rules. */
+function seriesUnlockSnapshot(userId:string,seriesId:string){
+  assertPaymentAccountClear(userId);
+  const series=assertSeriesAvailable(seriesId),cents=episodePriceCents(series.price_cents),lucky=hasLuckyDrawAccess(userId,seriesId);
+  const episodes=all<{id:string;number:number;free:number}>(`SELECT e.id,e.number,${episodeFreeSql()} AS free FROM episodes e JOIN series s ON s.id=e.series_id WHERE e.series_id=? ORDER BY e.number,e.id`,seriesId)
+    .map(episode=>({...episode,owned:hasEpisodePurchase(userId,episode.id)}));
+  const remaining=series.creator_id===userId||lucky?[]:episodes.filter(episode=>!episode.free&&!episode.owned);
+  const total=remaining.length*cents*10000;
+  assert(canAdd(0,total),409,'BALANCE_LIMIT','This purchase exceeds the supported balance range.');
+  const revision=crypto.createHash('sha256').update(JSON.stringify({version:1,userId,mode:usingTestPaymentState()?'test':'default',seriesId,creatorId:series.creator_id,storedPrice:series.price_cents,cents,lucky,episodes:episodes.map(episode=>[episode.id,episode.number,!!episode.free,episode.owned])})).digest('hex');
+  const quote:SeriesUnlockQuote={series_id:seriesId,episode_ids:remaining.map(episode=>episode.id),episode_count:remaining.length,total_micros:total,unit_price_micros:cents*10000,revision};
+  return{quote,series,remaining,cents};
+}
+export function quoteSeriesUnlock(userId:string,seriesId:string):SeriesUnlockQuote{
+  return transaction(()=>seriesUnlockSnapshot(userId,seriesId).quote);
+}
+export function unlockAllEpisodes(userId:string,seriesId:string,revision:string){
+  assert(typeof revision==='string'&&/^[a-f0-9]{64}$/.test(revision),400,'VALIDATION','Supply a valid unlock quote revision.');
+  return transaction(()=>{
+    const snapshot=seriesUnlockSnapshot(userId,seriesId);
+    if(!snapshot.remaining.length)return{unlocked_count:0,paid_micros:0,alreadyUnlocked:true};
+    assert(snapshot.quote.revision===revision,409,'UNLOCK_QUOTE_CHANGED','The episodes or price changed. Review a fresh quote before unlocking.');
+    const charged=chargeEpisodes(userId,snapshot.series.creator_id,snapshot.remaining.map(episode=>({id:episode.id,number:episode.number,series_title:snapshot.series.title})),snapshot.cents);
+    return{unlocked_count:snapshot.remaining.length,paid_micros:charged.paid_micros,alreadyUnlocked:false};
   });
 }
 export function returnWithdrawalFunds(userId:string,amount:number){
