@@ -9,9 +9,9 @@ const TOKEN='https://oauth2.googleapis.com/token',FILES='https://www.googleapis.
 const pair=generateKeyPairSync('rsa',{modulusLength:2048,privateKeyEncoding:{type:'pkcs8',format:'pem'},publicKeyEncoding:{type:'spki',format:'pem'}});
 const email='lingying-reader@project.iam.gserviceaccount.com',raw=JSON.stringify({type:'service_account',client_email:email,private_key:pair.privateKey,token_uri:'https://attacker.test/token'});
 const meta=(values:Record<string,unknown>={})=>({id:'file-one',name:'episode.mp4',mimeType:'video/mp4',size:'15',version:'7',modifiedTime:'2026-11-15T00:00:00.000Z',parents:['series-folder'],...values});
-function fixture(handler:(url:URL,init:RequestInit)=>Promise<Response>|Response,clock=()=>Date.now()){
+function fixture(handler:(url:URL,init:RequestInit)=>Promise<Response>|Response,clock=()=>Date.now(),authorization?:(init:RequestInit)=>Promise<Response>|Response){
   const calls:Array<{url:URL;init:RequestInit}>=[];let assertion='';
-  const fetcher=(async(input:RequestInfo|URL,init:RequestInit={})=>{const url=new URL(input instanceof Request?input.url:String(input));calls.push({url,init});if(url.href===TOKEN){assertion=new URLSearchParams(String(init.body)).get('assertion')||'';return Response.json({access_token:'fake-test-token',expires_in:3600,token_type:'Bearer'});}return handler(url,init);}) as typeof fetch;
+  const fetcher=(async(input:RequestInfo|URL,init:RequestInit={})=>{const url=new URL(input instanceof Request?input.url:String(input));calls.push({url,init});if(url.href===TOKEN){assertion=new URLSearchParams(String(init.body)).get('assertion')||'';return authorization?authorization(init):Response.json({access_token:'fake-test-token',expires_in:3600,token_type:'Bearer'});}return handler(url,init);}) as typeof fetch;
   return{reader:createGoogleDriveReader(raw,{fetch:fetcher,now:clock}),calls,assertion:()=>assertion};
 }
 const rejection=(code:string)=>(error:unknown)=>error instanceof GoogleDriveImportError&&error.code===code;
@@ -71,4 +71,50 @@ test('Drive int64 sizes are parsed exactly and support-asset ranges remain bound
   }
   const invalid=fixture(()=>{throw new Error('Unsafe range must not request data.');});
   await assert.rejects(invalid.reader.readRange('file-one',Number.MAX_SAFE_INTEGER,5,Number.MAX_SAFE_INTEGER),rejection('DRIVE_SOURCE_CHANGED'));assert.equal(invalid.calls.length,0);
+});
+
+const disabledInfo={'@type':'type.googleapis.com/google.rpc.ErrorInfo',reason:'SERVICE_DISABLED',domain:'googleapis.com',metadata:{service:'drive.googleapis.com',consumer:'projects/private-provider-project'}};
+function safeDiagnostic(code:string,status?:number){return(error:unknown)=>{
+  assert.ok(error instanceof GoogleDriveImportError);assert.equal(error.code,code);if(status!==undefined)assert.equal(error.status,status);
+  for(const secret of ['private-provider-body','private-provider-project','fake-test-token','PRIVATE KEY',email])assert.equal(error.message.includes(secret),false);return true;
+};}
+
+test('disabled Drive API diagnostics require recognized modern or legacy structured reasons rather than private provider messages',async()=>{
+  for(const error of [{details:[disabledInfo],message:'private-provider-body'},{errors:[{reason:'accessNotConfigured',domain:'usageLimits'}],message:'private-provider-body'}]){
+    const f=fixture(()=>Response.json({error},{status:403}));await assert.rejects(f.reader.getFile('file-one'),safeDiagnostic('DRIVE_API_DISABLED',403));assert.equal(f.calls.length,2);assert.ok(f.calls.every(call=>call.init.redirect==='manual'));
+  }
+});
+
+test('untrusted or malformed error details cannot impersonate disabled Drive API or escape the original HTTP failure classification',async()=>{
+  const wrongDetails=[{...disabledInfo,'@type':'example.test/ErrorInfo'},{...disabledInfo,domain:'example.test'},{...disabledInfo,reason:'OTHER_REASON'},{...disabledInfo,metadata:{service:'sheets.googleapis.com'}},{...disabledInfo,metadata:{service:['drive.googleapis.com']}},{...disabledInfo,metadata:undefined}];
+  const bodies=[...wrongDetails.map(detail=>JSON.stringify({error:{details:[detail]}})),JSON.stringify({error:{message:'SERVICE_DISABLED: Enable Google Drive API. private-provider-body'}}),JSON.stringify({error:{message:'rateLimitExceeded private-provider-body'}}),JSON.stringify({error:{errors:[{reason:'accessNotConfigured',domain:'global'}]}}),JSON.stringify({error:{errors:[{reason:'rateLimitExceeded',domain:'global'}]}}),JSON.stringify({error:{details:[{...disabledInfo,reason:'QUOTA_EXCEEDED',metadata:{service:'sheets.googleapis.com'}}]}}),JSON.stringify({error:{details:disabledInfo}}),'not JSON private-provider-body','null','[]'];
+  for(const body of bodies){const f=fixture(()=>new Response(body,{status:403}));await assert.rejects(f.reader.getFile('file-one'),safeDiagnostic('DRIVE_ACCESS_DENIED',403));}
+  for(const[status,code]of [[404,'DRIVE_ACCESS_DENIED'],[500,'DRIVE_UNAVAILABLE']] as const){const f=fixture(()=>Response.json({error:{details:[disabledInfo]}},{status}));await assert.rejects(f.reader.getFile('file-one'),safeDiagnostic(code));}
+});
+
+test('provider error parsing is bounded to 32 KiB and safely handles declared oversize, streaming overflow and broken bodies',async()=>{
+  const declared=fixture(()=>Response.json({error:{details:[disabledInfo]}},{status:403,headers:{'Content-Length':String(32*1024+1)}}));await assert.rejects(declared.reader.getFile('file-one'),safeDiagnostic('DRIVE_ACCESS_DENIED',403));
+  const oversized=fixture(()=>Response.json({error:{details:[disabledInfo],private:'private-provider-body'+'x'.repeat(32*1024)}},{status:403}));await assert.rejects(oversized.reader.getFile('file-one'),safeDiagnostic('DRIVE_ACCESS_DENIED',403));
+  let pulls=0,cancelled=false;const streaming=fixture(()=>new Response(new ReadableStream<Uint8Array>({pull(controller){pulls++;controller.enqueue(new Uint8Array(4096).fill(120));},cancel(){cancelled=true;}}),{status:403}));await assert.rejects(streaming.reader.getFile('file-one'),safeDiagnostic('DRIVE_ACCESS_DENIED',403));assert.equal(cancelled,true);assert.ok(pulls<=10,'error parsing must stop rather than drain an unbounded provider body');
+  for(const response of [new Response(null,{status:403}),new Response(Uint8Array.of(255),{status:403}),new Response(new ReadableStream({start(controller){controller.error(new Error('private-provider-body'));}}),{status:403})]){const f=fixture(()=>response);await assert.rejects(f.reader.getFile('file-one'),safeDiagnostic('DRIVE_ACCESS_DENIED',403));}
+});
+
+test('rate limits retain a bounded retry delay without accepting provider text or confusing folder permissions with quota',async()=>{
+  const limits=[...['rateLimitExceeded','userRateLimitExceeded','dailyLimitExceeded','sharingRateLimitExceeded'].map(reason=>({errors:[{reason,domain:'usageLimits'}]})),...['RATE_LIMIT_EXCEEDED','QUOTA_EXCEEDED'].map(reason=>({details:[{...disabledInfo,reason}]}))];
+  for(const error of limits){const f=fixture(()=>Response.json({error:{...error,message:'private-provider-body'}},{status:403,headers:{'Retry-After':'90'}}));await assert.rejects(f.reader.getFile('file-one'),error=>safeDiagnostic('DRIVE_RATE_LIMITED',429)(error)&&error instanceof GoogleDriveImportError&&error.retryAfterSeconds===90);}
+  for(const[retry,expected]of [['999999',3600],['not-a-delay',undefined],['-1',undefined]] as const){const f=fixture(()=>new Response('private-provider-body',{status:429,headers:{'Retry-After':retry}}));await assert.rejects(f.reader.getFile('file-one'),error=>safeDiagnostic('DRIVE_RATE_LIMITED',429)(error)&&error instanceof GoogleDriveImportError&&error.retryAfterSeconds===expected);}
+});
+
+test('OAuth rejection, rate limits and provider outages keep separate safe diagnostics and never request Drive metadata without a token',async()=>{
+  for(const[status,code]of [[400,'DRIVE_AUTH_FAILED'],[401,'DRIVE_AUTH_FAILED'],[403,'DRIVE_AUTH_FAILED'],[429,'DRIVE_RATE_LIMITED'],[500,'DRIVE_UNAVAILABLE'],[503,'DRIVE_UNAVAILABLE']] as const){
+    const f=fixture(()=>{assert.fail('Rejected authorization cannot reach Drive metadata.');},undefined,()=>Response.json({error:'invalid_grant',error_description:'private-provider-body',details:[disabledInfo]},{status,headers:{'Retry-After':'90'}}));await assert.rejects(f.reader.getFile('file-one'),safeDiagnostic(code));assert.equal(f.calls.length,1);assert.equal(f.calls[0].url.href,TOKEN);
+  }
+  for(const value of [{access_token:'',expires_in:3600},{access_token:'fake-test-token\nprivate-provider-body',expires_in:3600},{access_token:'fake-test-token',expires_in:0}]){const f=fixture(()=>Response.json(meta()),undefined,()=>Response.json(value));await assert.rejects(f.reader.getFile('file-one'),safeDiagnostic('DRIVE_AUTH_FAILED',503));assert.equal(f.calls.length,1);}
+});
+
+test('signing failures, transport failures and a persistent 401 remain redacted with at most one authorization refresh',async()=>{
+  const invalidRaw=JSON.stringify({type:'service_account',client_email:email,private_key:'-----BEGIN PRIVATE KEY-----\n'+'A'.repeat(600)+'\n-----END PRIVATE KEY-----'});assert.equal(googleDriveCredentials(invalidRaw).configured,true);let calls=0;
+  const invalid=createGoogleDriveReader(invalidRaw,{fetch:(async()=>{calls++;throw new Error('Signing must fail before requesting authorization.');}) as typeof fetch});await assert.rejects(invalid.getFile('file-one'),safeDiagnostic('DRIVE_AUTH_FAILED',503));assert.equal(calls,0);
+  for(const tokenFailure of [false,true]){const fail=()=>{throw new Error('private-provider-body: Bearer fake-test-token');},f=fixture(tokenFailure?()=>Response.json(meta()):fail,undefined,tokenFailure?fail:undefined);await assert.rejects(f.reader.getFile('file-one'),safeDiagnostic('DRIVE_UNAVAILABLE'));assert.equal(f.calls.length,tokenFailure?1:2);}
+  const expired=fixture(()=>new Response('private-provider-body',{status:401}));await assert.rejects(expired.reader.getFile('file-one'),safeDiagnostic('DRIVE_AUTH_FAILED',503));assert.equal(expired.calls.filter(call=>call.url.href===TOKEN).length,2);assert.equal(expired.calls.filter(call=>call.url.origin+call.url.pathname===FILES+'/file-one').length,2);assert.equal(expired.calls.length,4);
 });

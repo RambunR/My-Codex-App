@@ -106,6 +106,29 @@ test('raw provider failure details never reach the browser or enable the importe
   runtime=true;configured=true;verify=async()=>{throw new Error('Bearer fixture-private-access-token -----BEGIN PRIVATE KEY-----');};
   const result=await request('/connection',{},actors.owner,409);assert.equal(result.data.error.code,'DRIVE_IMPORT_CONNECTION_FAILED');assert(!JSON.stringify(result.data).includes('fixture-private'));assert.equal(getDriveImportSettingsRow().enabled,0);
 });
+test('connection diagnostics select fixed owner guidance across runtime error classes without changing verification, imports or finances',async()=>{
+  runtime=true;configured=true;
+  const snapshot=()=>({settings:all('SELECT * FROM drive_import_settings'),jobs:all('SELECT * FROM drive_import_jobs'),files:all('SELECT * FROM drive_import_files'),events:all('SELECT * FROM drive_import_events'),notifications:all('SELECT * FROM drive_import_notifications'),series:all('SELECT * FROM series'),finances:financialSnapshot()});
+  const before=snapshot(),privateText='private-provider-project fixture-folder client_email Bearer fixture-token -----BEGIN PRIVATE KEY-----';
+  // A separate class models the original runtime versus generated CF module.
+  class AdapterError extends Error {constructor(readonly code:unknown,readonly retryAfterSeconds?:unknown){super(privateText);}}
+  for(const [providerCode,apiCode,status]of [
+    ['DRIVE_API_DISABLED','DRIVE_IMPORT_API_DISABLED',409],['DRIVE_AUTH_FAILED','DRIVE_IMPORT_AUTH_FAILED',409],['DRIVE_ACCESS_DENIED','DRIVE_IMPORT_ACCESS_DENIED',409],
+    ['DRIVE_RATE_LIMITED','DRIVE_IMPORT_RATE_LIMITED',429],['DRIVE_UNAVAILABLE','DRIVE_IMPORT_UNAVAILABLE',503],['INVALID_DRIVE_FOLDER','DRIVE_IMPORT_INVALID_FOLDER',422],['DRIVE_SOURCE_CHANGED','DRIVE_IMPORT_INVALID_RESPONSE',502],
+    ['unrecognized-provider-reason','DRIVE_IMPORT_CONNECTION_FAILED',409],['toString','DRIVE_IMPORT_CONNECTION_FAILED',409],
+  ]as const){
+    clock+=61_000;verify=async()=>{throw new AdapterError(providerCode,999999);};
+    const result=await request('/connection',{},actors.owner,status),serialized=JSON.stringify(result.data);
+    assert.equal(result.data.error.code,apiCode);assert.deepEqual(Object.keys(result.data.error).sort(),['code','message']);
+    for(const marker of privateText.split(' '))assert(!serialized.includes(marker),providerCode+' leaked provider text');
+    assert.equal(result.headers.get('Retry-After'),status===429?'3600':null);assert.deepEqual(snapshot(),before);
+  }
+  for(const retry of ['90\r\nX-Private: fixture-token',-1,Infinity]){
+    clock+=61_000;verify=async()=>{throw new AdapterError('DRIVE_RATE_LIMITED',retry);};
+    assert.equal((await request('/connection',{},actors.owner,429)).headers.get('Retry-After'),null);assert.deepEqual(snapshot(),before);
+  }
+  clock+=61_000;verify=async()=>{};const recovered=await request('/connection',{});assert.equal(recovered.data.settings.verifiedAt,clock);assert.equal(recovered.data.settings.enabled,false);assert.equal(recovered.data.jobs.length,0);assert.deepEqual(financialSnapshot(),before.finances);
+});
 test('cancel is idempotent, invalidates the lease and notifies once; imported tombstones can never be cancelled or retried',async()=>{
   await enable();const id=job('downloading');staged(id);
   await request('/jobs/'+id+'/cancel',{});await request('/jobs/'+id+'/cancel',{});

@@ -17,6 +17,16 @@ The main Wrangler config tracks `keep_vars: true` so omitted Dashboard-owned var
 
 Only the pinned owner with a current administrator role can configure or operate this feature. Verification is bound to that owner, the folder and the credential fingerprint. A folder change disables the watcher. Credential changes require another verification before work resumes. The UI exposes no private key and no key-entry field.
 
+## If connection verification fails
+
+Verification now distinguishes a disabled Drive API, rejected service-account authentication, folder access denial, rate limits, temporary Google/network failures, an invalid folder and invalid metadata. The owner sees fixed translated guidance and links to Google Drive API settings and the saved source folder. Unknown failures stay generic; provider messages, response bodies, tokens and private keys are never shown.
+
+Enable **Google Drive API in the service account's project**, which may differ from the project used for Google sign-in. The API-settings link selects that project from the validated service-account email. Confirm that the saved source folder has a Viewer share for the exact email displayed in Admin. Google Cloud project roles and public editing access are not required for this read-only folder connection.
+
+If Google reports authentication failure, check the complete JSON key stored directly in the encrypted Cloudflare Secret; do not paste it into support messages. A rate limit or temporary outage calls for a later retry rather than replacing a valid key. A failed check never verifies the connection or enables imports, and the UI suppresses an old verification indicator until an explicit successful retry. Successful verification alone still does not enable the watcher.
+
+The provider error classifier reads at most 32 KiB and recognises only documented reason enums. Verification repeats the owner, saved-folder revision and credential-fingerprint checks before recording success. Existing ClipWeave validation, drafts, import jobs, notifications and financial state are unaffected.
+
 ## Verify ClipWeave exports
 
 For ClipWeave output, select the whole `ClipWeave_<run>` export or its parent. Its producer must provide `EXPORT_SUMMARY.txt`, `upload_manifest.json` and `EXPORT_FINALIZED.json`. Keep the nested folders intact. The seal arriving in Drive does not prove the videos finished syncing.

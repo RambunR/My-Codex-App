@@ -54,9 +54,9 @@
     "USD_TO_HKD": "7.8",
     "STRIPE_WECHAT_PAY_ENABLED": "true",
     "SEED_CATALOG": "false",
-    "EMAIL_PROVIDER": "cloudflare",
+    "EMAIL_PROVIDER": "resend",
     "CF_EMAIL_ACCOUNT_ID": "95040c4f244233138195b80657887486",
-    "MAIL_FROM": "LingYing <accounts@hknovaxrproduction.com>",
+    "MAIL_FROM": "LingYing <accounts@lingyingdrama.com>",
     "PUBLIC_APP_URL": "https://lingyingdrama.com",
     "STRIPE_SITE_ORIGIN": "https://aidramio.jimmy-tsoi2001.workers.dev"
   },

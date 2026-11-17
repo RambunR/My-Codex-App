@@ -8,6 +8,7 @@ const FILES_ENDPOINT='https://www.googleapis.com/drive/v3/files';
 const READONLY_SCOPE='https://www.googleapis.com/auth/drive.readonly';
 const FILE_FIELDS='id,name,mimeType,size,version,modifiedTime,md5Checksum,sha256Checksum,parents';
 const MAX_RANGE_BYTES=5*1024*1024;
+const MAX_ERROR_BYTES=32*1024;
 interface ServiceAccount {client_email:string;private_key:string}
 export class GoogleDriveImportError extends Error {
   readonly code:string;readonly status:number;readonly retryAfterSeconds?:number;
@@ -43,6 +44,27 @@ async function jsonResponse(response:Response,maxBytes:number){
   try{return JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(await readLimited(response,maxBytes)));}
   catch(error){if(error instanceof GoogleDriveImportError)throw error;fail('DRIVE_UNAVAILABLE','Drive returned invalid metadata. Try again later.');}
 }
+/** Inspect only bounded, documented reason enums. Provider text, URLs and
+ * project identities are never retained in an error or sent to the browser. */
+async function forbiddenReason(response:Response):Promise<'disabled'|'rate'|undefined>{
+  let value:any;
+  try{value=await jsonResponse(response,MAX_ERROR_BYTES);}catch{return;}
+  const error=value?.error;
+  if(Array.isArray(error?.details)){
+    const reasons=error.details.filter((detail:any)=>detail?.['@type']==='type.googleapis.com/google.rpc.ErrorInfo'&&detail.domain==='googleapis.com'&&detail.metadata?.service==='drive.googleapis.com');
+    if(reasons.some((detail:any)=>detail.reason==='SERVICE_DISABLED'))return'disabled';
+    if(reasons.some((detail:any)=>detail.reason==='RATE_LIMIT_EXCEEDED'||detail.reason==='QUOTA_EXCEEDED'))return'rate';
+  }
+  if(Array.isArray(error?.errors)){
+    const reasons=error.errors.filter((detail:any)=>detail?.domain==='usageLimits');
+    if(reasons.some((detail:any)=>detail.reason==='accessNotConfigured'))return'disabled';
+    if(reasons.some((detail:any)=>['rateLimitExceeded','userRateLimitExceeded','dailyLimitExceeded','sharingRateLimitExceeded'].includes(detail.reason)))return'rate';
+  }
+}
+function rateLimited(response:Response):never{
+  const raw=response.headers.get('Retry-After'),seconds=raw&&/^\d+$/u.test(raw)?Number(raw):NaN;
+  throw new GoogleDriveImportError('DRIVE_RATE_LIMITED','Drive is temporarily rate limited. Try again later.',429,Number.isSafeInteger(seconds)?Math.min(3600,seconds):undefined);
+}
 function fileMetadata(value:any,expectedId?:string):DriveFile{
   // Native Google documents have no binary size. Keep them in listings so
   // unrelated Docs/Sheets can be ignored; they can never satisfy media input.
@@ -72,7 +94,12 @@ export function createGoogleDriveReader(raw:string,options:GoogleDriveReaderOpti
       try{const key=await importPKCS8(account.private_key,'RS256'),issued=Math.floor(now()/1000);assertion=await new SignJWT({scope:READONLY_SCOPE}).setProtectedHeader({alg:'RS256',typ:'JWT'}).setIssuer(account.client_email).setAudience(TOKEN_ENDPOINT).setIssuedAt(issued).setExpirationTime(issued+3600).sign(key);}
       catch{fail('DRIVE_AUTH_FAILED','Private Drive credentials could not be used. Check the service-account key.',503);}
       const response=await send(TOKEN_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded',Accept:'application/json'},body:new URLSearchParams({grant_type:'urn:ietf:params:oauth:grant-type:jwt-bearer',assertion})},10000);
-      if(!response.ok){await response.body?.cancel();fail('DRIVE_AUTH_FAILED','Google did not accept the Drive service-account credentials.',503);}
+      if(!response.ok){
+        await response.body?.cancel();
+        if(response.status===429)rateLimited(response);
+        if(response.status>=500&&response.status<=599)fail('DRIVE_UNAVAILABLE','Google authorization is temporarily unavailable. Try again later.');
+        fail('DRIVE_AUTH_FAILED','Google did not accept the Drive service-account credentials.',503);
+      }
       const value=await jsonResponse(response,65536);
       if(typeof value?.access_token!=='string'||!value.access_token||value.access_token.length>16000||/[\r\n]/u.test(value.access_token)||!Number.isFinite(value.expires_in)||value.expires_in<=0)fail('DRIVE_AUTH_FAILED','Google returned an invalid Drive authorization response.',503);
       accessToken=value.access_token;expiresAt=now()+Math.max(1,Math.min(3600,value.expires_in)-30)*1000;return accessToken;
@@ -84,8 +111,10 @@ export function createGoogleDriveReader(raw:string,options:GoogleDriveReaderOpti
       const response=await send(url,{method:'GET',headers:{Authorization:'Bearer '+await token(),Accept:'application/json','Accept-Encoding':'identity',...extra}},30000);
       if(response.status===401&&attempt===0){await response.body?.cancel();accessToken='';expiresAt=0;continue;}
       if(response.ok)return response;
-      const status=response.status,retry=response.headers.get('Retry-After');await response.body?.cancel();
-      if(status===429)throw new GoogleDriveImportError('DRIVE_RATE_LIMITED','Drive is temporarily rate limited. Try again later.',429,retry&&/^\d+$/u.test(retry)?Math.min(3600,Number(retry)):undefined);
+      const status=response.status,reason=status===403?await forbiddenReason(response):undefined;
+      if(status!==403)await response.body?.cancel();
+      if(status===429||reason==='rate')rateLimited(response);
+      if(reason==='disabled')fail('DRIVE_API_DISABLED','Google Drive API is disabled for the service-account project.',403);
       if(status===401)fail('DRIVE_AUTH_FAILED','Drive authorization failed. Check the service-account credentials.',503);
       if(status===403||status===404)fail('DRIVE_ACCESS_DENIED','The Drive service account cannot read this folder or file. Check Viewer access.',status);
       fail('DRIVE_UNAVAILABLE','Drive returned an unavailable response. Try again later.');

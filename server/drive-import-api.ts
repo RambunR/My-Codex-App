@@ -14,6 +14,15 @@ const folderId=z.string().regex(/^[A-Za-z0-9_-]{10,200}$/u,'Enter a Google Drive
 const settingsBody=z.object({enabled:z.boolean().optional(),folderId:folderId.optional()}).strict().refine(body=>body.enabled!==undefined||body.folderId!==undefined,'Choose a setting to change.');
 const emptyBody=z.object({}).strict();
 const recentVerificationMs=24*60*60*1000;
+const connectionFailures=new Map<string,readonly[number,string,string]>([
+  ['DRIVE_API_DISABLED',[409,'DRIVE_IMPORT_API_DISABLED','Google Drive API is disabled for the service-account project. Enable Google Drive API for that project, then verify again.']],
+  ['DRIVE_AUTH_FAILED',[409,'DRIVE_IMPORT_AUTH_FAILED','Google could not authorize the configured service-account key. Check or replace the private JSON key in Cloudflare, then verify again.']],
+  ['DRIVE_ACCESS_DENIED',[409,'DRIVE_IMPORT_ACCESS_DENIED','The configured service account cannot read this folder. Share the selected folder with the service account shown here as a Viewer, keep general access Restricted, then verify again.']],
+  ['DRIVE_RATE_LIMITED',[429,'DRIVE_IMPORT_RATE_LIMITED','Google is temporarily limiting Drive requests. Wait before verifying again.']],
+  ['DRIVE_UNAVAILABLE',[503,'DRIVE_IMPORT_UNAVAILABLE','Google Drive could not be reached or is temporarily unavailable. Try verifying again later.']],
+  ['INVALID_DRIVE_FOLDER',[422,'DRIVE_IMPORT_INVALID_FOLDER','The selected source is not a valid Google Drive folder. Check the folder ID, then verify again.']],
+  ['DRIVE_SOURCE_CHANGED',[502,'DRIVE_IMPORT_INVALID_RESPONSE','Google Drive returned incomplete or invalid folder information. Check the source folder and try verifying again.']],
+]);
 type Job={id:string;owner_id:string;root_folder_id:string;status:string;series_id:string|null;cleanup_needed:number};
 function credentials(){
   try{return driveImportRuntime.credentials();}catch{return{configured:false,serviceAccountEmail:null,fingerprint:''};}
@@ -83,8 +92,16 @@ export function registerDriveImportApi(app:Express){
     assert(runtimeAvailable(),503,'DRIVE_IMPORT_RUNTIME_UNAVAILABLE','Drive imports require the production Cloudflare runtime.');
     const ownerId=req.user!.id,before=getDriveImportSettingsRow(),current=credentials();
     assert(current.configured&&current.fingerprint,409,'DRIVE_IMPORT_CREDENTIALS_REQUIRED','Configure the private Google Drive service-account secret first.');
-    try{await driveImportRuntime.verifyFolder(before.folder_id);}catch{
-      // Provider error bodies may contain credentials or private folder data.
+    try{await driveImportRuntime.verifyFolder(before.folder_id);}catch(error){
+      // Runtime adapters and generated Cloudflare modules need not share an
+      // Error class identity. Only allowlisted codes select fixed safe text.
+      const failure=connectionFailures.get(typeof(error as any)?.code==='string'?(error as any).code:'');
+      if(failure){
+        const retry=(error as any).retryAfterSeconds;
+        if(failure[0]===429&&Number.isSafeInteger(retry)&&retry>=0)res.setHeader('Retry-After',String(Math.min(3600,retry)));
+        throw new AppError(...failure);
+      }
+      // Unknown provider errors may contain credentials or private folder data.
       throw new AppError(409,'DRIVE_IMPORT_CONNECTION_FAILED','Unable to verify this Drive folder. Enable Google Drive API and share the folder with the configured service account as a Viewer.');
     }
     transaction(()=>{

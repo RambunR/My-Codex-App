@@ -11,6 +11,15 @@ import '../drive-import.css';
 const endpoint='/api/admin/drive-imports';
 const verificationLifetime=24*60*60*1000;
 const statuses:Record<DriveJobStatus,Key>={waiting:'driveImportStatusWaiting',downloading:'driveImportStatusDownloading',validating:'driveImportStatusValidating',complete:'driveImportStatusComplete',error:'driveImportStatusError',cancelled:'driveImportStatusCancelled',review:'driveImportStatusReview'};
+const verificationMessages:Record<string,Key>={DRIVE_IMPORT_API_DISABLED:'driveImportApiDisabled',DRIVE_IMPORT_AUTH_FAILED:'driveImportAuthFailed',DRIVE_IMPORT_ACCESS_DENIED:'driveImportAccessDenied',DRIVE_IMPORT_RATE_LIMITED:'driveImportRateLimited',DRIVE_IMPORT_UNAVAILABLE:'driveImportUnavailable',DRIVE_IMPORT_INVALID_FOLDER:'driveImportInvalidFolder',DRIVE_IMPORT_INVALID_RESPONSE:'driveImportInvalidResponse',DRIVE_IMPORT_CONNECTION_FAILED:'driveImportConnectionFailed',DRIVE_IMPORT_CREDENTIALS_REQUIRED:'driveImportCredentialsMissing',DRIVE_IMPORT_RUNTIME_UNAVAILABLE:'driveImportRuntimeMissing'};
+
+// This owner-only shortcut uses the public account identifier, never provider
+// error text or a private credential value, to select the Cloud Console project.
+function driveApiConsoleUrl(email:string|null){
+  const project=typeof email==='string'?email.match(/^[a-z0-9][a-z0-9-]{0,62}@([a-z][a-z0-9-]{4,28}[a-z0-9])\.iam\.gserviceaccount\.com$/)?.[1]:undefined;
+  const url=new URL('https://console.cloud.google.com/apis/library/drive.googleapis.com');
+  if(project)url.searchParams.set('project',project);return url.href;
+}
 
 // Only an ID is sent to the server. A pasted URL never becomes a fetch target.
 export function driveFolderId(value:string):string|null{
@@ -28,10 +37,10 @@ export function DriveImports(){
   const{user,toast,refreshUser}=useApp(),{t,locale}=useI18n();
   const owner=user?.role==='admin'&&user.max_episode_seconds===null;
   const[data,setData]=useState<DriveImportStatus>(),[loading,setLoading]=useState(true),[readError,setReadError]=useState<Error>(),[failure,setFailure]=useState(''),[denied,setDenied]=useState(false);
-  const[folder,setFolder]=useState(''),[busy,setBusy]=useState('');
+  const[folder,setFolder]=useState(''),[busy,setBusy]=useState(''),[verificationFailure,setVerificationFailure]=useState<Key|null>(null);
   const mounted=useRef(false),mutation=useRef(false),edited=useRef(false),requestId=useRef(0),request=useRef<AbortController|null>(null),accessDenied=useRef(false);
 
-  const deny=()=>{accessDenied.current=true;setDenied(true);setData(undefined);setReadError(undefined);setFailure('');};
+  const deny=()=>{accessDenied.current=true;setDenied(true);setData(undefined);setReadError(undefined);setFailure('');setVerificationFailure(null);};
   const load=useCallback(async()=>{
     if(!owner||!mounted.current||accessDenied.current)return;
     const id=++requestId.current;request.current?.abort();const controller=new AbortController();request.current=controller;setLoading(true);
@@ -55,11 +64,12 @@ export function DriveImports(){
   const perform=async(key:string,operation:()=>Promise<unknown>,message?:Key,onSuccess?:()=>void)=>{
     if(mutation.current||!owner||accessDenied.current)return;
     mutation.current=true;++requestId.current;request.current?.abort();setBusy(key);setFailure('');
+    if(key==='connection')setVerificationFailure(null);
     try{
       await operation();if(!mounted.current)return;onSuccess?.();await load();
       if(mounted.current&&!accessDenied.current&&message)toast(t(message));
     }catch(error){
-      if(mounted.current){if(error instanceof ApiError&&error.status===403)deny();else setFailure(error instanceof Error?error.message:t('failed'));}
+      if(mounted.current){if(error instanceof ApiError&&error.status===403)deny();else if(key==='connection')setVerificationFailure(error instanceof ApiError&&Object.hasOwn(verificationMessages,error.code)?verificationMessages[error.code]:'driveImportConnectionFailed');else setFailure(error instanceof Error?error.message:t('failed'));}
     }finally{mutation.current=false;if(mounted.current){setBusy('');setLoading(false);}}
   };
 
@@ -68,15 +78,16 @@ export function DriveImports(){
   if(!data)return readError?<ErrorState error={readError} retry={()=>void load()}/>:null;
 
   const parsedFolder=driveFolderId(folder),dirty=parsedFolder!==data.settings.folderId;
+  const savedFolder=driveFolderId(data.settings.folderId),folderUrl=savedFolder?`https://drive.google.com/drive/folders/${encodeURIComponent(savedFolder)}`:null;
   const ready=data.connection.configured&&data.connection.runtimeAvailable;
   const verifiedAt=data.settings.verifiedAt;
   const freshVerification=verifiedAt!==null&&verifiedAt<=Date.now()&&Date.now()-verifiedAt<=verificationLifetime;
-  const verified=verifiedAt!==null&&verifiedAt<=Date.now()&&(data.settings.enabled||freshVerification);
-  const canEnable=ready&&freshVerification&&!dirty;
+  const verified=!verificationFailure&&verifiedAt!==null&&verifiedAt<=Date.now()&&(data.settings.enabled||freshVerification);
+  const canEnable=ready&&freshVerification&&!dirty&&!verificationFailure;
   const date=(value:string|number)=>{const parsed=new Date(typeof value==='string'&&!/[TZ+]/.test(value)?value.replace(' ','T')+'Z':value);return Number.isFinite(parsed.getTime())?new Intl.DateTimeFormat(locale,{dateStyle:'medium',timeStyle:'short'}).format(parsed):String(value);};
   const save=(event:FormEvent)=>{
     event.preventDefault();if(!parsedFolder||!dirty||busy)return;
-    void perform('folder',()=>api(endpoint,{method:'PATCH',body:JSON.stringify({folderId:parsedFolder})}),'driveImportSaved',()=>{edited.current=false;setFolder(parsedFolder);});
+    void perform('folder',()=>api(endpoint,{method:'PATCH',body:JSON.stringify({folderId:parsedFolder})}),'driveImportSaved',()=>{edited.current=false;setFolder(parsedFolder);setVerificationFailure(null);});
   };
   const progress=(job:DriveImportJob)=>{
     const total=Math.max(0,job.totalFiles),done=Math.min(total,Math.max(0,job.finishedFiles));
@@ -88,13 +99,14 @@ export function DriveImports(){
   return <section className="drive-import-panel panel" aria-labelledby="drive-import-heading" aria-busy={!!busy}>
     <div className="drive-import-heading"><div><h2 id="drive-import-heading"><CloudDownload size={22} aria-hidden="true"/>{t('driveImportTitle')}</h2><p>{t('driveImportIntro')}</p></div><span className={`drive-import-state ${data.settings.enabled?'is-on':''}`}><span aria-hidden="true"/>{t(data.settings.enabled?'driveImportEnabled':'driveImportDisabled')}</span></div>
     {failure&&<p className="form-error drive-import-error" role="alert">{failure}</p>}
+    {verificationFailure&&<div className="drive-import-error drive-import-verification-error" role="alert"><p>{t(verificationFailure)}</p><div className="drive-import-diagnostic-links"><a className="drive-import-setup-link drive-import-open-api" href={driveApiConsoleUrl(data.connection.serviceAccountEmail)} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} aria-hidden="true"/>{t('driveImportOpenApiConsole')}</a>{folderUrl&&<a className="drive-import-setup-link drive-import-open-sharing" href={folderUrl} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} aria-hidden="true"/>{t('driveImportOpenSharing')}</a>}</div></div>}
     {readError&&<div className="drive-import-error" role="alert"><p>{readError.message}</p><Button className="button secondary small" disabled={!!busy||loading} onClick={()=>void load()}><RefreshCw size={14} aria-hidden="true"/>{t('retry')}</Button></div>}
     <div className="drive-import-setup">
       <form onSubmit={save} className="drive-import-folder-form">
         <label className="field" htmlFor="drive-import-folder"><span><Folder size={17} aria-hidden="true"/>{t('driveImportFolder')}</span><input id="drive-import-folder" aria-label={t('driveImportFolder')} aria-invalid={!parsedFolder||undefined} type="text" dir="ltr" autoComplete="off" spellCheck={false} value={folder} maxLength={500} disabled={!!busy} aria-describedby="drive-import-folder-hint" onChange={event=>{edited.current=true;setFolder(event.target.value);}}/><small id="drive-import-folder-hint">{t('driveImportFolderHint')}</small></label>
         <Button type="submit" className="button secondary" busy={busy==='folder'} disabled={!!busy||!parsedFolder||!dirty}>{t('driveImportSaveFolder')}</Button>
       </form>
-      <a className="drive-import-folder-link" href={`https://drive.google.com/drive/folders/${encodeURIComponent(data.settings.folderId)}`} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} aria-hidden="true"/><span dir="ltr">drive.google.com/drive/folders/{data.settings.folderId}</span></a>
+      {folderUrl&&<a className="drive-import-folder-link" href={folderUrl} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} aria-hidden="true"/><span dir="ltr">drive.google.com/drive/folders/{savedFolder}</span></a>}
       {!data.connection.configured?<p className="drive-import-warning" role="status">{t('driveImportCredentialsMissing')}</p>:<div className="drive-import-account"><strong>{t('driveImportServiceAccount')}</strong>{data.connection.serviceAccountEmail&&<code dir="ltr">{data.connection.serviceAccountEmail}</code>}<p>{t('driveImportConnectHelp')}</p></div>}
       {!data.connection.runtimeAvailable&&<p className="drive-import-warning" role="status">{t('driveImportRuntimeMissing')}</p>}
       <div className="drive-import-connection-state"><ShieldCheck size={17} aria-hidden="true"/><span>{t(verified?'driveImportVerified':'driveImportVerifyFirst')}{verified&&verifiedAt!==null&&<time dateTime={new Date(verifiedAt).toISOString()}>{date(verifiedAt)}</time>}</span></div>

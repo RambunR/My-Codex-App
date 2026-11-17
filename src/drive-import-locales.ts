@@ -42,7 +42,17 @@ export const driveImportEnglish={
   "driveImportStatusReview": "Source changed — review required",
   "driveImportSetupGuide": "Drive setup and manifest guide",
   "driveImportDownloadTool": "Download ClipWeave verifier (read-only)",
-  "driveImportsTitle": "Drive imports"
+  "driveImportsTitle": "Drive imports",
+  "driveImportApiDisabled": "Google Drive API is not enabled for the saved service account’s project. Open Google Drive API settings, enable it in that project, wait a few minutes, then verify again.",
+  "driveImportAuthFailed": "Google could not authenticate the saved service account. Check that the encrypted Worker Secret contains the correct, active service-account credentials, then verify again. Never paste a private key here.",
+  "driveImportAccessDenied": "The saved service account cannot read this folder. Keep the folder private, share it with the account shown below as Viewer, check the saved folder ID, then verify again.",
+  "driveImportRateLimited": "Google Drive is temporarily limiting requests. Wait a few minutes, then verify again.",
+  "driveImportUnavailable": "Google Drive is temporarily unavailable. Try verifying again later.",
+  "driveImportInvalidFolder": "This folder could not be verified. Check that the saved ID belongs to the intended Google Drive folder and that the account shown below has Viewer access.",
+  "driveImportInvalidResponse": "Google returned an unexpected response. Try verifying again later. If the problem continues, check the saved service-account configuration.",
+  "driveImportConnectionFailed": "The private Drive connection could not be verified. Check that Google Drive API is enabled for the saved service account’s project and that the folder is shared with the account shown below as Viewer, then verify again.",
+  "driveImportOpenApiConsole": "Open Google Drive API settings",
+  "driveImportOpenSharing": "Open folder sharing"
 } as const;
 type Messages=Record<keyof typeof driveImportEnglish,string>;
 
@@ -90,7 +100,17 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusReview": "來源已變更，請檢查",
     "driveImportSetupGuide": "Drive 設定及清單指南",
     "driveImportDownloadTool": "下載 ClipWeave 驗證工具（唯讀）",
-    "driveImportsTitle": "Drive 匯入"
+    "driveImportsTitle": "Drive 匯入",
+    "driveImportApiDisabled": "已儲存的服務帳戶所屬專案尚未啟用 Google Drive API。請開啟 Google Drive API 設定，在該專案中啟用 API，等待數分鐘後再驗證。",
+    "driveImportAuthFailed": "Google 無法驗證已儲存的服務帳戶身分。請確認加密的 Worker Secret 包含正確且有效的服務帳戶憑證，再重新驗證。切勿在此貼上私密金鑰。",
+    "driveImportAccessDenied": "已儲存的服務帳戶無法讀取此資料夾。請保留資料夾為私人，以「檢視者」權限與下方顯示的帳戶共用，確認已儲存的資料夾 ID，再重新驗證。",
+    "driveImportRateLimited": "Google Drive 暫時限制請求次數。請等待數分鐘後再驗證。",
+    "driveImportUnavailable": "Google Drive 暫時無法使用。請稍後再嘗試驗證。",
+    "driveImportInvalidFolder": "無法驗證此資料夾。請確認已儲存的 ID 對應你要使用的 Google Drive 資料夾，並確認下方顯示的帳戶具有「檢視者」權限。",
+    "driveImportInvalidResponse": "Google 傳回非預期的回應。請稍後再嘗試驗證。如果問題持續，請檢查已儲存的服務帳戶設定。",
+    "driveImportConnectionFailed": "無法驗證私人 Drive 連線。請確認已儲存的服務帳戶所屬專案已啟用 Google Drive API，並已以「檢視者」權限與下方顯示的帳戶共用資料夾，再重新驗證。",
+    "driveImportOpenApiConsole": "開啟 Google Drive API 設定",
+    "driveImportOpenSharing": "開啟資料夾共用設定"
   },
   "zh-CN":{
     "driveImportTitle": "Drive 导入",
@@ -134,7 +154,17 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusReview": "来源已更改，请检查",
     "driveImportSetupGuide": "Drive 设置及清单指南",
     "driveImportDownloadTool": "下载 ClipWeave 验证工具（只读）",
-    "driveImportsTitle": "Drive 导入"
+    "driveImportsTitle": "Drive 导入",
+    "driveImportApiDisabled": "已保存的服务账号所属项目尚未启用 Google Drive API。请打开 Google Drive API 设置，在该项目中启用 API，等待几分钟后再验证。",
+    "driveImportAuthFailed": "Google 无法验证已保存的服务账号身份。请确认加密的 Worker Secret 包含正确且有效的服务账号凭据，再重新验证。切勿在此粘贴私钥。",
+    "driveImportAccessDenied": "已保存的服务账号无法读取此文件夹。请将文件夹保持为私密，以“查看者”权限与下方显示的账号共享，确认已保存的文件夹 ID，再重新验证。",
+    "driveImportRateLimited": "Google Drive 暂时限制请求次数。请等待几分钟后再验证。",
+    "driveImportUnavailable": "Google Drive 暂时无法使用。请稍后再尝试验证。",
+    "driveImportInvalidFolder": "无法验证此文件夹。请确认已保存的 ID 对应你要使用的 Google Drive 文件夹，并确认下方显示的账号具有“查看者”权限。",
+    "driveImportInvalidResponse": "Google 返回了非预期的响应。请稍后再尝试验证。如果问题持续，请检查已保存的服务账号配置。",
+    "driveImportConnectionFailed": "无法验证私人 Drive 连接。请确认已保存的服务账号所属项目已启用 Google Drive API，并已以“查看者”权限与下方显示的账号共享文件夹，再重新验证。",
+    "driveImportOpenApiConsole": "打开 Google Drive API 设置",
+    "driveImportOpenSharing": "打开文件夹共享设置"
   },
   "ja":{
     "driveImportTitle": "Drive インポート",
@@ -178,7 +208,17 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusReview": "ソースが変更されました。確認が必要です",
     "driveImportSetupGuide": "Drive 設定とマニフェストのガイド",
     "driveImportDownloadTool": "ClipWeave 検証ツールをダウンロード（読み取り専用）",
-    "driveImportsTitle": "Drive インポート"
+    "driveImportsTitle": "Drive インポート",
+    "driveImportApiDisabled": "保存済みサービスアカウントのプロジェクトで Google Drive API が有効になっていません。Google Drive API の設定を開き、そのプロジェクトで API を有効にして、数分待ってから再確認してください。",
+    "driveImportAuthFailed": "Google が保存済みサービスアカウントを認証できませんでした。暗号化された Worker Secret に正しい有効なサービスアカウント認証情報が保存されていることを確認し、再確認してください。ここに秘密鍵を貼り付けないでください。",
+    "driveImportAccessDenied": "保存済みサービスアカウントはこのフォルダを読み取れません。フォルダは非公開のまま、下に表示されたアカウントと「閲覧者」権限で共有し、保存済みフォルダ ID を確認してから再確認してください。",
+    "driveImportRateLimited": "Google Drive が一時的にリクエストを制限しています。数分待ってから再確認してください。",
+    "driveImportUnavailable": "Google Drive は一時的に利用できません。後ほど接続確認を再試行してください。",
+    "driveImportInvalidFolder": "このフォルダを確認できませんでした。保存済み ID が目的の Google Drive フォルダのものであることと、下に表示されたアカウントに「閲覧者」権限があることを確認してください。",
+    "driveImportInvalidResponse": "Google から予期しない応答が返されました。後ほど接続確認を再試行してください。問題が続く場合は、保存済みサービスアカウントの設定を確認してください。",
+    "driveImportConnectionFailed": "非公開の Drive への接続を確認できませんでした。保存済みサービスアカウントのプロジェクトで Google Drive API が有効になっていることと、フォルダが下に表示されたアカウントと「閲覧者」権限で共有されていることを確認し、再確認してください。",
+    "driveImportOpenApiConsole": "Google Drive API の設定を開く",
+    "driveImportOpenSharing": "フォルダの共有設定を開く"
   },
   "ko":{
     "driveImportTitle": "Drive 가져오기",
@@ -222,7 +262,17 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusReview": "원본이 변경되어 검토가 필요합니다",
     "driveImportSetupGuide": "Drive 설정 및 매니페스트 안내",
     "driveImportDownloadTool": "ClipWeave 검증 도구 다운로드 (읽기 전용)",
-    "driveImportsTitle": "Drive 가져오기"
+    "driveImportsTitle": "Drive 가져오기",
+    "driveImportApiDisabled": "저장된 서비스 계정의 프로젝트에 Google Drive API가 사용 설정되어 있지 않습니다. Google Drive API 설정을 열고 해당 프로젝트에서 API를 사용 설정한 뒤 몇 분 기다렸다가 다시 확인하세요.",
+    "driveImportAuthFailed": "Google에서 저장된 서비스 계정을 인증하지 못했습니다. 암호화된 Worker Secret에 올바르고 활성 상태인 서비스 계정 인증 정보가 있는지 확인한 뒤 다시 확인하세요. 여기에 비공개 키를 붙여 넣지 마세요.",
+    "driveImportAccessDenied": "저장된 서비스 계정이 이 폴더를 읽을 수 없습니다. 폴더를 비공개로 유지하고 아래에 표시된 계정에 뷰어 권한으로 공유한 뒤 저장된 폴더 ID를 확인하고 다시 확인하세요.",
+    "driveImportRateLimited": "Google Drive가 일시적으로 요청을 제한하고 있습니다. 몇 분 기다렸다가 다시 확인하세요.",
+    "driveImportUnavailable": "Google Drive를 일시적으로 사용할 수 없습니다. 나중에 다시 확인해 보세요.",
+    "driveImportInvalidFolder": "이 폴더를 확인하지 못했습니다. 저장된 ID가 원하는 Google Drive 폴더의 ID인지, 아래에 표시된 계정에 뷰어 권한이 있는지 확인하세요.",
+    "driveImportInvalidResponse": "Google에서 예상하지 못한 응답을 반환했습니다. 나중에 다시 확인해 보세요. 문제가 계속되면 저장된 서비스 계정 설정을 점검하세요.",
+    "driveImportConnectionFailed": "비공개 Drive 연결을 확인하지 못했습니다. 저장된 서비스 계정의 프로젝트에 Google Drive API가 사용 설정되어 있는지, 아래에 표시된 계정에 폴더가 뷰어 권한으로 공유되어 있는지 점검한 뒤 다시 확인하세요.",
+    "driveImportOpenApiConsole": "Google Drive API 설정 열기",
+    "driveImportOpenSharing": "폴더 공유 설정 열기"
   },
   "hi":{
     "driveImportTitle": "Drive आयात",
@@ -266,7 +316,17 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusReview": "स्रोत बदल गया है — समीक्षा ज़रूरी है",
     "driveImportSetupGuide": "Drive सेटअप और मैनिफ़ेस्ट गाइड",
     "driveImportDownloadTool": "ClipWeave जाँच उपकरण डाउनलोड करें (केवल पढ़ने के लिए)",
-    "driveImportsTitle": "Drive आयात"
+    "driveImportsTitle": "Drive आयात",
+    "driveImportApiDisabled": "सहेजे गए सेवा खाते के प्रोजेक्ट में Google Drive API चालू नहीं है। Google Drive API की सेटिंग खोलें, उसी प्रोजेक्ट में इसे चालू करें, कुछ मिनट प्रतीक्षा करें और फिर से सत्यापित करें।",
+    "driveImportAuthFailed": "Google सहेजे गए सेवा खाते को प्रमाणित नहीं कर सका। जाँचें कि एन्क्रिप्ट किए गए Worker Secret में सेवा खाते के सही और सक्रिय क्रेडेंशियल हैं, फिर दोबारा सत्यापित करें। यहाँ कभी भी निजी कुंजी न चिपकाएँ।",
+    "driveImportAccessDenied": "सहेजा गया सेवा खाता इस फ़ोल्डर को नहीं पढ़ सकता। फ़ोल्डर निजी रखें, इसे नीचे दिखाए गए खाते के साथ Viewer के रूप में साझा करें, सहेजा गया फ़ोल्डर ID जाँचें और फिर से सत्यापित करें।",
+    "driveImportRateLimited": "Google Drive अस्थायी रूप से अनुरोध सीमित कर रहा है। कुछ मिनट प्रतीक्षा करें, फिर दोबारा सत्यापित करें।",
+    "driveImportUnavailable": "Google Drive अस्थायी रूप से उपलब्ध नहीं है। बाद में दोबारा सत्यापित करने का प्रयास करें।",
+    "driveImportInvalidFolder": "यह फ़ोल्डर सत्यापित नहीं हो सका। जाँचें कि सहेजा गया ID सही Google Drive फ़ोल्डर का है और नीचे दिखाए गए खाते को Viewer की पहुँच मिली है।",
+    "driveImportInvalidResponse": "Google से अप्रत्याशित जवाब मिला। बाद में दोबारा सत्यापित करने का प्रयास करें। समस्या जारी रहने पर सहेजे गए सेवा खाते की सेटिंग जाँचें।",
+    "driveImportConnectionFailed": "निजी Drive कनेक्शन सत्यापित नहीं हो सका। जाँचें कि सहेजे गए सेवा खाते के प्रोजेक्ट में Google Drive API चालू है और फ़ोल्डर नीचे दिखाए गए खाते के साथ Viewer के रूप में साझा है, फिर दोबारा सत्यापित करें।",
+    "driveImportOpenApiConsole": "Google Drive API की सेटिंग खोलें",
+    "driveImportOpenSharing": "फ़ोल्डर साझाकरण खोलें"
   },
   "id":{
     "driveImportTitle": "Impor Drive",
@@ -310,7 +370,17 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusReview": "Sumber berubah — perlu ditinjau",
     "driveImportSetupGuide": "Panduan penyiapan Drive dan manifes",
     "driveImportDownloadTool": "Unduh pemeriksa ClipWeave (hanya baca)",
-    "driveImportsTitle": "Impor Drive"
+    "driveImportsTitle": "Impor Drive",
+    "driveImportApiDisabled": "Google Drive API belum diaktifkan untuk proyek akun layanan yang tersimpan. Buka setelan Google Drive API, aktifkan di proyek tersebut, tunggu beberapa menit, lalu verifikasi lagi.",
+    "driveImportAuthFailed": "Google tidak dapat mengautentikasi akun layanan yang tersimpan. Pastikan Worker Secret terenkripsi berisi kredensial akun layanan yang benar dan aktif, lalu verifikasi lagi. Jangan pernah menempelkan kunci pribadi di sini.",
+    "driveImportAccessDenied": "Akun layanan yang tersimpan tidak dapat membaca folder ini. Biarkan folder tetap pribadi, bagikan kepada akun yang ditampilkan di bawah sebagai Pelihat, periksa ID folder yang tersimpan, lalu verifikasi lagi.",
+    "driveImportRateLimited": "Google Drive sedang membatasi permintaan untuk sementara. Tunggu beberapa menit, lalu verifikasi lagi.",
+    "driveImportUnavailable": "Google Drive tidak tersedia untuk sementara. Coba verifikasi lagi nanti.",
+    "driveImportInvalidFolder": "Folder ini tidak dapat diverifikasi. Pastikan ID yang tersimpan adalah milik folder Google Drive yang dimaksud dan akun yang ditampilkan di bawah memiliki akses Pelihat.",
+    "driveImportInvalidResponse": "Google mengembalikan respons yang tidak terduga. Coba verifikasi lagi nanti. Jika masalah berlanjut, periksa konfigurasi akun layanan yang tersimpan.",
+    "driveImportConnectionFailed": "Koneksi Drive pribadi tidak dapat diverifikasi. Pastikan Google Drive API diaktifkan untuk proyek akun layanan yang tersimpan dan folder dibagikan kepada akun yang ditampilkan di bawah sebagai Pelihat, lalu verifikasi lagi.",
+    "driveImportOpenApiConsole": "Buka setelan Google Drive API",
+    "driveImportOpenSharing": "Buka setelan berbagi folder"
   },
   "pt-BR":{
     "driveImportTitle": "Importações do Drive",
@@ -354,7 +424,17 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusReview": "Origem alterada — revisão necessária",
     "driveImportSetupGuide": "Guia de configuração do Drive e manifesto",
     "driveImportDownloadTool": "Baixar verificador ClipWeave (somente leitura)",
-    "driveImportsTitle": "Importações do Drive"
+    "driveImportsTitle": "Importações do Drive",
+    "driveImportApiDisabled": "A Google Drive API não está ativada no projeto da conta de serviço salva. Abra as configurações da Google Drive API, ative-a nesse projeto, aguarde alguns minutos e verifique novamente.",
+    "driveImportAuthFailed": "O Google não conseguiu autenticar a conta de serviço salva. Confira se o Worker Secret criptografado contém as credenciais corretas e ativas da conta de serviço e verifique novamente. Nunca cole uma chave privada aqui.",
+    "driveImportAccessDenied": "A conta de serviço salva não pode ler esta pasta. Mantenha a pasta privada, compartilhe-a com a conta mostrada abaixo como Leitor, confira o ID da pasta salvo e verifique novamente.",
+    "driveImportRateLimited": "O Google Drive está limitando as solicitações temporariamente. Aguarde alguns minutos e verifique novamente.",
+    "driveImportUnavailable": "O Google Drive está temporariamente indisponível. Tente verificar novamente mais tarde.",
+    "driveImportInvalidFolder": "Não foi possível verificar esta pasta. Confira se o ID salvo pertence à pasta pretendida do Google Drive e se a conta mostrada abaixo tem acesso de Leitor.",
+    "driveImportInvalidResponse": "O Google retornou uma resposta inesperada. Tente verificar novamente mais tarde. Se o problema persistir, confira a configuração da conta de serviço salva.",
+    "driveImportConnectionFailed": "Não foi possível verificar a conexão privada com o Drive. Confira se a Google Drive API está ativada no projeto da conta de serviço salva e se a pasta está compartilhada com a conta mostrada abaixo como Leitor. Depois, verifique novamente.",
+    "driveImportOpenApiConsole": "Abrir configurações da Google Drive API",
+    "driveImportOpenSharing": "Abrir compartilhamento da pasta"
   },
   "es":{
     "driveImportTitle": "Importaciones de Drive",
@@ -398,7 +478,17 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusReview": "El origen ha cambiado; es necesario revisarlo",
     "driveImportSetupGuide": "Guía de configuración de Drive y del manifiesto",
     "driveImportDownloadTool": "Descargar verificador ClipWeave (solo lectura)",
-    "driveImportsTitle": "Importaciones de Drive"
+    "driveImportsTitle": "Importaciones de Drive",
+    "driveImportApiDisabled": "Google Drive API no está habilitada en el proyecto de la cuenta de servicio guardada. Abre la configuración de Google Drive API, habilítala en ese proyecto, espera unos minutos y vuelve a verificar.",
+    "driveImportAuthFailed": "Google no pudo autenticar la cuenta de servicio guardada. Comprueba que el Worker Secret cifrado contiene las credenciales correctas y activas de la cuenta de servicio y vuelve a verificar. Nunca pegues una clave privada aquí.",
+    "driveImportAccessDenied": "La cuenta de servicio guardada no puede leer esta carpeta. Mantén la carpeta privada, compártela con la cuenta que aparece debajo como Lector, comprueba el ID de carpeta guardado y vuelve a verificar.",
+    "driveImportRateLimited": "Google Drive está limitando las solicitudes temporalmente. Espera unos minutos y vuelve a verificar.",
+    "driveImportUnavailable": "Google Drive no está disponible temporalmente. Intenta verificar de nuevo más tarde.",
+    "driveImportInvalidFolder": "No se pudo verificar esta carpeta. Comprueba que el ID guardado pertenece a la carpeta de Google Drive que quieres usar y que la cuenta que aparece debajo tiene acceso de Lector.",
+    "driveImportInvalidResponse": "Google devolvió una respuesta inesperada. Intenta verificar de nuevo más tarde. Si el problema continúa, comprueba la configuración de la cuenta de servicio guardada.",
+    "driveImportConnectionFailed": "No se pudo verificar la conexión privada con Drive. Comprueba que Google Drive API está habilitada en el proyecto de la cuenta de servicio guardada y que la carpeta se comparte con la cuenta que aparece debajo como Lector. Después, vuelve a verificar.",
+    "driveImportOpenApiConsole": "Abrir configuración de Google Drive API",
+    "driveImportOpenSharing": "Abrir opciones de compartir carpeta"
   },
   "ar":{
     "driveImportTitle": "الاستيراد من Drive",
@@ -442,7 +532,17 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusReview": "تغيّر المصدر — تلزم المراجعة",
     "driveImportSetupGuide": "دليل إعداد Drive وملف البيان",
     "driveImportDownloadTool": "تنزيل أداة تحقق ClipWeave (للقراءة فقط)",
-    "driveImportsTitle": "الاستيراد من Drive"
+    "driveImportsTitle": "الاستيراد من Drive",
+    "driveImportApiDisabled": "لم يتم تفعيل Google Drive API في مشروع حساب الخدمة المحفوظ. افتح إعدادات Google Drive API وفعّله في ذلك المشروع، ثم انتظر بضع دقائق وتحقّق مجددًا.",
+    "driveImportAuthFailed": "لم تتمكن Google من مصادقة حساب الخدمة المحفوظ. تأكد من أن Worker Secret المشفّر يحتوي على بيانات الاعتماد الصحيحة والفعّالة لحساب الخدمة، ثم تحقّق مجددًا. لا تلصق أي مفتاح خاص هنا أبدًا.",
+    "driveImportAccessDenied": "لا يستطيع حساب الخدمة المحفوظ قراءة هذا المجلد. أبقِ المجلد خاصًا وشاركه مع الحساب الموضّح أدناه بصفة مشاهد (Viewer)، وتحقّق من معرّف المجلد المحفوظ، ثم تحقّق مجددًا.",
+    "driveImportRateLimited": "تحدّ Google Drive من الطلبات مؤقتًا. انتظر بضع دقائق، ثم تحقّق مجددًا.",
+    "driveImportUnavailable": "Google Drive غير متاح مؤقتًا. حاول التحقّق مجددًا لاحقًا.",
+    "driveImportInvalidFolder": "تعذّر التحقّق من هذا المجلد. تأكد من أن المعرّف المحفوظ يخص مجلد Google Drive المقصود، وأن الحساب الموضّح أدناه يملك صلاحية مشاهد (Viewer).",
+    "driveImportInvalidResponse": "أعادت Google استجابة غير متوقعة. حاول التحقّق مجددًا لاحقًا. إذا استمرت المشكلة، فراجع إعدادات حساب الخدمة المحفوظ.",
+    "driveImportConnectionFailed": "تعذّر التحقّق من اتصال Drive الخاص. تأكد من تفعيل Google Drive API في مشروع حساب الخدمة المحفوظ، ومن مشاركة المجلد مع الحساب الموضّح أدناه بصفة مشاهد (Viewer)، ثم تحقّق مجددًا.",
+    "driveImportOpenApiConsole": "فتح إعدادات Google Drive API",
+    "driveImportOpenSharing": "فتح إعدادات مشاركة المجلد"
   },
   "bn":{
     "driveImportTitle": "Drive থেকে আমদানি",
@@ -486,7 +586,17 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusReview": "উৎস পরিবর্তিত হয়েছে — পর্যালোচনা প্রয়োজন",
     "driveImportSetupGuide": "Drive সেটআপ ও ম্যানিফেস্ট নির্দেশিকা",
     "driveImportDownloadTool": "ClipWeave যাচাইকারী ডাউনলোড করুন (শুধু পড়ার জন্য)",
-    "driveImportsTitle": "Drive থেকে আমদানি"
+    "driveImportsTitle": "Drive থেকে আমদানি",
+    "driveImportApiDisabled": "সংরক্ষিত সার্ভিস অ্যাকাউন্টের প্রজেক্টে Google Drive API চালু নেই। Google Drive API সেটিংস খুলে সেই প্রজেক্টে এটি চালু করুন, কয়েক মিনিট অপেক্ষা করুন, তারপর আবার যাচাই করুন।",
+    "driveImportAuthFailed": "Google সংরক্ষিত সার্ভিস অ্যাকাউন্টের পরিচয় যাচাই করতে পারেনি। এনক্রিপ্ট করা Worker Secret-এ সার্ভিস অ্যাকাউন্টের সঠিক ও সক্রিয় ক্রেডেনশিয়াল আছে কি না দেখুন, তারপর আবার যাচাই করুন। এখানে কখনো প্রাইভেট কী পেস্ট করবেন না।",
+    "driveImportAccessDenied": "সংরক্ষিত সার্ভিস অ্যাকাউন্ট এই ফোল্ডারটি পড়তে পারছে না। ফোল্ডারটি ব্যক্তিগত রাখুন, নিচে দেখানো অ্যাকাউন্টকে Viewer হিসেবে শেয়ার করুন, সংরক্ষিত ফোল্ডার ID পরীক্ষা করুন, তারপর আবার যাচাই করুন।",
+    "driveImportRateLimited": "Google Drive সাময়িকভাবে অনুরোধ সীমিত করছে। কয়েক মিনিট অপেক্ষা করে আবার যাচাই করুন।",
+    "driveImportUnavailable": "Google Drive সাময়িকভাবে অনুপলব্ধ। পরে আবার যাচাই করার চেষ্টা করুন।",
+    "driveImportInvalidFolder": "এই ফোল্ডারটি যাচাই করা যায়নি। সংরক্ষিত ID যে কাঙ্ক্ষিত Google Drive ফোল্ডারের এবং নিচে দেখানো অ্যাকাউন্টের Viewer অ্যাক্সেস আছে, তা নিশ্চিত করুন।",
+    "driveImportInvalidResponse": "Google অপ্রত্যাশিত উত্তর দিয়েছে। পরে আবার যাচাই করার চেষ্টা করুন। সমস্যা চলতে থাকলে সংরক্ষিত সার্ভিস অ্যাকাউন্টের কনফিগারেশন পরীক্ষা করুন।",
+    "driveImportConnectionFailed": "ব্যক্তিগত Drive সংযোগ যাচাই করা যায়নি। সংরক্ষিত সার্ভিস অ্যাকাউন্টের প্রজেক্টে Google Drive API চালু আছে এবং ফোল্ডারটি নিচে দেখানো অ্যাকাউন্টকে Viewer হিসেবে শেয়ার করা হয়েছে কি না দেখুন, তারপর আবার যাচাই করুন।",
+    "driveImportOpenApiConsole": "Google Drive API সেটিংস খুলুন",
+    "driveImportOpenSharing": "ফোল্ডার শেয়ারিং খুলুন"
   },
   "ur":{
     "driveImportTitle": "Drive سے درآمد",
@@ -530,7 +640,17 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusReview": "ماخذ بدل گیا ہے — جائزہ ضروری ہے",
     "driveImportSetupGuide": "Drive سیٹ اپ اور مینی فیسٹ کی رہنمائی",
     "driveImportDownloadTool": "ClipWeave تصدیقی ٹول ڈاؤن لوڈ کریں (صرف پڑھنے کے لیے)",
-    "driveImportsTitle": "Drive سے درآمد"
+    "driveImportsTitle": "Drive سے درآمد",
+    "driveImportApiDisabled": "محفوظ سروس اکاؤنٹ کے پروجیکٹ میں Google Drive API فعال نہیں ہے۔ Google Drive API کی ترتیبات کھولیں، اسی پروجیکٹ میں اسے فعال کریں، چند منٹ انتظار کریں، پھر دوبارہ تصدیق کریں۔",
+    "driveImportAuthFailed": "Google محفوظ سروس اکاؤنٹ کی شناخت کی تصدیق نہیں کر سکا۔ چیک کریں کہ انکرپٹ شدہ Worker Secret میں سروس اکاؤنٹ کی درست اور فعال اسناد موجود ہیں، پھر دوبارہ تصدیق کریں۔ یہاں کبھی نجی کلید پیسٹ نہ کریں۔",
+    "driveImportAccessDenied": "محفوظ سروس اکاؤنٹ اس فولڈر کو پڑھ نہیں سکتا۔ فولڈر نجی رکھیں، اسے نیچے دکھائے گئے اکاؤنٹ کے ساتھ Viewer کے طور پر شیئر کریں، محفوظ فولڈر ID چیک کریں، پھر دوبارہ تصدیق کریں۔",
+    "driveImportRateLimited": "Google Drive عارضی طور پر درخواستیں محدود کر رہا ہے۔ چند منٹ انتظار کریں، پھر دوبارہ تصدیق کریں۔",
+    "driveImportUnavailable": "Google Drive عارضی طور پر دستیاب نہیں ہے۔ بعد میں دوبارہ تصدیق کی کوشش کریں۔",
+    "driveImportInvalidFolder": "اس فولڈر کی تصدیق نہیں ہو سکی۔ چیک کریں کہ محفوظ ID مطلوبہ Google Drive فولڈر کی ہے اور نیچے دکھائے گئے اکاؤنٹ کو Viewer کی رسائی حاصل ہے۔",
+    "driveImportInvalidResponse": "Google نے غیر متوقع جواب دیا۔ بعد میں دوبارہ تصدیق کی کوشش کریں۔ اگر مسئلہ برقرار رہے تو محفوظ سروس اکاؤنٹ کی ترتیب چیک کریں۔",
+    "driveImportConnectionFailed": "نجی Drive کنکشن کی تصدیق نہیں ہو سکی۔ چیک کریں کہ محفوظ سروس اکاؤنٹ کے پروجیکٹ میں Google Drive API فعال ہے اور فولڈر نیچے دکھائے گئے اکاؤنٹ کے ساتھ Viewer کے طور پر شیئر ہے، پھر دوبارہ تصدیق کریں۔",
+    "driveImportOpenApiConsole": "Google Drive API کی ترتیبات کھولیں",
+    "driveImportOpenSharing": "فولڈر شیئرنگ کھولیں"
   },
   "vi":{
     "driveImportTitle": "Nhập từ Drive",
@@ -574,7 +694,17 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusReview": "Nguồn đã thay đổi — cần xem xét",
     "driveImportSetupGuide": "Hướng dẫn thiết lập Drive và tệp kê khai",
     "driveImportDownloadTool": "Tải công cụ xác minh ClipWeave (chỉ đọc)",
-    "driveImportsTitle": "Nhập từ Drive"
+    "driveImportsTitle": "Nhập từ Drive",
+    "driveImportApiDisabled": "Google Drive API chưa được bật cho dự án của tài khoản dịch vụ đã lưu. Mở phần cài đặt Google Drive API, bật API trong dự án đó, chờ vài phút rồi xác minh lại.",
+    "driveImportAuthFailed": "Google không thể xác thực tài khoản dịch vụ đã lưu. Kiểm tra xem Worker Secret được mã hóa có chứa thông tin xác thực chính xác và còn hiệu lực của tài khoản dịch vụ không, rồi xác minh lại. Tuyệt đối không dán khóa riêng tư vào đây.",
+    "driveImportAccessDenied": "Tài khoản dịch vụ đã lưu không thể đọc thư mục này. Giữ thư mục ở chế độ riêng tư, chia sẻ với tài khoản hiển thị bên dưới dưới vai trò Người xem, kiểm tra ID thư mục đã lưu rồi xác minh lại.",
+    "driveImportRateLimited": "Google Drive đang tạm thời giới hạn các yêu cầu. Chờ vài phút rồi xác minh lại.",
+    "driveImportUnavailable": "Google Drive tạm thời không khả dụng. Hãy thử xác minh lại sau.",
+    "driveImportInvalidFolder": "Không thể xác minh thư mục này. Kiểm tra xem ID đã lưu có thuộc thư mục Google Drive bạn muốn dùng không và tài khoản hiển thị bên dưới có quyền Người xem không.",
+    "driveImportInvalidResponse": "Google trả về phản hồi không mong đợi. Hãy thử xác minh lại sau. Nếu sự cố tiếp diễn, hãy kiểm tra cấu hình tài khoản dịch vụ đã lưu.",
+    "driveImportConnectionFailed": "Không thể xác minh kết nối Drive riêng tư. Kiểm tra xem Google Drive API đã được bật cho dự án của tài khoản dịch vụ đã lưu chưa và thư mục đã được chia sẻ với tài khoản hiển thị bên dưới dưới vai trò Người xem chưa, rồi xác minh lại.",
+    "driveImportOpenApiConsole": "Mở cài đặt Google Drive API",
+    "driveImportOpenSharing": "Mở phần chia sẻ thư mục"
   },
   "th":{
     "driveImportTitle": "นำเข้าจาก Drive",
@@ -618,7 +748,17 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusReview": "แหล่งข้อมูลเปลี่ยนไป — ต้องตรวจสอบ",
     "driveImportSetupGuide": "คู่มือตั้งค่า Drive และไฟล์รายการ",
     "driveImportDownloadTool": "ดาวน์โหลดเครื่องมือตรวจสอบ ClipWeave (อ่านอย่างเดียว)",
-    "driveImportsTitle": "นำเข้าจาก Drive"
+    "driveImportsTitle": "นำเข้าจาก Drive",
+    "driveImportApiDisabled": "ยังไม่ได้เปิดใช้ Google Drive API ในโปรเจกต์ของบัญชีบริการที่บันทึกไว้ เปิดการตั้งค่า Google Drive API และเปิดใช้ในโปรเจกต์นั้น รอสองสามนาทีแล้วตรวจสอบอีกครั้ง",
+    "driveImportAuthFailed": "Google ไม่สามารถยืนยันตัวตนของบัญชีบริการที่บันทึกไว้ได้ ตรวจสอบว่า Worker Secret ที่เข้ารหัสมีข้อมูลรับรองที่ถูกต้องและยังใช้งานได้ของบัญชีบริการ แล้วตรวจสอบอีกครั้ง ห้ามวางคีย์ส่วนตัวที่นี่",
+    "driveImportAccessDenied": "บัญชีบริการที่บันทึกไว้ไม่สามารถอ่านโฟลเดอร์นี้ได้ ให้คงโฟลเดอร์เป็นส่วนตัว แชร์กับบัญชีที่แสดงด้านล่างในฐานะผู้มีสิทธิ์อ่าน (Viewer) ตรวจสอบ ID โฟลเดอร์ที่บันทึกไว้ แล้วตรวจสอบอีกครั้ง",
+    "driveImportRateLimited": "Google Drive กำลังจำกัดคำขอชั่วคราว รอสองสามนาทีแล้วตรวจสอบอีกครั้ง",
+    "driveImportUnavailable": "Google Drive ไม่พร้อมใช้งานชั่วคราว โปรดลองตรวจสอบอีกครั้งภายหลัง",
+    "driveImportInvalidFolder": "ไม่สามารถตรวจสอบโฟลเดอร์นี้ได้ ตรวจสอบว่า ID ที่บันทึกไว้เป็นของโฟลเดอร์ Google Drive ที่ต้องการ และบัญชีที่แสดงด้านล่างมีสิทธิ์อ่าน (Viewer)",
+    "driveImportInvalidResponse": "Google ส่งการตอบกลับที่ไม่คาดคิด โปรดลองตรวจสอบอีกครั้งภายหลัง หากยังมีปัญหา ให้ตรวจสอบการกำหนดค่าของบัญชีบริการที่บันทึกไว้",
+    "driveImportConnectionFailed": "ไม่สามารถตรวจสอบการเชื่อมต่อ Drive ส่วนตัวได้ ตรวจสอบว่าเปิดใช้ Google Drive API ในโปรเจกต์ของบัญชีบริการที่บันทึกไว้ และแชร์โฟลเดอร์กับบัญชีที่แสดงด้านล่างในฐานะผู้มีสิทธิ์อ่าน (Viewer) แล้วตรวจสอบอีกครั้ง",
+    "driveImportOpenApiConsole": "เปิดการตั้งค่า Google Drive API",
+    "driveImportOpenSharing": "เปิดการแชร์โฟลเดอร์"
   },
   "fil":{
     "driveImportTitle": "Mga import mula sa Drive",
@@ -662,7 +802,17 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusReview": "Nagbago ang source — kailangan ng pagsusuri",
     "driveImportSetupGuide": "Gabay sa pag-set up ng Drive at manifest",
     "driveImportDownloadTool": "I-download ang ClipWeave verifier (read-only)",
-    "driveImportsTitle": "Mga import mula sa Drive"
+    "driveImportsTitle": "Mga import mula sa Drive",
+    "driveImportApiDisabled": "Hindi naka-enable ang Google Drive API sa proyekto ng naka-save na service account. Buksan ang mga setting ng Google Drive API, i-enable ito sa proyektong iyon, maghintay ng ilang minuto, at mag-verify muli.",
+    "driveImportAuthFailed": "Hindi ma-authenticate ng Google ang naka-save na service account. Tiyaking nasa naka-encrypt na Worker Secret ang tama at aktibong credentials ng service account, at mag-verify muli. Huwag kailanman mag-paste ng private key rito.",
+    "driveImportAccessDenied": "Hindi mabasa ng naka-save na service account ang folder na ito. Panatilihing pribado ang folder, ibahagi ito sa account na ipinapakita sa ibaba bilang Viewer, suriin ang naka-save na folder ID, at mag-verify muli.",
+    "driveImportRateLimited": "Pansamantalang nililimitahan ng Google Drive ang mga request. Maghintay ng ilang minuto, at mag-verify muli.",
+    "driveImportUnavailable": "Pansamantalang hindi available ang Google Drive. Subukang mag-verify muli mamaya.",
+    "driveImportInvalidFolder": "Hindi ma-verify ang folder na ito. Tiyaking ang naka-save na ID ay para sa nilalayong Google Drive folder at may Viewer access ang account na ipinapakita sa ibaba.",
+    "driveImportInvalidResponse": "Nagbalik ang Google ng hindi inaasahang tugon. Subukang mag-verify muli mamaya. Kung magpatuloy ang problema, suriin ang configuration ng naka-save na service account.",
+    "driveImportConnectionFailed": "Hindi ma-verify ang pribadong Drive connection. Tiyaking naka-enable ang Google Drive API sa proyekto ng naka-save na service account at naibahagi ang folder sa account na ipinapakita sa ibaba bilang Viewer, at mag-verify muli.",
+    "driveImportOpenApiConsole": "Buksan ang mga setting ng Google Drive API",
+    "driveImportOpenSharing": "Buksan ang pagbabahagi ng folder"
   },
   "tr":{
     "driveImportTitle": "Drive içe aktarımları",
@@ -706,7 +856,17 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusReview": "Kaynak değişti — inceleme gerekiyor",
     "driveImportSetupGuide": "Drive kurulumu ve bildirim dosyası kılavuzu",
     "driveImportDownloadTool": "ClipWeave doğrulayıcısını indir (salt okunur)",
-    "driveImportsTitle": "Drive içe aktarımları"
+    "driveImportsTitle": "Drive içe aktarımları",
+    "driveImportApiDisabled": "Kayıtlı hizmet hesabının projesinde Google Drive API etkin değil. Google Drive API ayarlarını açın, API’yi o projede etkinleştirin, birkaç dakika bekleyin ve yeniden doğrulayın.",
+    "driveImportAuthFailed": "Google kayıtlı hizmet hesabının kimliğini doğrulayamadı. Şifrelenmiş Worker Secret içinde doğru ve etkin hizmet hesabı kimlik bilgilerinin bulunduğunu kontrol edin ve yeniden doğrulayın. Buraya asla özel anahtar yapıştırmayın.",
+    "driveImportAccessDenied": "Kayıtlı hizmet hesabı bu klasörü okuyamıyor. Klasörü gizli tutun, aşağıda gösterilen hesapla Görüntüleyen olarak paylaşın, kayıtlı klasör kimliğini kontrol edin ve yeniden doğrulayın.",
+    "driveImportRateLimited": "Google Drive istekleri geçici olarak sınırlandırıyor. Birkaç dakika bekleyin ve yeniden doğrulayın.",
+    "driveImportUnavailable": "Google Drive geçici olarak kullanılamıyor. Daha sonra yeniden doğrulamayı deneyin.",
+    "driveImportInvalidFolder": "Bu klasör doğrulanamadı. Kayıtlı kimliğin amaçlanan Google Drive klasörüne ait olduğunu ve aşağıda gösterilen hesabın Görüntüleyen erişimine sahip olduğunu kontrol edin.",
+    "driveImportInvalidResponse": "Google beklenmeyen bir yanıt döndürdü. Daha sonra yeniden doğrulamayı deneyin. Sorun devam ederse kayıtlı hizmet hesabı yapılandırmasını kontrol edin.",
+    "driveImportConnectionFailed": "Gizli Drive bağlantısı doğrulanamadı. Kayıtlı hizmet hesabının projesinde Google Drive API’nin etkin olduğunu ve klasörün aşağıda gösterilen hesapla Görüntüleyen olarak paylaşıldığını kontrol edin, ardından yeniden doğrulayın.",
+    "driveImportOpenApiConsole": "Google Drive API ayarlarını aç",
+    "driveImportOpenSharing": "Klasör paylaşımını aç"
   },
   "ru":{
     "driveImportTitle": "Импорт из Drive",
@@ -750,7 +910,17 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusReview": "Источник изменился — требуется проверка",
     "driveImportSetupGuide": "Руководство по настройке Drive и манифесту",
     "driveImportDownloadTool": "Скачать проверку ClipWeave (только чтение)",
-    "driveImportsTitle": "Импорт из Drive"
+    "driveImportsTitle": "Импорт из Drive",
+    "driveImportApiDisabled": "Google Drive API не включён в проекте сохранённого сервисного аккаунта. Откройте настройки Google Drive API, включите API в этом проекте, подождите несколько минут и повторите проверку.",
+    "driveImportAuthFailed": "Google не смог аутентифицировать сохранённый сервисный аккаунт. Убедитесь, что зашифрованный Worker Secret содержит правильные действующие учётные данные сервисного аккаунта, и повторите проверку. Никогда не вставляйте сюда закрытый ключ.",
+    "driveImportAccessDenied": "Сохранённый сервисный аккаунт не может читать эту папку. Оставьте папку закрытой, предоставьте указанному ниже аккаунту доступ с ролью «Читатель», проверьте сохранённый ID папки и повторите проверку.",
+    "driveImportRateLimited": "Google Drive временно ограничивает запросы. Подождите несколько минут и повторите проверку.",
+    "driveImportUnavailable": "Google Drive временно недоступен. Попробуйте повторить проверку позже.",
+    "driveImportInvalidFolder": "Не удалось проверить эту папку. Убедитесь, что сохранённый ID относится к нужной папке Google Drive и у указанного ниже аккаунта есть доступ с ролью «Читатель».",
+    "driveImportInvalidResponse": "Google вернул неожиданный ответ. Попробуйте повторить проверку позже. Если проблема сохраняется, проверьте настройки сохранённого сервисного аккаунта.",
+    "driveImportConnectionFailed": "Не удалось проверить закрытое подключение к Drive. Убедитесь, что Google Drive API включён в проекте сохранённого сервисного аккаунта и указанному ниже аккаунту предоставлен доступ к папке с ролью «Читатель», затем повторите проверку.",
+    "driveImportOpenApiConsole": "Открыть настройки Google Drive API",
+    "driveImportOpenSharing": "Открыть настройки доступа к папке"
   },
   "fr":{
     "driveImportTitle": "Importations Drive",
@@ -794,7 +964,17 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusReview": "Source modifiée — vérification nécessaire",
     "driveImportSetupGuide": "Guide de configuration de Drive et du manifeste",
     "driveImportDownloadTool": "Télécharger le vérificateur ClipWeave (lecture seule)",
-    "driveImportsTitle": "Importations Drive"
+    "driveImportsTitle": "Importations Drive",
+    "driveImportApiDisabled": "Google Drive API n’est pas activée dans le projet du compte de service enregistré. Ouvrez les paramètres de Google Drive API, activez-la dans ce projet, attendez quelques minutes, puis vérifiez à nouveau.",
+    "driveImportAuthFailed": "Google n’a pas pu authentifier le compte de service enregistré. Vérifiez que le Worker Secret chiffré contient les identifiants corrects et actifs du compte de service, puis vérifiez à nouveau. Ne collez jamais de clé privée ici.",
+    "driveImportAccessDenied": "Le compte de service enregistré ne peut pas lire ce dossier. Gardez le dossier privé, partagez-le avec le compte affiché ci-dessous en tant que Lecteur, vérifiez l’ID de dossier enregistré, puis vérifiez à nouveau.",
+    "driveImportRateLimited": "Google Drive limite temporairement les requêtes. Attendez quelques minutes, puis vérifiez à nouveau.",
+    "driveImportUnavailable": "Google Drive est temporairement indisponible. Réessayez la vérification plus tard.",
+    "driveImportInvalidFolder": "Ce dossier n’a pas pu être vérifié. Vérifiez que l’ID enregistré correspond au dossier Google Drive souhaité et que le compte affiché ci-dessous dispose d’un accès Lecteur.",
+    "driveImportInvalidResponse": "Google a renvoyé une réponse inattendue. Réessayez la vérification plus tard. Si le problème persiste, contrôlez la configuration du compte de service enregistré.",
+    "driveImportConnectionFailed": "La connexion privée à Drive n’a pas pu être vérifiée. Vérifiez que Google Drive API est activée dans le projet du compte de service enregistré et que le dossier est partagé avec le compte affiché ci-dessous en tant que Lecteur, puis vérifiez à nouveau.",
+    "driveImportOpenApiConsole": "Ouvrir les paramètres de Google Drive API",
+    "driveImportOpenSharing": "Ouvrir le partage du dossier"
   },
   "de":{
     "driveImportTitle": "Drive-Importe",
@@ -838,7 +1018,17 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusReview": "Quelle geändert — Prüfung erforderlich",
     "driveImportSetupGuide": "Anleitung für Drive-Einrichtung und Manifest",
     "driveImportDownloadTool": "ClipWeave-Prüfprogramm herunterladen (nur lesen)",
-    "driveImportsTitle": "Drive-Importe"
+    "driveImportsTitle": "Drive-Importe",
+    "driveImportApiDisabled": "Google Drive API ist im Projekt des gespeicherten Dienstkontos nicht aktiviert. Öffnen Sie die Einstellungen für Google Drive API, aktivieren Sie die API in diesem Projekt, warten Sie einige Minuten und prüfen Sie erneut.",
+    "driveImportAuthFailed": "Google konnte das gespeicherte Dienstkonto nicht authentifizieren. Prüfen Sie, ob das verschlüsselte Worker Secret die richtigen, aktiven Anmeldedaten des Dienstkontos enthält, und prüfen Sie erneut. Fügen Sie hier niemals einen privaten Schlüssel ein.",
+    "driveImportAccessDenied": "Das gespeicherte Dienstkonto kann diesen Ordner nicht lesen. Lassen Sie den Ordner privat, geben Sie ihn für das unten angezeigte Konto als Betrachter frei, prüfen Sie die gespeicherte Ordner-ID und prüfen Sie erneut.",
+    "driveImportRateLimited": "Google Drive begrenzt vorübergehend die Anfragen. Warten Sie einige Minuten und prüfen Sie erneut.",
+    "driveImportUnavailable": "Google Drive ist vorübergehend nicht verfügbar. Versuchen Sie die Prüfung später erneut.",
+    "driveImportInvalidFolder": "Dieser Ordner konnte nicht geprüft werden. Prüfen Sie, ob die gespeicherte ID zum gewünschten Google Drive-Ordner gehört und das unten angezeigte Konto Betrachterzugriff hat.",
+    "driveImportInvalidResponse": "Google hat eine unerwartete Antwort zurückgegeben. Versuchen Sie die Prüfung später erneut. Wenn das Problem weiterhin besteht, prüfen Sie die Konfiguration des gespeicherten Dienstkontos.",
+    "driveImportConnectionFailed": "Die private Drive-Verbindung konnte nicht geprüft werden. Prüfen Sie, ob Google Drive API im Projekt des gespeicherten Dienstkontos aktiviert und der Ordner für das unten angezeigte Konto als Betrachter freigegeben ist. Prüfen Sie dann erneut.",
+    "driveImportOpenApiConsole": "Einstellungen für Google Drive API öffnen",
+    "driveImportOpenSharing": "Ordnerfreigabe öffnen"
   },
   "ms":{
     "driveImportTitle": "Import Drive",
@@ -882,7 +1072,17 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusReview": "Sumber berubah — semakan diperlukan",
     "driveImportSetupGuide": "Panduan persediaan Drive dan manifes",
     "driveImportDownloadTool": "Muat turun pengesah ClipWeave (baca sahaja)",
-    "driveImportsTitle": "Import Drive"
+    "driveImportsTitle": "Import Drive",
+    "driveImportApiDisabled": "Google Drive API belum didayakan untuk projek akaun perkhidmatan yang disimpan. Buka tetapan Google Drive API, dayakannya dalam projek tersebut, tunggu beberapa minit, kemudian sahkan semula.",
+    "driveImportAuthFailed": "Google tidak dapat mengesahkan identiti akaun perkhidmatan yang disimpan. Pastikan Worker Secret yang disulitkan mengandungi kelayakan akaun perkhidmatan yang betul dan aktif, kemudian sahkan semula. Jangan sekali-kali tampal kunci peribadi di sini.",
+    "driveImportAccessDenied": "Akaun perkhidmatan yang disimpan tidak dapat membaca folder ini. Kekalkan folder sebagai peribadi, kongsikannya dengan akaun yang ditunjukkan di bawah sebagai Pelihat (Viewer), semak ID folder yang disimpan, kemudian sahkan semula.",
+    "driveImportRateLimited": "Google Drive mengehadkan permintaan buat sementara waktu. Tunggu beberapa minit, kemudian sahkan semula.",
+    "driveImportUnavailable": "Google Drive tidak tersedia buat sementara waktu. Cuba sahkan semula kemudian.",
+    "driveImportInvalidFolder": "Folder ini tidak dapat disahkan. Pastikan ID yang disimpan ialah milik folder Google Drive yang dimaksudkan dan akaun yang ditunjukkan di bawah mempunyai akses Pelihat (Viewer).",
+    "driveImportInvalidResponse": "Google memberikan respons yang tidak dijangka. Cuba sahkan semula kemudian. Jika masalah berterusan, semak konfigurasi akaun perkhidmatan yang disimpan.",
+    "driveImportConnectionFailed": "Sambungan Drive peribadi tidak dapat disahkan. Pastikan Google Drive API didayakan untuk projek akaun perkhidmatan yang disimpan dan folder dikongsi dengan akaun yang ditunjukkan di bawah sebagai Pelihat (Viewer), kemudian sahkan semula.",
+    "driveImportOpenApiConsole": "Buka tetapan Google Drive API",
+    "driveImportOpenSharing": "Buka perkongsian folder"
   },
   "ta":{
     "driveImportTitle": "Drive இறக்குமதிகள்",
@@ -926,6 +1126,16 @@ export const driveImportMessages:Record<Locale,Messages>={
     "driveImportStatusReview": "மூலம் மாறியுள்ளது — மதிப்பாய்வு தேவை",
     "driveImportSetupGuide": "Drive அமைப்பு மற்றும் கோப்புப் பட்டியல் வழிகாட்டி",
     "driveImportDownloadTool": "ClipWeave சரிபார்ப்புக் கருவியைப் பதிவிறக்கு (படிக்க மட்டும்)",
-    "driveImportsTitle": "Drive இறக்குமதிகள்"
+    "driveImportsTitle": "Drive இறக்குமதிகள்",
+    "driveImportApiDisabled": "சேமிக்கப்பட்ட சேவைக் கணக்கின் திட்டத்தில் Google Drive API இயக்கப்படவில்லை. Google Drive API அமைப்புகளைத் திறந்து, அந்தத் திட்டத்தில் அதை இயக்கவும்; சில நிமிடங்கள் காத்திருந்து மீண்டும் சரிபார்க்கவும்.",
+    "driveImportAuthFailed": "சேமிக்கப்பட்ட சேவைக் கணக்கின் அடையாளத்தை Google உறுதிப்படுத்த முடியவில்லை. மறையாக்கப்பட்ட Worker Secret-இல் சேவைக் கணக்கின் சரியான, செயலிலுள்ள நற்சான்றுகள் உள்ளதா எனச் சரிபார்த்து, மீண்டும் சரிபார்க்கவும். தனிப்பட்ட விசையை இங்கே ஒருபோதும் ஒட்ட வேண்டாம்.",
+    "driveImportAccessDenied": "சேமிக்கப்பட்ட சேவைக் கணக்கால் இந்தக் கோப்புறையைப் படிக்க முடியவில்லை. கோப்புறையைத் தனிப்பட்டதாக வைத்திருந்து, கீழே காட்டப்படும் கணக்குடன் பார்வையாளராக (Viewer) பகிரவும்; சேமிக்கப்பட்ட கோப்புறை ID-ஐச் சரிபார்த்து மீண்டும் சரிபார்க்கவும்.",
+    "driveImportRateLimited": "Google Drive தற்காலிகமாகக் கோரிக்கைகளைக் கட்டுப்படுத்துகிறது. சில நிமிடங்கள் காத்திருந்து மீண்டும் சரிபார்க்கவும்.",
+    "driveImportUnavailable": "Google Drive தற்காலிகமாகக் கிடைக்கவில்லை. பின்னர் மீண்டும் சரிபார்க்க முயற்சிக்கவும்.",
+    "driveImportInvalidFolder": "இந்தக் கோப்புறையைச் சரிபார்க்க முடியவில்லை. சேமிக்கப்பட்ட ID நீங்கள் நினைத்த Google Drive கோப்புறைக்குரியது என்பதையும், கீழே காட்டப்படும் கணக்குக்குப் பார்வையாளர் (Viewer) அணுகல் உள்ளது என்பதையும் உறுதிப்படுத்தவும்.",
+    "driveImportInvalidResponse": "Google எதிர்பாராத பதிலை வழங்கியுள்ளது. பின்னர் மீண்டும் சரிபார்க்க முயற்சிக்கவும். சிக்கல் தொடர்ந்தால், சேமிக்கப்பட்ட சேவைக் கணக்கின் அமைப்பைச் சரிபார்க்கவும்.",
+    "driveImportConnectionFailed": "தனிப்பட்ட Drive இணைப்பைச் சரிபார்க்க முடியவில்லை. சேமிக்கப்பட்ட சேவைக் கணக்கின் திட்டத்தில் Google Drive API இயக்கப்பட்டுள்ளதையும், கோப்புறை கீழே காட்டப்படும் கணக்குடன் பார்வையாளராக (Viewer) பகிரப்பட்டுள்ளதையும் உறுதிப்படுத்தி, மீண்டும் சரிபார்க்கவும்.",
+    "driveImportOpenApiConsole": "Google Drive API அமைப்புகளைத் திற",
+    "driveImportOpenSharing": "கோப்புறைப் பகிர்வைத் திற"
   }
 };

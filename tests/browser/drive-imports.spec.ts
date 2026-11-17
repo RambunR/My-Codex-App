@@ -10,9 +10,10 @@ const fixedTime='2026-11-15T12:00:00Z';
 const initialStatus=():DriveImportStatus=>({settings:{enabled:false,folderId:DEFAULT_DRIVE_IMPORT_FOLDER,revision:1,verifiedAt:null},connection:{configured:true,serviceAccountEmail:'private-importer@lingying-browser-test.iam.gserviceaccount.com',runtimeAvailable:true},jobs:[],notifications:[],unread:0});
 const job=(overrides:Partial<DriveImportJob>={}):DriveImportJob=>({id:'job-ready',folderId:'series-source-folder',folderName:'001_clips',status:'waiting',seriesId:null,episodeCount:10,finishedFiles:2,totalFiles:10,message:'Waiting for the remaining manifest files.',createdAt:fixedTime,updatedAt:fixedTime,...overrides});
 interface FixtureOptions {actor?:typeof owner|typeof otherAdmin;locale?:Locale;status?:DriveImportStatus;forbidden?:boolean}
+interface VerificationFailure {code?:string;status?:number;message?:string;details?:Record<string,unknown>;abort?:boolean}
 async function fixture(page:Page,{actor=owner,locale='en',status=initialStatus(),forbidden=false}:FixtureOptions={}){
   const unexpected:string[]=[],errors:string[]=[],writes:Array<{method:string;path:string;body:unknown}>=[];
-  const state={status:structuredClone(status),forbidden,readFailure:false,mutationFailure:false,readCount:0,authCount:0};
+  const state={status:structuredClone(status),forbidden,readFailure:false,mutationFailure:false,verificationFailure:null as VerificationFailure|null,readCount:0,authCount:0};
   await page.addInitScript(language=>localStorage.setItem('drama-language',language),locale);page.on('pageerror',error=>errors.push(error.message));
   await page.route('**/api/**',async route=>{
     const request=route.request(),path=new URL(request.url()).pathname,method=request.method();
@@ -32,7 +33,11 @@ async function fixture(page:Page,{actor=owner,locale='en',status=initialStatus()
         state.status.settings.revision++;
         return route.fulfill({json:{ok:true}});
       }
-      if(method==='POST'&&path===endpoint+'/connection'){state.status.settings.verifiedAt=Date.now();return route.fulfill({json:{ok:true}});}
+      if(method==='POST'&&path===endpoint+'/connection'){
+        const failure=state.verificationFailure;
+        if(failure){if(failure.abort)return route.abort('connectionfailed');return route.fulfill({status:failure.status??409,json:{error:{code:failure.code,message:failure.message,details:failure.details}}});}
+        state.status.settings.verifiedAt=Date.now();return route.fulfill({json:{ok:true}});
+      }
       if(method==='POST'&&path===endpoint+'/scan')return route.fulfill({json:{queued:true}});
       if(method==='POST'&&path===endpoint+'/notifications/read'){state.status.notifications=state.status.notifications.map(item=>({...item,readAt:fixedTime}));state.status.unread=0;return route.fulfill({json:{ok:true}});}
       const action=path.match(/\/jobs\/([^/]+)\/(cancel|retry)$/);
@@ -115,4 +120,50 @@ test('polling refreshes activity without discarding edited input and stops after
 for(const locale of ['en','zh-TW','ar'] as const)test(`the private import panel fits a 320px ${locale} phone`,async({page})=>{
   await page.setViewportSize({width:320,height:740});const status=initialStatus();status.connection.serviceAccountEmail='very-long-private-drive-service-account-name@lingying-browser-import-project.iam.gserviceaccount.com';status.jobs=[job({folderName:'001_clips_'+('A'.repeat(150)),message:'A detailed manifest error: '+('b'.repeat(200))})];status.notifications=[{id:'phone-notice',jobId:'job-ready',kind:'attention',title:'Source review required',message:'The original draft is preserved. '+('c'.repeat(150)),seriesId:'phone-draft',createdAt:fixedTime,readAt:null}];status.unread=1;
   const check=await fixture(page,{status,locale}),panel=await openPanel(page,locale);await expect(panel.getByLabel(localeMessages[locale].driveImportFolder!,{exact:true})).toHaveValue(DEFAULT_DRIVE_IMPORT_FOLDER);expect(await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth)).toBeLessThanOrEqual(1);expect(await panel.evaluate(element=>element.scrollWidth-element.clientWidth)).toBeLessThanOrEqual(1);if(locale==='ar')await expect(page.locator('html')).toHaveAttribute('dir','rtl');check.assertClean();
+});
+
+const verificationCases=[
+  ['DRIVE_IMPORT_API_DISABLED',409,'driveImportApiDisabled'],
+  ['DRIVE_IMPORT_AUTH_FAILED',409,'driveImportAuthFailed'],
+  ['DRIVE_IMPORT_ACCESS_DENIED',409,'driveImportAccessDenied'],
+  ['DRIVE_IMPORT_RATE_LIMITED',429,'driveImportRateLimited'],
+  ['DRIVE_IMPORT_UNAVAILABLE',503,'driveImportUnavailable'],
+  ['DRIVE_IMPORT_INVALID_FOLDER',422,'driveImportInvalidFolder'],
+  ['DRIVE_IMPORT_INVALID_RESPONSE',502,'driveImportInvalidResponse'],
+  ['DRIVE_IMPORT_CONNECTION_FAILED',409,'driveImportConnectionFailed'],
+] as const;
+const privateProviderMarker='PRIVATE_PROVIDER_DETAILS_NEVER_DISPLAY';
+const unsafeProviderFailure={message:`${privateProviderMarker} <img src=x onerror="window.__driveProviderInjected=true"> https://untrusted.example/enable?project=foreign-project`,details:{activationUrl:'https://untrusted.example/enable?project=foreign-project',serviceAccountEmail:'provider-controlled@foreign-project.iam.gserviceaccount.com'}};
+const apiSettings='https://console.cloud.google.com/apis/library/drive.googleapis.com';
+
+for(const[code,status,key]of verificationCases)test(`${code} shows a fixed diagnostic and keeps the watcher off without exposing provider details`,async({page})=>{
+  const check=await fixture(page);check.state.verificationFailure={code,status,...unsafeProviderFailure};const panel=await openPanel(page);await panel.getByRole('button',{name:localeMessages.en.driveImportVerify!,exact:true}).click();const alert=panel.locator('.drive-import-verification-error');await expect(alert).toHaveAttribute('role','alert');await expect(alert.locator('p').first()).toHaveText(localeMessages.en[key]!);await expect(page.locator('body')).not.toContainText(privateProviderMarker);await expect(page.locator('body')).not.toContainText('untrusted.example');expect(await page.evaluate(()=>(window as any).__driveProviderInjected)).toBeUndefined();await expect(panel.getByRole('button',{name:localeMessages.en.driveImportEnable!,exact:true})).toBeDisabled();await expect(panel.locator('.drive-import-state')).toContainText(localeMessages.en.driveImportDisabled!);expect(check.state.status.settings.enabled).toBe(false);expect(check.state.status.settings.verifiedAt).toBeNull();expect(check.writes).toEqual([{method:'POST',path:endpoint+'/connection',body:{}}]);check.assertClean();
+});
+
+for(const[code,abort]of [['PRIVATE_UPSTREAM_ERROR',false],['constructor',false],['NETWORK',true]] as const)test(`an unrecognised ${code} verification failure uses the safe connection message`,async({page})=>{
+  const check=await fixture(page);check.state.verificationFailure={code,status:502,abort,...unsafeProviderFailure};const panel=await openPanel(page);await panel.getByRole('button',{name:localeMessages.en.driveImportVerify!,exact:true}).click();const alert=panel.locator('.drive-import-verification-error');await expect(alert.locator('p').first()).toHaveText(localeMessages.en.driveImportConnectionFailed!);await expect(page.locator('body')).not.toContainText(privateProviderMarker);await expect(panel.getByRole('button',{name:localeMessages.en.driveImportEnable!,exact:true})).toBeDisabled();expect(check.writes).toEqual([{method:'POST',path:endpoint+'/connection',body:{}}]);check.assertClean();
+});
+
+test('a failed recheck suppresses a previously fresh verification through polling until an explicit successful retry',async({page})=>{
+  await page.clock.install();const status=initialStatus();status.settings.verifiedAt=Date.now()-1000;const check=await fixture(page,{status}),panel=await openPanel(page),copy=localeMessages.en;await expect(panel.getByRole('button',{name:copy.driveImportEnable!,exact:true})).toBeEnabled();check.state.verificationFailure={code:'DRIVE_IMPORT_API_DISABLED',status:409,...unsafeProviderFailure};await panel.getByRole('button',{name:copy.driveImportVerify!,exact:true}).click();await expect(panel.locator('.drive-import-verification-error')).toBeVisible();await expect(panel.getByRole('button',{name:copy.driveImportEnable!,exact:true})).toBeDisabled();await expect(panel.locator('.drive-import-connection-state')).not.toContainText(copy.driveImportVerified!);const reads=check.state.readCount;await page.clock.fastForward(30001);await expect.poll(()=>check.state.readCount).toBeGreaterThan(reads);await expect(panel.locator('.drive-import-verification-error')).toBeVisible();await expect(panel.getByRole('button',{name:copy.driveImportEnable!,exact:true})).toBeDisabled();expect(check.state.status.settings.enabled).toBe(false);
+  check.state.verificationFailure=null;await panel.getByRole('button',{name:copy.driveImportVerify!,exact:true}).click();await expect(panel.locator('.drive-import-verification-error')).toHaveCount(0);await expect(panel.getByRole('button',{name:copy.driveImportEnable!,exact:true})).toBeEnabled();await expect(panel.locator('.drive-import-state')).toContainText(copy.driveImportDisabled!);expect(check.writes).toEqual([{method:'POST',path:endpoint+'/connection',body:{}},{method:'POST',path:endpoint+'/connection',body:{}}]);check.assertClean();
+});
+
+test('diagnostic links use only the saved account project and saved folder and never provider-controlled destinations',async({page})=>{
+  const check=await fixture(page);check.state.verificationFailure={code:'DRIVE_IMPORT_API_DISABLED',status:409,...unsafeProviderFailure};const panel=await openPanel(page),copy=localeMessages.en;await panel.getByRole('button',{name:copy.driveImportVerify!,exact:true}).click();const alert=panel.locator('.drive-import-verification-error'),api=alert.locator('.drive-import-open-api'),sharing=alert.locator('.drive-import-open-sharing');await expect(api).toHaveAttribute('href',apiSettings+'?project=lingying-browser-test');await expect(sharing).toHaveAttribute('href','https://drive.google.com/drive/folders/'+DEFAULT_DRIVE_IMPORT_FOLDER);await expect(api).toHaveText(copy.driveImportOpenApiConsole!);await expect(sharing).toHaveText(copy.driveImportOpenSharing!);
+  for(const link of [api,sharing]){await expect(link).toHaveAttribute('target','_blank');await expect(link).toHaveAttribute('rel',/(?:^|\s)noopener(?:\s|$)/);await expect(link).toHaveAttribute('rel',/(?:^|\s)noreferrer(?:\s|$)/);}
+  const nextFolder='unsaved-private-folder-0123456789';await panel.getByLabel(copy.driveImportFolder!,{exact:true}).fill(nextFolder);await expect(sharing).toHaveAttribute('href','https://drive.google.com/drive/folders/'+DEFAULT_DRIVE_IMPORT_FOLDER);expect(check.writes).toEqual([{method:'POST',path:endpoint+'/connection',body:{}}]);await expect(panel.locator('textarea,input[type="password"]')).toHaveCount(0);await panel.getByRole('button',{name:copy.driveImportSaveFolder!,exact:true}).click();await expect(alert).toHaveCount(0);await expect(panel.getByRole('button',{name:copy.driveImportEnable!,exact:true})).toBeDisabled();expect(check.state.status.settings.folderId).toBe(nextFolder);expect(check.state.status.settings.enabled).toBe(false);check.assertClean();
+});
+
+for(const[email,reason]of [[null,'missing account'],['reader@lingying-browser-test.iam.gserviceaccount.com?project=foreign-project','query injection'],['reader@lingying-browser-test.iam.gserviceaccount.com.untrusted.example','foreign host suffix']] as const)test(`${reason} uses a generic API settings link instead of an unsafe account project`,async({page})=>{
+  const status=initialStatus();status.connection.serviceAccountEmail=email;const check=await fixture(page,{status});check.state.verificationFailure={code:'DRIVE_IMPORT_AUTH_FAILED',status:409,...unsafeProviderFailure};const panel=await openPanel(page);await panel.getByRole('button',{name:localeMessages.en.driveImportVerify!,exact:true}).click();await expect(panel.locator('.drive-import-open-api')).toHaveAttribute('href',apiSettings);await expect(panel.locator('.drive-import-open-sharing')).toHaveAttribute('href','https://drive.google.com/drive/folders/'+DEFAULT_DRIVE_IMPORT_FOLDER);check.assertClean();
+});
+
+test('an invalid saved folder never becomes a sharing link after the status refreshes',async({page})=>{
+  await page.clock.install();const check=await fixture(page);check.state.verificationFailure={code:'DRIVE_IMPORT_ACCESS_DENIED',status:409,...unsafeProviderFailure};const panel=await openPanel(page);await panel.getByRole('button',{name:localeMessages.en.driveImportVerify!,exact:true}).click();await expect(panel.locator('.drive-import-open-sharing')).toBeVisible();check.state.status.settings.folderId='../../private-source?redirect=https://untrusted.example';const reads=check.state.readCount;await page.clock.fastForward(30001);await expect.poll(()=>check.state.readCount).toBeGreaterThan(reads);await expect(panel.locator('.drive-import-verification-error')).toBeVisible();await expect(panel.locator('.drive-import-open-sharing,.drive-import-folder-link')).toHaveCount(0);await expect(panel.locator('.drive-import-open-api')).toHaveAttribute('href',apiSettings+'?project=lingying-browser-test');await expect(panel.getByRole('button',{name:localeMessages.en.driveImportEnable!,exact:true})).toBeDisabled();expect(check.writes).toEqual([{method:'POST',path:endpoint+'/connection',body:{}}]);check.assertClean();
+});
+
+for(const locale of ['en','zh-TW','zh-CN','ar','de'] as const)test(`verification guidance and safe recovery links fit a 320px ${locale} phone`,async({page})=>{
+  await page.setViewportSize({width:320,height:740});const check=await fixture(page,{locale});check.state.verificationFailure={code:'DRIVE_IMPORT_API_DISABLED',status:409,...unsafeProviderFailure};const panel=await openPanel(page,locale),copy=localeMessages[locale];await panel.getByRole('button',{name:copy.driveImportVerify!,exact:true}).click();const alert=panel.locator('.drive-import-verification-error');await expect(alert.locator('p').first()).toHaveText(copy.driveImportApiDisabled!);await expect(page.locator('html')).toHaveAttribute('lang',locale);await expect(page.locator('html')).toHaveAttribute('dir',locale==='ar'?'rtl':'ltr');expect(await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth)).toBeLessThanOrEqual(1);expect(await alert.evaluate(element=>element.scrollWidth-element.clientWidth)).toBeLessThanOrEqual(1);
+  for(const selector of ['.drive-import-open-api','.drive-import-open-sharing']){const link=alert.locator(selector);await link.scrollIntoViewIfNeeded();await expect(link).toBeVisible();const box=await link.boundingBox();expect(box).not.toBeNull();expect(box!.height).toBeGreaterThanOrEqual(44);await link.click({trial:true});}await expect(panel.getByRole('button',{name:copy.driveImportEnable!,exact:true})).toBeDisabled();await expect(page.locator('body')).not.toContainText(privateProviderMarker);expect(check.writes).toEqual([{method:'POST',path:endpoint+'/connection',body:{}}]);check.assertClean();
 });

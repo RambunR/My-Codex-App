@@ -943,7 +943,8 @@ try{
   assert.deepEqual((await request('/api/admin/drive-imports',undefined,admin)).data.jobs,[]);
   assert.equal((await request('/api/auth/me',undefined,admin)).data.user.drive_import_unread,0);
   await request('/api/admin/drive-imports',{enabled:true},admin,409,'PATCH');
-  await request('/api/admin/drive-imports/connection',{},admin,409);
+  const missingDriveCredentials=await request('/api/admin/drive-imports/connection',{},admin,409);
+  assert.equal(missingDriveCredentials.data.error.code,'DRIVE_IMPORT_CREDENTIALS_REQUIRED');assert.equal(missingDriveCredentials.headers.get('Retry-After'),null);
   await request('/api/admin/drive-imports',undefined,publisher,403);
   assert.equal((await request('/api/admin/drive-imports',undefined,admin)).data.settings.enabled,false);
   console.log('PASS: real local Cloudflare adapter stays disabled without private credentials; owner-only controls cannot enable it accidentally.');
