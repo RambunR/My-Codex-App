@@ -87,7 +87,7 @@ async function finish(subject=fixture){
 }
 function seriesCount(){return one('SELECT COUNT(*) AS n FROM series')!.n;}
 before(()=>{config.sandbox=false;config.platformOwnerUserId=OWNER;run("INSERT INTO users (id,email,name,password_hash,role) VALUES (?,?,?,'unused','admin')",OWNER,'clipweave-engine@example.test','Drive administrator');initializePublisherProfiles();});
-beforeEach(()=>{config.sandbox=false;config.platformOwnerUserId=OWNER;run("UPDATE users SET role='admin' WHERE id=?",OWNER);fixture=makeFixture();});
+beforeEach(()=>{clock=Date.now();config.sandbox=false;config.platformOwnerUserId=OWNER;run("UPDATE users SET role='admin' WHERE id=?",OWNER);fixture=makeFixture();});
 afterEach(async()=>{run("UPDATE drive_import_jobs SET status='cancelled',lease_token='',lease_until=0,cleanup_needed=1 WHERE root_folder_id=? AND series_id IS NULL",fixture.root);run('UPDATE drive_import_settings SET enabled=0 WHERE id=1');for(let index=0;index<10&&one('SELECT 1 FROM drive_import_jobs WHERE root_folder_id=? AND cleanup_needed=1',fixture.root);index++)await runDriveImportEngine({storage:fixture.storage,credentialFingerprint:'',now:()=>clock});});
 after(async()=>{db.close();await rm(directory,{recursive:true,force:true});});
 
@@ -108,7 +108,7 @@ test('seal-first, missing video and missing required captions wait without stagi
   const before=seriesCount(),missing=fixture.drive.metadata.get('video-2')!;fixture.drive.metadata.delete('video-2');await fixture.tick(true);await fixture.tick();assert.equal(fixture.job()!.status,'waiting');assert.equal(fixture.storage.partCalls,0);assert.equal(seriesCount(),before);
   fixture.drive.metadata.set('video-2',missing);fixture.drive.metadata.delete('caption');clock+=WAIT;await fixture.tick();assert.equal(fixture.job()!.status,'waiting');assert.equal(seriesCount(),before);
 });
-const WAIT=5*60_000;
+const WAIT=24*60*60_000;
 test('a same-size corrupted support file fails before any clip transfer',async()=>{
   const before=seriesCount(),body=fixture.drive.bodies.get('caption')!;fixture.drive.bodies.set('caption',body.map((byte,index)=>index===0?byte^1:byte));
   const job=await finish();assert.equal(job!.status,'error');assert.equal(job!.error_code,'CLIPWEAVE_CHECKSUM_MISMATCH');assert.equal(fixture.storage.partCalls,0);assert.equal(seriesCount(),before);
@@ -131,7 +131,8 @@ test('the configured root may itself be a sealed export and cannot fall back to 
   fixture=makeFixture({child:false,cover:false});const flat=fixture.manifest.series[0];
   fixture.drive.add('old-ready','lingying-ready.json','application/json','clips',encode(JSON.stringify({version:1,series:{title:'Must not import an unsealed export'},episodes:[{name:'old.mp4',number:1,bytes:1,sha256:'a'.repeat(64)}]})));fixture.drive.metadata.delete('seal');
   const before=seriesCount();await fixture.tick(true);await fixture.tick();assert.equal(seriesCount(),before);assert.equal(fixture.storage.partCalls,0);assert.equal(fixture.job(),undefined);
-  fixture.writeSeal();clock+=WAIT;const result=await finish();assert.equal(result!.status,'complete');assert.equal(one('SELECT title FROM series WHERE id=?',result!.series_id)!.title,flat.name);
+  fixture.writeSeal();run('UPDATE drive_import_clipweave_exports SET next_check_at=0 WHERE root_folder_id=?',fixture.root);
+  const result=await finish();assert.equal(result!.status,'complete');assert.equal(one('SELECT title FROM series WHERE id=?',result!.series_id)!.title,flat.name);
 });
 test('revising a completed manifest preserves the same export/source identity and existing website edits',async()=>{
   const result=await finish(),before=seriesCount();run('UPDATE series SET title=? WHERE id=?','Owner website title '+randomUUID(),result!.series_id);

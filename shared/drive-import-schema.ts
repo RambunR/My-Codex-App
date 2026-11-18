@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS drive_import_jobs (
  UNIQUE(root_folder_id,folder_id)
 );
 CREATE INDEX IF NOT EXISTS drive_import_jobs_due ON drive_import_jobs(status,next_check_at,lease_until);
+CREATE INDEX IF NOT EXISTS drive_import_jobs_cleanup_pending ON drive_import_jobs(id) WHERE cleanup_needed=1 AND series_id IS NULL;
 CREATE TABLE IF NOT EXISTS drive_import_files (
  id TEXT PRIMARY KEY,job_id TEXT NOT NULL REFERENCES drive_import_jobs(id) ON DELETE CASCADE,
  drive_file_id TEXT NOT NULL,name TEXT NOT NULL,kind TEXT NOT NULL CHECK(kind IN('video','cover')),
@@ -34,12 +35,15 @@ CREATE TABLE IF NOT EXISTS drive_import_files (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS drive_import_object_key ON drive_import_files(object_key) WHERE object_key<>'';
 CREATE INDEX IF NOT EXISTS drive_import_files_job ON drive_import_files(job_id,status);
+CREATE INDEX IF NOT EXISTS drive_import_files_next ON drive_import_files(job_id,kind DESC,number,id) WHERE status<>'validated';
+CREATE INDEX IF NOT EXISTS drive_import_files_cleanup_pending ON drive_import_files(job_id) WHERE cleanup_pending=1;
 CREATE TABLE IF NOT EXISTS drive_import_clipweave_schedule (id INTEGER PRIMARY KEY CHECK(id=1),next_discovery_at INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS drive_import_clipweave_exports (
  id TEXT PRIMARY KEY,root_folder_id TEXT NOT NULL,export_folder_id TEXT NOT NULL,owner_id TEXT NOT NULL,
  config_revision INTEGER NOT NULL,next_check_at INTEGER NOT NULL DEFAULT 0,message TEXT NOT NULL DEFAULT '',
  UNIQUE(root_folder_id,export_folder_id)
 );
+CREATE INDEX IF NOT EXISTS drive_import_clipweave_exports_due ON drive_import_clipweave_exports(root_folder_id,owner_id,config_revision,next_check_at,id);
 CREATE TABLE IF NOT EXISTS drive_import_clipweave_jobs (
  job_id TEXT PRIMARY KEY REFERENCES drive_import_jobs(id) ON DELETE CASCADE,owner_id TEXT NOT NULL,
  export_folder_id TEXT NOT NULL,export_id TEXT NOT NULL,source_id TEXT NOT NULL,
@@ -56,6 +60,8 @@ CREATE TABLE IF NOT EXISTS drive_import_clipweave_assets (
  UNIQUE(job_id,path),UNIQUE(job_id,drive_file_id)
 );
 CREATE INDEX IF NOT EXISTS drive_import_clipweave_assets_pending ON drive_import_clipweave_assets(job_id,kind,verified);
+CREATE INDEX IF NOT EXISTS drive_import_clipweave_assets_next_support ON drive_import_clipweave_assets(job_id,path) WHERE kind='support' AND verified=0;
+CREATE INDEX IF NOT EXISTS drive_import_clipweave_assets_media ON drive_import_clipweave_assets(job_id,media_file_id) WHERE media_file_id IS NOT NULL;
 CREATE TABLE IF NOT EXISTS drive_import_notifications (
  id TEXT PRIMARY KEY,job_id TEXT REFERENCES drive_import_jobs(id) ON DELETE CASCADE,owner_id TEXT NOT NULL,event_key TEXT NOT NULL UNIQUE,
  kind TEXT NOT NULL CHECK(kind IN('complete','error','attention')),title TEXT NOT NULL,message TEXT NOT NULL,

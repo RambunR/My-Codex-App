@@ -51,7 +51,7 @@ async function cleanupOne(session:Row,storage:EpisodeUploadStorage){
 }
 export async function cleanupExpiredEpisodeUploads(limit=10,now=Date.now(),storage:EpisodeUploadStorage=episodeUploadStorage){
   if(!storage.enabled())return;
-  const rows=all("SELECT u.* FROM episode_upload_sessions u WHERE u.status<>'complete' AND (u.cleanup_pending=1 OR u.status<>'cancelled' AND (u.expires_at_ms<=? OR EXISTS(SELECT 1 FROM series_deletions d WHERE d.series_id=u.series_id))) ORDER BY u.created_at_ms LIMIT ?",now,Math.min(10,Math.max(1,limit)));
+  const rows=all("SELECT u.* FROM episode_upload_sessions u WHERE u.status<>'complete' AND (u.status<>'cancelled' OR u.cleanup_pending=1) AND (u.cleanup_pending=1 OR u.expires_at_ms<=? OR EXISTS(SELECT 1 FROM series_deletions d WHERE d.series_id=u.series_id)) ORDER BY u.created_at_ms LIMIT ?",now,Math.min(10,Math.max(1,limit)));
   for(const row of rows)await locked(row.id,async()=>{const current=one('SELECT * FROM episode_upload_sessions WHERE id=?',row.id);if(!current||current.status==='complete')return;markCleanup(row.id);try{await cleanupOne(current,storage);}catch{console.warn('Episode upload cleanup remains queued for retry.');}});
   const pending=one("SELECT MIN(CASE WHEN cleanup_pending=1 THEN ? ELSE expires_at_ms END) AS next FROM episode_upload_sessions WHERE status<>'complete' AND (status<>'cancelled' OR cleanup_pending=1)",now+60_000);
   if(pending?.next!==null&&pending?.next!==undefined)await scheduleMediaCleanup(Math.max(1000,Number(pending.next)-now));

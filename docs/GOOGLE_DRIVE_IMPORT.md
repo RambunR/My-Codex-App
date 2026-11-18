@@ -1,6 +1,6 @@
 # Private Google Drive imports
 
-The existing `lingying` Worker has a five-minute scheduled importer. It starts **disabled**, uses the existing APP database and private MEDIA bucket, and sends completion/error messages to **Admin → Drive imports** and the owner's notification bell. It never publishes a series or sends email.
+The existing `lingying` Worker checks for new Drive series daily at **08:15 Hong Kong time (00:15 UTC)**. It starts **disabled**, uses the existing APP database and private MEDIA bucket, and sends completion/error messages to **Admin → Drive imports** and the owner's notification bell. It never publishes a series or sends email.
 
 ## Connect the source folder
 
@@ -55,7 +55,7 @@ Drafts start with all episodes free (`free_episodes=1000`), no featured selectio
 
 Manual source folders map to their destination once; sealed ClipWeave sources use export/source identity. Subsequent scans preserve edits made on LingYing. Changes to an already imported source are flagged for review instead of overwriting the destination. Deleting a destination does not erase its provenance or cause automatic re-creation. Removing a Drive folder does not delete a LingYing drama.
 
-Use **Scan now** to request discovery, **Cancel** to stop an unfinished job, and **Retry** after correcting a failed source. Staging cleanup is durable and continues when imports are disabled. Root discovery happens every five minutes; transfer continuation uses the existing Durable Object alarm without replacing media-cleanup work. The background entry point is internal to the Durable Object; the public Worker rejects that reserved path.
+Use **Check now** for an immediate scan and to recheck waiting or previously imported sources. Use **Cancel** to stop an unfinished job, and **Retry** after correcting a failed source. Idle source checks are spaced 24 hours apart. Active transfers and their retries use the existing Durable Object alarm. Staging cleanup continues even when imports are disabled. The background entry point is internal to the Durable Object; the public Worker rejects that reserved path.
 
 ## Verification and current limitations
 

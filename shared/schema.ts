@@ -125,6 +125,7 @@ CREATE TABLE IF NOT EXISTS playback_session_times (
 );
 CREATE INDEX IF NOT EXISTS episode_upload_owner_active ON episode_upload_sessions(creator_id,status,expires_at_ms);
 CREATE INDEX IF NOT EXISTS episode_upload_cleanup ON episode_upload_sessions(cleanup_pending,expires_at_ms);
+CREATE INDEX IF NOT EXISTS episode_upload_pending_created ON episode_upload_sessions(created_at_ms) WHERE status<>'complete' AND (status<>'cancelled' OR cleanup_pending=1);
 CREATE TABLE IF NOT EXISTS episode_upload_parts (
  session_id TEXT NOT NULL REFERENCES episode_upload_sessions(id), part_number INTEGER NOT NULL,
  bytes INTEGER NOT NULL, sha256 TEXT NOT NULL, etag TEXT NOT NULL,

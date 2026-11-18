@@ -20,7 +20,8 @@ import {writeSeriesCoverLayout} from './cover-layout.js';
 import {writeSeriesSubtitleLanguages} from './subtitle-languages.js';
 import {writeSeriesLastEpisodeFree} from './episode-access.js';
 
-const PART_BYTES=5*1024*1024,COVER_BYTES=5*1024*1024,WAIT_MS=5*60_000,LEASE_MS=60_000;
+const PART_BYTES=5*1024*1024,COVER_BYTES=5*1024*1024,LEASE_MS=60_000;
+const DAILY_RECHECK_MS=24*60*60_000,TRANSFER_RETRY_MAX_MS=5*60_000;
 const STAGING_TTL_MS=24*60*60_000,FOLDER='application/vnd.google-apps.folder';
 type Row=Record<string,any>;
 type Part={partNumber:number;etag:string};
@@ -76,10 +77,10 @@ function failed(job:Row,lease:string,error:unknown,now:number){
     return;
   }
   const code=safeCode(error);
-  if((error as any)?.state==='WAIT'){checkpoint(job,lease,"UPDATE drive_import_jobs SET next_check_at=?,message='Waiting for every required file in the sealed ClipWeave export.',updated_at=datetime('now')",now+WAIT_MS);return;}
+  if((error as any)?.state==='WAIT'){checkpoint(job,lease,"UPDATE drive_import_jobs SET next_check_at=?,message='Waiting for every required file in the sealed ClipWeave export.',updated_at=datetime('now')",now+(current.status==='waiting'?DAILY_RECHECK_MS:TRANSFER_RETRY_MAX_MS));return;}
   const transient=['DRIVE_UNAVAILABLE','DRIVE_RATE_LIMITED','DRIVE_AUTH_FAILED'].includes(code);
   if(transient&&current.retry_count<5){
-    checkpoint(job,lease,"UPDATE drive_import_jobs SET retry_count=retry_count+1,next_check_at=?,message='Drive is temporarily unavailable. The importer will retry.',updated_at=datetime('now')",now+Math.min(WAIT_MS,15_000*2**current.retry_count));return;
+    checkpoint(job,lease,"UPDATE drive_import_jobs SET retry_count=retry_count+1,next_check_at=?,message='Drive is temporarily unavailable. The importer will retry.',updated_at=datetime('now')",now+Math.min(TRANSFER_RETRY_MAX_MS,15_000*2**current.retry_count));return;
   }
   const message=code==='SERIES_TITLE_EXISTS'?'A drama already uses this title. Rename the source manifest and retry after cleanup.':code==='PAYMENT_REVIEW_REQUIRED'?'The administrator payment account needs review before this import can continue.':code==='DRIVE_SOURCE_CHANGED'?'The source folder changed during import. Complete the folder and retry after cleanup.':code==='DRIVE_CHECKSUM_MISMATCH'?'A source file did not match its manifest checksum. Check the completed upload and retry.':code==='INVALID_VIDEO'||code==='VIDEO_TOO_LONG'?'A video failed the normal website media checks. Check its codec and duration before retrying.':'This folder could not be imported safely. Review its manifest and source files, then retry after cleanup.';
   transaction(()=>{
@@ -134,11 +135,11 @@ async function discoverClipWeave(options:DriveImportEngineOptions,now:number){
         run('INSERT INTO drive_import_jobs (id,root_folder_id,folder_id,folder_name,owner_id,config_revision,message) VALUES (?,?,?,?,?,?,?)',id,settings.folder_id,folderId,source.name,owner,settings.revision,'Waiting to verify the sealed ClipWeave export.');
         run('INSERT INTO drive_import_clipweave_jobs (job_id,owner_id,export_folder_id,export_id,source_id,original_series_complete) VALUES (?,?,?,?,?,?)',id,owner,pending.export_folder_id,loaded.seal.export_id,source.source_id,loaded.manifest.original_series_complete===null?null:Number(loaded.manifest.original_series_complete));
       }
-      run('UPDATE drive_import_clipweave_exports SET next_check_at=?,message=? WHERE id=? AND root_folder_id=? AND config_revision=?',now+WAIT_MS,ready.length?'Sealed ready-series identities discovered.':'No source is in the sealed ready-series set.',pending.id,settings.folder_id,settings.revision);
+      run('UPDATE drive_import_clipweave_exports SET next_check_at=?,message=? WHERE id=? AND root_folder_id=? AND config_revision=?',now+DAILY_RECHECK_MS,ready.length?'Sealed ready-series identities discovered.':'No source is in the sealed ready-series set.',pending.id,settings.folder_id,settings.revision);
     });
   }catch(error){
     const state=(error as any)?.state,code=safeCode(error);
-    run('UPDATE drive_import_clipweave_exports SET next_check_at=?,message=? WHERE id=? AND root_folder_id=? AND config_revision=?',now+WAIT_MS,state==='WAIT'?'Waiting for sealed export controls and files.':'The sealed export needs verification or repair.',pending.id,settings.folder_id,settings.revision);
+    run('UPDATE drive_import_clipweave_exports SET next_check_at=?,message=? WHERE id=? AND root_folder_id=? AND config_revision=?',now+DAILY_RECHECK_MS,state==='WAIT'?'Waiting for sealed export controls and files.':'The sealed export needs verification or repair.',pending.id,settings.folder_id,settings.revision);
     if(!(error instanceof Interrupted))notifyDriveImportRoot(`clipweave-export:${pending.id}:${state}:${code}`,state==='WAIT'?'attention':'error',state==='WAIT'?'ClipWeave export is still syncing':'ClipWeave export needs attention',state==='WAIT'?'A discovered ClipWeave export is not yet fully sealed and ready. No drama has been created.':'The discovered export could not pass its sealed inventory checks. No drama has been created.',owner);
   }
   return true;
@@ -235,14 +236,14 @@ async function inspect(options:DriveImportEngineOptions,job:Row,lease:string,now
   const files=await listSeries(drive,job.folder_id);assertBinding(options,job,lease);
   const manifests=files.filter(file=>file.name===DRIVE_IMPORT_MANIFEST_NAME);
   assert(manifests.length<=1,422,'DRIVE_FILES_AMBIGUOUS','Only one ready manifest is allowed.');
-  if(!manifests.length){checkpoint(job,lease,"UPDATE drive_import_jobs SET next_check_at=?,message='Waiting for lingying-ready.json and its complete files.',updated_at=datetime('now')",now+WAIT_MS);return;}
+  if(!manifests.length){checkpoint(job,lease,"UPDATE drive_import_jobs SET next_check_at=?,message='Waiting for lingying-ready.json and its complete files.',updated_at=datetime('now')",now+DAILY_RECHECK_MS);return;}
   const manifestFile=manifests[0];assertSnapshotFile(manifestFile,job.folder_id);
   assert(manifestFile.size>0&&manifestFile.size<=1024*1024,422,'INVALID_DRIVE_MANIFEST','The manifest is too large.');
   const text=await drive.readText(manifestFile.id,1024*1024);assertBinding(options,job,lease);
   const manifest=parseDriveManifest(text);let matched:ReturnType<typeof matchDriveManifestFiles>;
   try{matched=matchDriveManifestFiles(manifest,files);}catch(error){
     if(safeCode(error)!=='DRIVE_FILES_PENDING')throw error;
-    checkpoint(job,lease,"UPDATE drive_import_jobs SET next_check_at=?,message='Waiting for all manifest files to finish uploading to Drive.',updated_at=datetime('now')",now+WAIT_MS);return;
+    checkpoint(job,lease,"UPDATE drive_import_jobs SET next_check_at=?,message='Waiting for all manifest files to finish uploading to Drive.',updated_at=datetime('now')",now+DAILY_RECHECK_MS);return;
   }
   const selected=[...matched.episodes.map(item=>({manifest:item.manifest,file:item.file,kind:'video' as const,number:item.manifest.number})),...(matched.cover?[{manifest:matched.cover.manifest,file:matched.cover.file,kind:'cover' as const,number:0}]:[])];
   for(const item of selected){assertSnapshotFile(item.file,job.folder_id);assert(item.file.size<=(item.kind==='cover'?COVER_BYTES:MAX_EPISODE_BYTES),422,'FILE_TOO_LARGE','A source file exceeds the website upload limit.');}
@@ -295,9 +296,20 @@ async function transfer(options:DriveImportEngineOptions,job:Row,lease:string,fi
 }
 async function validate(options:DriveImportEngineOptions,job:Row,lease:string,file:Row){
   const input=await options.storage.read(file.object_key);assertBinding(options,job,lease,true);
-  const sha=createHash('sha256'),md5=createHash('md5');let bytes=0;const reader=input.getReader();
-  try{while(true){const part=await reader.read();if(part.done)break;bytes+=part.value.byteLength;assert(bytes<=file.bytes&&bytes<=MAX_EPISODE_BYTES,422,'DRIVE_CHECKSUM_MISMATCH','Stored media size does not match the manifest.');sha.update(part.value);md5.update(part.value);assertBinding(options,job,lease,true);}}
-  finally{await reader.cancel().catch(()=>{});reader.releaseLock();}
+  const sha=createHash('sha256'),md5=createHash('md5'),reader=input.getReader();
+  let bytes=0,nextBindingCheck=PART_BYTES;
+  try{
+    for(;;){
+      const part=await reader.read();if(part.done)break;
+      bytes+=part.value.byteLength;
+      assert(bytes<=file.bytes&&bytes<=MAX_EPISODE_BYTES,422,'DRIVE_CHECKSUM_MISMATCH','Stored media size does not match the manifest.');
+      // The data is already in private staging. Recheck in bounded intervals
+      // while hashing, and again before any further network or database work.
+      if(bytes>=nextBindingCheck){assertBinding(options,job,lease,true);nextBindingCheck=bytes+PART_BYTES;}
+      sha.update(part.value);md5.update(part.value);
+    }
+  }finally{await reader.cancel().catch(()=>{});reader.releaseLock();}
+  assertBinding(options,job,lease,true);
   assert(bytes===file.bytes&&sha.digest('hex')===file.sha256&&(!file.drive_md5||md5.digest('hex')===file.drive_md5),422,'DRIVE_CHECKSUM_MISMATCH','Stored media does not match its manifest checksum.');
   await freshFile(options,job,lease,file);
   // The normal uploader's validators inspect the original R2 bytes. Safari's
@@ -358,7 +370,7 @@ async function commit(options:DriveImportEngineOptions,job:Row,lease:string,now:
       writeEpisodeDuration(episodeId,file.duration);
     }
     run('UPDATE users SET used_bytes=used_bytes+? WHERE id=?',total,job.owner_id);
-    checkpoint(job,lease,"UPDATE drive_import_jobs SET status='complete',series_id=?,message='Imported as an unpublished draft. Review the details in Creator Studio.',next_check_at=?,retry_count=0,updated_at=datetime('now')",id,now+WAIT_MS);
+    checkpoint(job,lease,"UPDATE drive_import_jobs SET status='complete',series_id=?,message='Imported as an unpublished draft. Review the details in Creator Studio.',next_check_at=?,retry_count=0,updated_at=datetime('now')",id,now+DAILY_RECHECK_MS);
     notifyDriveImport(job.id,'complete','complete','Drive series imported',`${manifest.series.title}: ${manifest.episodes.length} episodes are ready as an unpublished draft.`,id);
     recordDriveImportEvent('import-complete',job.id,{seriesId:id,episodeCount:manifest.episodes.length,bytes:total});
   });
@@ -366,17 +378,17 @@ async function commit(options:DriveImportEngineOptions,job:Row,lease:string,now:
 async function checkCompleted(options:DriveImportEngineOptions,job:Row,now:number){
   const sealed=clipWeaveJob(job.id);
   if(sealed){
-    try{await revalidateClipWeaveSnapshot(options.drive!,JSON.parse(sealed.snapshot_json));assertBinding(options);run('UPDATE drive_import_jobs SET next_check_at=? WHERE id=?',now+WAIT_MS,job.id);}
+    try{await revalidateClipWeaveSnapshot(options.drive!,JSON.parse(sealed.snapshot_json));assertBinding(options);run('UPDATE drive_import_jobs SET next_check_at=? WHERE id=?',now+DAILY_RECHECK_MS,job.id);}
     catch(error){
       if(error instanceof Interrupted)throw error;
       if((error as any)?.state==='REJECT'||(error as any)?.state==='WAIT')transaction(()=>{run("UPDATE drive_import_jobs SET status='review',message='The sealed ClipWeave source changed. Existing website content was preserved.',updated_at=datetime('now') WHERE id=? AND status='complete'",job.id);notifyDriveImport(job.id,'clipweave-source-changed','attention','ClipWeave source needs review','The verified export changed after import. No website edits were overwritten.',job.series_id);});
-      else run('UPDATE drive_import_jobs SET next_check_at=? WHERE id=?',now+WAIT_MS,job.id);
+      else run('UPDATE drive_import_jobs SET next_check_at=? WHERE id=?',now+DAILY_RECHECK_MS,job.id);
     }return;
   }
   // Provenance survives website deletion. Source changes are a review notice,
   // never permission to recreate or overwrite an edited destination.
   const snapshot=JSON.parse(job.source_snapshot_json) as Snapshot;
-  if(!snapshot.manifest){run('UPDATE drive_import_jobs SET next_check_at=? WHERE id=?',now+WAIT_MS,job.id);return;}
+  if(!snapshot.manifest){run('UPDATE drive_import_jobs SET next_check_at=? WHERE id=?',now+DAILY_RECHECK_MS,job.id);return;}
   const changed=()=>transaction(()=>{
       run("UPDATE drive_import_jobs SET status='review',message='The Drive source changed after import. The website draft was kept unchanged.',updated_at=datetime('now') WHERE id=? AND series_id IS NOT NULL AND status='complete'",job.id);
       notifyDriveImport(job.id,'source-changed','attention','Imported Drive source changed',`${job.folder_name}: review the changed source manually. Existing website content was kept unchanged.`,job.series_id);
@@ -390,11 +402,11 @@ async function checkCompleted(options:DriveImportEngineOptions,job:Row,now:numbe
     const manifest=parseDriveManifest(JSON.parse(job.manifest_json)),matched=matchDriveManifestFiles(manifest,files);
     const selected=[...matched.episodes.map(item=>item.file),...(matched.cover?[matched.cover.file]:[])];
     if(selected.length!==snapshot.files.length||snapshot.files.some(expected=>!selected.some(actual=>actual.id===expected.id&&driveFileRevision(actual)===driveFileRevision(expected))))changed();
-    else run('UPDATE drive_import_jobs SET next_check_at=? WHERE id=?',now+WAIT_MS,job.id);
+    else run('UPDATE drive_import_jobs SET next_check_at=? WHERE id=?',now+DAILY_RECHECK_MS,job.id);
   }catch(error){
     if(error instanceof Interrupted)throw error;
     if(['DRIVE_SOURCE_CHANGED','DRIVE_FILES_PENDING','DRIVE_FILES_UNEXPECTED','DRIVE_FILES_AMBIGUOUS','DRIVE_CHECKSUM_MISMATCH'].includes(safeCode(error)))changed();
-    else run('UPDATE drive_import_jobs SET next_check_at=? WHERE id=?',now+WAIT_MS,job.id);
+    else run('UPDATE drive_import_jobs SET next_check_at=? WHERE id=?',now+DAILY_RECHECK_MS,job.id);
   }
 }
 function cancelUnsafeJobs(){
@@ -414,6 +426,8 @@ async function cleanup(storage:DriveImportStorage,now:number){
     run("UPDATE drive_import_jobs SET status='error',error_code='DRIVE_STAGING_EXPIRED',message='Paused staged files expired. Retry to import a fresh copy.',cleanup_needed=1,lease_token='',lease_until=0 WHERE id=? AND series_id IS NULL",job.id);
     notifyDriveImport(job.id,`staging-expired:${job.updated_at}`,'error','Drive import staging expired',`${job.folder_name}: paused staged files expired. Retry after cleanup.`);
   });
+  if(!one('SELECT 1 FROM drive_import_jobs WHERE cleanup_needed=1 AND series_id IS NULL LIMIT 1')&&
+     !one('SELECT 1 FROM drive_import_files f JOIN drive_import_jobs j ON j.id=f.job_id WHERE f.cleanup_pending=1 AND j.series_id IS NULL LIMIT 1'))return;
   const pending=all<Row>('SELECT f.*,j.owner_id,j.id AS parent_job_id,j.series_id FROM drive_import_files f JOIN drive_import_jobs j ON j.id=f.job_id WHERE j.series_id IS NULL AND (j.cleanup_needed=1 OR f.cleanup_pending=1) ORDER BY f.created_at,f.id LIMIT 2');
   for(const file of pending){
     const job=jobRow(file.job_id);if(!job||job.series_id)continue;
@@ -426,36 +440,47 @@ async function cleanup(storage:DriveImportStorage,now:number){
   run('UPDATE drive_import_jobs SET cleanup_needed=0 WHERE cleanup_needed=1 AND series_id IS NULL AND NOT EXISTS(SELECT 1 FROM drive_import_files f WHERE f.job_id=drive_import_jobs.id)');
 }
 function nextWake(now:number,enabled:boolean){
-  if(one('SELECT 1 FROM drive_import_jobs WHERE cleanup_needed=1 LIMIT 1'))return{wakeInMs:5_000};
+  if(one('SELECT 1 FROM drive_import_jobs WHERE cleanup_needed=1 AND series_id IS NULL LIMIT 1'))return{wakeInMs:5_000};
   if(!enabled)return{};
   const settings=getDriveImportSettingsRow();
   const next=one<{due:number}>("SELECT MIN(MAX(next_check_at,lease_until)) AS due FROM drive_import_jobs WHERE owner_id=? AND root_folder_id=? AND config_revision=? AND status IN('waiting','downloading','validating','complete')",config.platformOwnerUserId,settings.folder_id,settings.revision)?.due;
-  if(settings.scan_requested||one('SELECT 1 FROM drive_import_clipweave_exports WHERE root_folder_id=? AND owner_id=? AND config_revision=? AND next_check_at<=? LIMIT 1',settings.folder_id,config.platformOwnerUserId,settings.revision,now))return{wakeInMs:1_000};
-  return next===null||next===undefined?{}:{wakeInMs:Math.max(1_000,Math.min(WAIT_MS,next-now))};
+  if(settings.scan_requested)return{wakeInMs:1_000};
+  const exportDue=one<{next_check_at:number}>('SELECT next_check_at FROM drive_import_clipweave_exports WHERE root_folder_id=? AND owner_id=? AND config_revision=? ORDER BY next_check_at,id LIMIT 1',settings.folder_id,config.platformOwnerUserId,settings.revision)?.next_check_at;
+  const due=Math.min(next??Infinity,exportDue??Infinity);
+  return Number.isFinite(due)?{wakeInMs:Math.max(1_000,due-now)}:{};
 }
 
 /** One durable checkpoint at a time: at most two 5 MiB source ranges, one media
  * validation or one atomic draft commit. It never publishes or changes money. */
 export async function runDriveImportEngine(options:DriveImportEngineOptions):Promise<{wakeInMs?:number}>{
-  if(ticking)return{wakeInMs:5_000};ticking=true;const now=(options.now||Date.now)();
+  if(ticking){
+    // A daily trigger that overlaps an active transfer still queues a scan.
+    if(options.scanRoot&&options.drive&&options.credentialFingerprint){
+      let settings;
+      try{settings=assertBinding(options,undefined,undefined,true).settings;}catch{return{wakeInMs:5_000};}
+      if(!settings.scan_requested)run('UPDATE drive_import_settings SET scan_requested=1 WHERE id=1');
+    }
+    return{wakeInMs:5_000};
+  }
+  ticking=true;const now=(options.now||Date.now)();
   try{
     cancelUnsafeJobs();
     await cleanup(options.storage,now);
     const settings=getDriveImportSettingsRow();if(!settings.enabled||!options.drive||!options.credentialFingerprint||config.sandbox)return nextWake(now,false);
     try{assertBinding(options,undefined,undefined,true);}catch{return nextWake(now,false);}
-    if(options.scanRoot)run('UPDATE drive_import_settings SET scan_requested=1 WHERE id=1');
-    const scanSettings=getDriveImportSettingsRow();
+    if(options.scanRoot&&!settings.scan_requested)run('UPDATE drive_import_settings SET scan_requested=1 WHERE id=1');
+    const scanSettings=options.scanRoot?getDriveImportSettingsRow():settings;
     if(scanSettings.scan_requested){
       try{await discover(options);}catch(error){
-        // Google page tokens can expire or be rejected. Restart discovery at
-        // page one after a failed continuation; source-folder provenance makes
-        // replay idempotent. Preserve a concurrent configuration replacement.
-        if(scanSettings.scan_token)run("UPDATE drive_import_settings SET scan_token='',scan_requested=1 WHERE id=1 AND folder_id=? AND revision=? AND scan_token=?",scanSettings.folder_id,scanSettings.revision,scanSettings.scan_token);
+        // Restart an expired page token once. If page one also fails, wait
+        // for the next daily or manual scan. Keep a replacement folder intact.
+        const restart=!!scanSettings.scan_token&&!(error instanceof Interrupted);
+        run("UPDATE drive_import_settings SET scan_token='',scan_requested=? WHERE id=1 AND folder_id=? AND revision=? AND scan_token=?",Number(restart),scanSettings.folder_id,scanSettings.revision,scanSettings.scan_token);
         if(!(error instanceof Interrupted)){
           const current=getDriveImportSettingsRow(),code=safeCode(error);
           try{notifyDriveImportRoot(`${current.folder_id}:${current.revision}:${code}`,'error','Drive connection needs attention','The automatic importer could not read the configured Drive folder. Check the service-account access and source folder, then run a scan.',requireDriveImportOwner());}catch{ /* a revoked owner cannot receive a new setup notice */ }
         }
-        return{wakeInMs:WAIT_MS};
+        return restart?{wakeInMs:TRANSFER_RETRY_MAX_MS}:nextWake(now,false);
       }
     }
     const {owner,settings:current}=assertBinding(options);
@@ -478,7 +503,7 @@ export async function runDriveImportEngine(options:DriveImportEngineOptions):Pro
         const support=await verifyClipWeaveSupport(options,job,lease);
         if(support){checkpoint(job,lease,"UPDATE drive_import_jobs SET next_check_at=?,updated_at=datetime('now')",now+1_000);}
         else {
-        const files=filesFor(job.id),file=files.find(item=>item.status!=='validated');
+        const file=one<Row>("SELECT * FROM drive_import_files WHERE job_id=? AND status<>'validated' ORDER BY kind DESC,number,id LIMIT 1",job.id);
         if(!file)await commit(options,job,lease,now);
         else if(file.status==='assembled'){
           checkpoint(job,lease,"UPDATE drive_import_jobs SET status='validating',message='Checking media and source checksums.',updated_at=datetime('now')");

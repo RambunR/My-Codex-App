@@ -2,7 +2,7 @@ import type {Locale} from '../shared/config';
 
 export const driveImportEnglish={
   "driveImportTitle": "Drive imports",
-  "driveImportIntro": "Check the selected folder every five minutes and import complete series as editable, unpublished drafts.",
+  "driveImportIntro": "Check the selected folder once a day and import complete series as editable, unpublished drafts.",
   "driveImportFolder": "Google Drive folder",
   "driveImportFolderHint": "Use the folder link or folder ID. Saving a different folder turns the watcher off.",
   "driveImportSaveFolder": "Save folder",
@@ -60,7 +60,7 @@ export const driveImportMessages:Record<Locale,Messages>={
   en:driveImportEnglish,
   "zh-TW":{
     "driveImportTitle": "Drive 匯入",
-    "driveImportIntro": "每五分鐘檢查所選資料夾，將完整劇集匯入為可編輯、未發佈的草稿。",
+    "driveImportIntro": "每天檢查所選資料夾一次，將完整劇集匯入為可編輯、未發佈的草稿。",
     "driveImportFolder": "Google Drive 資料夾",
     "driveImportFolderHint": "輸入資料夾連結或 ID。儲存不同的資料夾會關閉自動監察。",
     "driveImportSaveFolder": "儲存資料夾",
@@ -114,7 +114,7 @@ export const driveImportMessages:Record<Locale,Messages>={
   },
   "zh-CN":{
     "driveImportTitle": "Drive 导入",
-    "driveImportIntro": "每五分钟检查所选文件夹，将完整剧集导入为可编辑、未发布的草稿。",
+    "driveImportIntro": "每天检查所选文件夹一次，将完整剧集导入为可编辑、未发布的草稿。",
     "driveImportFolder": "Google Drive 文件夹",
     "driveImportFolderHint": "输入文件夹链接或 ID。保存不同的文件夹会关闭自动监测。",
     "driveImportSaveFolder": "保存文件夹",
@@ -168,7 +168,7 @@ export const driveImportMessages:Record<Locale,Messages>={
   },
   "ja":{
     "driveImportTitle": "Drive インポート",
-    "driveImportIntro": "選択したフォルダを5分ごとに確認し、揃ったシリーズを編集可能な未公開の下書きとして取り込みます。",
+    "driveImportIntro": "選択したフォルダを1日1回確認し、揃ったシリーズを編集可能な未公開の下書きとして取り込みます。",
     "driveImportFolder": "Google Drive フォルダ",
     "driveImportFolderHint": "フォルダのリンクまたは ID を入力してください。別のフォルダを保存すると自動監視はオフになります。",
     "driveImportSaveFolder": "フォルダを保存",
@@ -222,7 +222,7 @@ export const driveImportMessages:Record<Locale,Messages>={
   },
   "ko":{
     "driveImportTitle": "Drive 가져오기",
-    "driveImportIntro": "선택한 폴더를 5분마다 확인하고 완전한 시리즈를 편집 가능한 미공개 초안으로 가져옵니다.",
+    "driveImportIntro": "선택한 폴더를 하루에 한 번 확인하고 완전한 시리즈를 편집 가능한 미공개 초안으로 가져옵니다.",
     "driveImportFolder": "Google Drive 폴더",
     "driveImportFolderHint": "폴더 링크 또는 ID를 입력하세요. 다른 폴더를 저장하면 자동 감시가 꺼집니다.",
     "driveImportSaveFolder": "폴더 저장",
@@ -276,7 +276,7 @@ export const driveImportMessages:Record<Locale,Messages>={
   },
   "hi":{
     "driveImportTitle": "Drive आयात",
-    "driveImportIntro": "चुने गए फ़ोल्डर को हर पाँच मिनट में जाँचें और पूरी सीरीज़ को संपादन योग्य, अप्रकाशित ड्राफ़्ट के रूप में आयात करें।",
+    "driveImportIntro": "चुने गए फ़ोल्डर को दिन में एक बार जाँचें और पूरी सीरीज़ को संपादन योग्य, अप्रकाशित ड्राफ़्ट के रूप में आयात करें।",
     "driveImportFolder": "Google Drive फ़ोल्डर",
     "driveImportFolderHint": "फ़ोल्डर का लिंक या ID दें। अलग फ़ोल्डर सहेजने पर स्वचालित निगरानी बंद हो जाती है।",
     "driveImportSaveFolder": "फ़ोल्डर सहेजें",
@@ -330,7 +330,7 @@ export const driveImportMessages:Record<Locale,Messages>={
   },
   "id":{
     "driveImportTitle": "Impor Drive",
-    "driveImportIntro": "Periksa folder yang dipilih setiap lima menit dan impor seri lengkap sebagai draf yang dapat diedit dan belum diterbitkan.",
+    "driveImportIntro": "Periksa folder yang dipilih sekali sehari dan impor seri lengkap sebagai draf yang dapat diedit dan belum diterbitkan.",
     "driveImportFolder": "Folder Google Drive",
     "driveImportFolderHint": "Gunakan tautan atau ID folder. Menyimpan folder lain akan mematikan pemantauan otomatis.",
     "driveImportSaveFolder": "Simpan folder",
@@ -384,7 +384,7 @@ export const driveImportMessages:Record<Locale,Messages>={
   },
   "pt-BR":{
     "driveImportTitle": "Importações do Drive",
-    "driveImportIntro": "Verifique a pasta selecionada a cada cinco minutos e importe séries completas como rascunhos editáveis e não publicados.",
+    "driveImportIntro": "Verifique a pasta selecionada uma vez por dia e importe séries completas como rascunhos editáveis e não publicados.",
     "driveImportFolder": "Pasta do Google Drive",
     "driveImportFolderHint": "Use o link ou o ID da pasta. Salvar outra pasta desativa o monitoramento.",
     "driveImportSaveFolder": "Salvar pasta",
@@ -438,7 +438,7 @@ export const driveImportMessages:Record<Locale,Messages>={
   },
   "es":{
     "driveImportTitle": "Importaciones de Drive",
-    "driveImportIntro": "Comprueba la carpeta seleccionada cada cinco minutos e importa series completas como borradores editables sin publicar.",
+    "driveImportIntro": "Comprueba la carpeta seleccionada una vez al día e importa series completas como borradores editables sin publicar.",
     "driveImportFolder": "Carpeta de Google Drive",
     "driveImportFolderHint": "Usa el enlace o el ID de la carpeta. Guardar otra carpeta desactiva la supervisión.",
     "driveImportSaveFolder": "Guardar carpeta",
@@ -492,7 +492,7 @@ export const driveImportMessages:Record<Locale,Messages>={
   },
   "ar":{
     "driveImportTitle": "الاستيراد من Drive",
-    "driveImportIntro": "يُفحص المجلد المحدد كل خمس دقائق وتُستورد المسلسلات المكتملة كمسودات قابلة للتعديل وغير منشورة.",
+    "driveImportIntro": "يُفحص المجلد المحدد مرة واحدة يوميًا وتُستورد المسلسلات المكتملة كمسودات قابلة للتعديل وغير منشورة.",
     "driveImportFolder": "مجلد Google Drive",
     "driveImportFolderHint": "استخدم رابط المجلد أو معرّفه. يؤدي حفظ مجلد مختلف إلى إيقاف المراقبة.",
     "driveImportSaveFolder": "حفظ المجلد",
@@ -546,7 +546,7 @@ export const driveImportMessages:Record<Locale,Messages>={
   },
   "bn":{
     "driveImportTitle": "Drive থেকে আমদানি",
-    "driveImportIntro": "নির্বাচিত ফোল্ডার প্রতি পাঁচ মিনিটে পরীক্ষা করুন এবং সম্পূর্ণ সিরিজ সম্পাদনাযোগ্য, অপ্রকাশিত খসড়া হিসেবে আমদানি করুন।",
+    "driveImportIntro": "নির্বাচিত ফোল্ডার দিনে একবার পরীক্ষা করুন এবং সম্পূর্ণ সিরিজ সম্পাদনাযোগ্য, অপ্রকাশিত খসড়া হিসেবে আমদানি করুন।",
     "driveImportFolder": "Google Drive ফোল্ডার",
     "driveImportFolderHint": "ফোল্ডারের লিংক বা ID দিন। অন্য ফোল্ডার সংরক্ষণ করলে স্বয়ংক্রিয় পর্যবেক্ষণ বন্ধ হয়ে যাবে।",
     "driveImportSaveFolder": "ফোল্ডার সংরক্ষণ করুন",
@@ -600,7 +600,7 @@ export const driveImportMessages:Record<Locale,Messages>={
   },
   "ur":{
     "driveImportTitle": "Drive سے درآمد",
-    "driveImportIntro": "منتخب فولڈر کو ہر پانچ منٹ بعد جانچیں اور مکمل سیریز کو قابلِ ترمیم، غیر شائع شدہ مسودوں کے طور پر درآمد کریں۔",
+    "driveImportIntro": "منتخب فولڈر کو دن میں ایک بار جانچیں اور مکمل سیریز کو قابلِ ترمیم، غیر شائع شدہ مسودوں کے طور پر درآمد کریں۔",
     "driveImportFolder": "Google Drive فولڈر",
     "driveImportFolderHint": "فولڈر کا لنک یا ID استعمال کریں۔ مختلف فولڈر محفوظ کرنے سے نگرانی بند ہو جاتی ہے۔",
     "driveImportSaveFolder": "فولڈر محفوظ کریں",
@@ -654,7 +654,7 @@ export const driveImportMessages:Record<Locale,Messages>={
   },
   "vi":{
     "driveImportTitle": "Nhập từ Drive",
-    "driveImportIntro": "Kiểm tra thư mục đã chọn mỗi năm phút và nhập các bộ phim đầy đủ thành bản nháp có thể chỉnh sửa, chưa xuất bản.",
+    "driveImportIntro": "Kiểm tra thư mục đã chọn mỗi ngày một lần và nhập các bộ phim đầy đủ thành bản nháp có thể chỉnh sửa, chưa xuất bản.",
     "driveImportFolder": "Thư mục Google Drive",
     "driveImportFolderHint": "Dùng liên kết hoặc ID thư mục. Lưu thư mục khác sẽ tắt tính năng theo dõi.",
     "driveImportSaveFolder": "Lưu thư mục",
@@ -708,7 +708,7 @@ export const driveImportMessages:Record<Locale,Messages>={
   },
   "th":{
     "driveImportTitle": "นำเข้าจาก Drive",
-    "driveImportIntro": "ตรวจสอบโฟลเดอร์ที่เลือกทุกห้านาที และนำเข้าซีรีส์ที่มีไฟล์ครบเป็นฉบับร่างที่แก้ไขได้และยังไม่เผยแพร่",
+    "driveImportIntro": "ตรวจสอบโฟลเดอร์ที่เลือกวันละครั้ง และนำเข้าซีรีส์ที่มีไฟล์ครบเป็นฉบับร่างที่แก้ไขได้และยังไม่เผยแพร่",
     "driveImportFolder": "โฟลเดอร์ Google Drive",
     "driveImportFolderHint": "ใช้ลิงก์หรือ ID ของโฟลเดอร์ การบันทึกโฟลเดอร์อื่นจะปิดการเฝ้าดูอัตโนมัติ",
     "driveImportSaveFolder": "บันทึกโฟลเดอร์",
@@ -762,7 +762,7 @@ export const driveImportMessages:Record<Locale,Messages>={
   },
   "fil":{
     "driveImportTitle": "Mga import mula sa Drive",
-    "driveImportIntro": "Suriin ang napiling folder bawat limang minuto at i-import ang mga kumpletong serye bilang nae-edit at hindi pa nailalathalang draft.",
+    "driveImportIntro": "Suriin ang napiling folder isang beses bawat araw at i-import ang mga kumpletong serye bilang nae-edit at hindi pa nailalathalang draft.",
     "driveImportFolder": "Folder sa Google Drive",
     "driveImportFolderHint": "Gamitin ang link o ID ng folder. Kapag nag-save ng ibang folder, mao-off ang awtomatikong pagsubaybay.",
     "driveImportSaveFolder": "I-save ang folder",
@@ -816,7 +816,7 @@ export const driveImportMessages:Record<Locale,Messages>={
   },
   "tr":{
     "driveImportTitle": "Drive içe aktarımları",
-    "driveImportIntro": "Seçilen klasörü beş dakikada bir kontrol edin ve tamamlanmış dizileri düzenlenebilir, yayımlanmamış taslaklar olarak içe aktarın.",
+    "driveImportIntro": "Seçilen klasörü günde bir kez kontrol edin ve tamamlanmış dizileri düzenlenebilir, yayımlanmamış taslaklar olarak içe aktarın.",
     "driveImportFolder": "Google Drive klasörü",
     "driveImportFolderHint": "Klasör bağlantısını veya kimliğini kullanın. Farklı bir klasör kaydetmek izlemeyi kapatır.",
     "driveImportSaveFolder": "Klasörü kaydet",
@@ -870,7 +870,7 @@ export const driveImportMessages:Record<Locale,Messages>={
   },
   "ru":{
     "driveImportTitle": "Импорт из Drive",
-    "driveImportIntro": "Проверяйте выбранную папку каждые пять минут и импортируйте полные сериалы как редактируемые неопубликованные черновики.",
+    "driveImportIntro": "Проверяйте выбранную папку раз в день и импортируйте полные сериалы как редактируемые неопубликованные черновики.",
     "driveImportFolder": "Папка Google Drive",
     "driveImportFolderHint": "Используйте ссылку или ID папки. Сохранение другой папки отключает наблюдение.",
     "driveImportSaveFolder": "Сохранить папку",
@@ -924,7 +924,7 @@ export const driveImportMessages:Record<Locale,Messages>={
   },
   "fr":{
     "driveImportTitle": "Importations Drive",
-    "driveImportIntro": "Vérifiez le dossier sélectionné toutes les cinq minutes et importez les séries complètes sous forme de brouillons modifiables et non publiés.",
+    "driveImportIntro": "Vérifiez le dossier sélectionné une fois par jour et importez les séries complètes sous forme de brouillons modifiables et non publiés.",
     "driveImportFolder": "Dossier Google Drive",
     "driveImportFolderHint": "Utilisez le lien ou l’identifiant du dossier. Enregistrer un autre dossier désactive la surveillance.",
     "driveImportSaveFolder": "Enregistrer le dossier",
@@ -978,7 +978,7 @@ export const driveImportMessages:Record<Locale,Messages>={
   },
   "de":{
     "driveImportTitle": "Drive-Importe",
-    "driveImportIntro": "Prüfe den ausgewählten Ordner alle fünf Minuten und importiere vollständige Serien als bearbeitbare, unveröffentlichte Entwürfe.",
+    "driveImportIntro": "Prüfe den ausgewählten Ordner einmal täglich und importiere vollständige Serien als bearbeitbare, unveröffentlichte Entwürfe.",
     "driveImportFolder": "Google-Drive-Ordner",
     "driveImportFolderHint": "Verwende den Ordnerlink oder die Ordner-ID. Das Speichern eines anderen Ordners schaltet die Überwachung aus.",
     "driveImportSaveFolder": "Ordner speichern",
@@ -1032,7 +1032,7 @@ export const driveImportMessages:Record<Locale,Messages>={
   },
   "ms":{
     "driveImportTitle": "Import Drive",
-    "driveImportIntro": "Semak folder yang dipilih setiap lima minit dan import siri lengkap sebagai draf yang boleh disunting dan belum diterbitkan.",
+    "driveImportIntro": "Semak folder yang dipilih sekali sehari dan import siri lengkap sebagai draf yang boleh disunting dan belum diterbitkan.",
     "driveImportFolder": "Folder Google Drive",
     "driveImportFolderHint": "Gunakan pautan atau ID folder. Menyimpan folder lain akan mematikan pemantauan.",
     "driveImportSaveFolder": "Simpan folder",
@@ -1086,7 +1086,7 @@ export const driveImportMessages:Record<Locale,Messages>={
   },
   "ta":{
     "driveImportTitle": "Drive இறக்குமதிகள்",
-    "driveImportIntro": "தேர்ந்தெடுத்த கோப்புறையை ஐந்து நிமிடங்களுக்கு ஒருமுறை சரிபார்த்து, முழுமையான தொடர்களைத் திருத்தக்கூடிய, வெளியிடப்படாத வரைவுகளாக இறக்குமதி செய்யவும்.",
+    "driveImportIntro": "தேர்ந்தெடுத்த கோப்புறையை தினமும் ஒருமுறை சரிபார்த்து, முழுமையான தொடர்களைத் திருத்தக்கூடிய, வெளியிடப்படாத வரைவுகளாக இறக்குமதி செய்யவும்.",
     "driveImportFolder": "Google Drive கோப்புறை",
     "driveImportFolderHint": "கோப்புறையின் இணைப்பு அல்லது ID-ஐப் பயன்படுத்தவும். வேறு கோப்புறையைச் சேமித்தால் கண்காணிப்பு நிறுத்தப்படும்.",
     "driveImportSaveFolder": "கோப்புறையைச் சேமி",

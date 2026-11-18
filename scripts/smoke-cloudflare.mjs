@@ -939,7 +939,7 @@ try{
   const driveStatus=(await request('/api/admin/drive-imports',undefined,admin)).data;
   assert.equal(driveStatus.settings.enabled,false);assert.equal(driveStatus.settings.verifiedAt,null);assert.equal(driveStatus.connection.runtimeAvailable,true);assert.equal(driveStatus.connection.configured,false);
   assert.deepEqual(driveStatus.jobs,[]);assert.deepEqual(driveStatus.notifications,[]);
-  const cron=await fetch(base+'/__scheduled?cron='+encodeURIComponent('*/5 * * * *'));assert.equal(cron.status,200);await cron.body.cancel();
+  const cron=await fetch(base+'/__scheduled?cron='+encodeURIComponent('15 0 * * *'));assert.equal(cron.status,200);await cron.body.cancel();
   assert.deepEqual((await request('/api/admin/drive-imports',undefined,admin)).data.jobs,[]);
   assert.equal((await request('/api/auth/me',undefined,admin)).data.user.drive_import_unread,0);
   await request('/api/admin/drive-imports',{enabled:true},admin,409,'PATCH');

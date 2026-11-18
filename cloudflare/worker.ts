@@ -24,6 +24,7 @@ import {searchDiscoveryResponse} from './search-discovery';
 import {runDriveImportTick} from './drive-import-runtime';
 import {scheduleMediaCleanup} from './background';
 import {blocksPublicDriveTick,isInternalDriveTick,dispatchDriveTick} from './drive-import-dispatch';
+import {DRIVE_IMPORT_DAILY_CRON} from '../shared/drive-import-types';
 
 let listening=false;
 export class AIDramioApp {
@@ -78,7 +79,8 @@ export class AIDramioApp {
   }
 }
 export default {
-  async scheduled(_event:unknown,env:Env,ctx:{waitUntil:(promise:Promise<unknown>)=>void}){
+  async scheduled(event:{cron:string},env:Env,ctx:{waitUntil:(promise:Promise<unknown>)=>void}){
+    if(event.cron!==DRIVE_IMPORT_DAILY_CRON)return;
     const stub=env.APP.get(env.APP.idFromName('platform'));
     ctx.waitUntil(dispatchDriveTick({fetch:request=>stub.fetch(request as any)}));
   },

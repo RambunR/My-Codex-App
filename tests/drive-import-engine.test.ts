@@ -78,7 +78,7 @@ before(()=>{
   run("INSERT INTO users (id,email,name,password_hash,role) VALUES (?,?,?,'unused','admin')",OWNER,'drive-engine@example.test','Drive administrator');
   initializePublisherProfiles();
 });
-beforeEach(()=>{config.sandbox=false;config.platformOwnerUserId=OWNER;run("UPDATE users SET role='admin' WHERE id=?",OWNER);fixture=makeFixture();});
+beforeEach(()=>{clock=Date.now();config.sandbox=false;config.platformOwnerUserId=OWNER;run("UPDATE users SET role='admin' WHERE id=?",OWNER);fixture=makeFixture();});
 afterEach(async()=>{
   run("UPDATE drive_import_jobs SET status='cancelled',lease_token='',lease_until=0,cleanup_needed=1 WHERE root_folder_id=? AND series_id IS NULL",fixture.root);
   run('UPDATE drive_import_settings SET enabled=0 WHERE id=1');
@@ -91,11 +91,14 @@ test('disabled or unverified automation makes no Drive requests',async()=>{
   run("UPDATE drive_import_settings SET enabled=1,verified_credential_hash='other-key' WHERE id=1");await fixture.tick(true);assert.equal(fixture.drive.calls,0);
 });
 test('incomplete folders wait for their manifest and exact files without creating drafts or notices',async()=>{
-  fixture.drive.metadata.delete('ready');await fixture.tick(true);assert.equal(fixture.job()!.status,'waiting');
+  fixture.drive.metadata.delete('ready');const initial=await fixture.tick(true);assert.equal(fixture.job()!.status,'waiting');
   assert.equal(one('SELECT COUNT(*) AS n FROM series')!.n,0);assert.equal(fixture.storage.partCalls,0);
+  assert.equal(initial.wakeInMs,24*60*60_000);
+  const calls=fixture.drive.calls;clock+=5*60_000;await fixture.tick();
+  assert.equal(fixture.drive.calls,calls,'other alarms do not poll a waiting source early');
   const before=one('SELECT COUNT(*) AS n FROM drive_import_notifications')!.n;
   const body=new TextEncoder().encode(JSON.stringify(fixture.manifest));fixture.drive.add('ready','lingying-ready.json','application/json',fixture.folder,body);fixture.drive.metadata.delete('video-2');
-  clock+=5*60_000;await fixture.tick();assert.equal(fixture.job()!.status,'waiting');assert.equal(fixture.storage.partCalls,0);assert.equal(one('SELECT COUNT(*) AS n FROM drive_import_notifications')!.n,before);
+  clock+=24*60*60_000;await fixture.tick();assert.equal(fixture.job()!.status,'waiting');assert.equal(fixture.storage.partCalls,0);assert.equal(one('SELECT COUNT(*) AS n FROM drive_import_notifications')!.n,before);
 });
 test('complete source imports one editable all-free draft atomically with actual long durations and no financial changes',async()=>{
   const before=finance(),used=one('SELECT used_bytes FROM users WHERE id=?',OWNER)!.used_bytes;
@@ -108,7 +111,7 @@ test('complete source imports one editable all-free draft atomically with actual
   assert.deepEqual(finance(),before);assert.equal(one('SELECT used_bytes FROM users WHERE id=?',OWNER)!.used_bytes,used+90);
   const event=one("SELECT * FROM drive_import_events WHERE job_id=? AND action='import-complete'",job.id)!;assert.equal(event.actor_type,'SYSTEM');assert.equal(event.actor_id,null);
   assert.equal(one("SELECT COUNT(*) AS n FROM drive_import_notifications WHERE job_id=? AND kind='complete'",job.id)!.n,1);
-  const count=one('SELECT COUNT(*) AS n FROM series')!.n;clock+=5*60_000;await fixture.tick(true);await fixture.tick();assert.equal(one('SELECT COUNT(*) AS n FROM series')!.n,count);assert.equal(one('SELECT used_bytes FROM users WHERE id=?',OWNER)!.used_bytes,used+90);
+  const count=one('SELECT COUNT(*) AS n FROM series')!.n;clock+=24*60*60_000;await fixture.tick(true);await fixture.tick();assert.equal(one('SELECT COUNT(*) AS n FROM series')!.n,count);assert.equal(one('SELECT used_bytes FROM users WHERE id=?',OWNER)!.used_bytes,used+90);
 });
 test('each transfer tick downloads at most two exact 5 MiB parts and resumes its durable checkpoint',async()=>{
   fixture=makeFixture({size:11*1024*1024,episodes:1,cover:false});await fixture.tick(true);const job=fixture.job()!;
@@ -162,17 +165,31 @@ test('final commit rechecks old source files, title uniqueness and current admin
 test('completed provenance detects a changed video and never recreates a manually deleted destination or overwrites edits',async()=>{
   const job=await finish();run('UPDATE series SET title=? WHERE id=?','Edited on LingYing '+randomUUID(),job.series_id);
   const edited=one('SELECT title FROM series WHERE id=?',job.series_id)!.title;
-  fixture.drive.bump('video-1');clock+=5*60_000;await fixture.tick(true);assert.equal(fixture.job()!.status,'review');assert.equal(one('SELECT title FROM series WHERE id=?',job.series_id)!.title,edited);
+  fixture.drive.bump('video-1');clock+=24*60*60_000;await fixture.tick(true);assert.equal(fixture.job()!.status,'review');assert.equal(one('SELECT title FROM series WHERE id=?',job.series_id)!.title,edited);
   const count=one('SELECT COUNT(*) AS n FROM series')!.n;
   run('INSERT INTO series_deletions (series_id,creator_id,actor_id,summary_json) VALUES (?,?,?,?)',job.series_id,OWNER,OWNER,'{}');run("UPDATE series SET status='archived' WHERE id=?",job.series_id);
-  clock+=5*60_000;await fixture.tick(true);await fixture.tick();assert.equal(one('SELECT COUNT(*) AS n FROM series')!.n,count);assert.equal(fixture.job()!.series_id,job.series_id);assert(one('SELECT 1 FROM series_deletions WHERE series_id=?',job.series_id));
+  clock+=24*60*60_000;await fixture.tick(true);await fixture.tick();assert.equal(one('SELECT COUNT(*) AS n FROM series')!.n,count);assert.equal(fixture.job()!.series_id,job.series_id);assert(one('SELECT 1 FROM series_deletions WHERE series_id=?',job.series_id));
   assert.equal(one("SELECT COUNT(*) AS n FROM drive_import_notifications WHERE job_id=? AND kind='attention'",job.id)!.n,1);
 });
 test('root connection failures give one safe administrator notice across repeated scans',async()=>{
-  fixture.drive.failRoot=true;await fixture.tick(true);await fixture.tick(true);
+  fixture.drive.failRoot=true;assert.deepEqual(await fixture.tick(true),{});
+  const calls=fixture.drive.calls;await fixture.tick();assert.equal(fixture.drive.calls,calls);
+  assert.equal(one('SELECT scan_requested FROM drive_import_settings WHERE id=1')!.scan_requested,0);
+  await fixture.tick(true);
   const notices=all('SELECT * FROM drive_import_notifications WHERE job_id IS NULL AND owner_id=? ORDER BY rowid DESC',OWNER);
   assert.equal(notices.filter(notice=>notice.event_key.includes(fixture.root)).length,0,'notification keys are hashed');
   assert(notices.length>=1);assert(!notices[0].message.includes('private provider text'));assert.equal(fixture.job(),undefined);
+});
+test('a daily trigger overlapping a transfer queues discovery without interrupting that transfer',async()=>{
+  await fixture.tick(true);
+  let overlapping:ReturnType<Fixture['tick']>|undefined;
+  fixture.drive.onRange=()=>{fixture.drive.onRange=undefined;overlapping=fixture.tick(true);};
+  await fixture.tick();await overlapping;
+  assert.equal(fixture.drive.rootTokens.length,1);
+  assert.equal(fixture.storage.partCalls,1);
+  assert.equal(one('SELECT scan_requested FROM drive_import_settings WHERE id=1')!.scan_requested,1);
+  await fixture.tick();
+  assert.equal(fixture.drive.rootTokens.length,2);
 });
 test('a rejected root page token restarts discovery safely without touching replacement configuration',async()=>{
   run("UPDATE drive_import_settings SET scan_requested=1,scan_token='expired-token' WHERE id=1");

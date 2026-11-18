@@ -115,7 +115,15 @@ export function registerDriveImportApi(app:Express){
   });
   app.post(base+'/scan',rateLimit('drive-import-scan',10,60_000),async(req,res)=>{
     emptyBody.parse(req.body??{});const ownerId=req.user!.id;
-    transaction(()=>{ready(ownerId,{enabled:true});run("UPDATE drive_import_settings SET scan_requested=1,updated_at=datetime('now') WHERE id=1");recordDriveImportEvent('scan.requested',null,{},ownerId);});
+    transaction(()=>{
+      const settings=ready(ownerId,{enabled:true}),now=Date.now();
+      run("UPDATE drive_import_settings SET scan_requested=1,updated_at=datetime('now') WHERE id=1");
+      // Let an operator recheck material that has just finished syncing.
+      // Leave active transfer checkpoints and their retry timing alone.
+      run("UPDATE drive_import_jobs SET next_check_at=? WHERE owner_id=? AND root_folder_id=? AND config_revision=? AND status IN('waiting','complete') AND lease_until<=? AND next_check_at>?",now,ownerId,settings.folder_id,settings.revision,now,now);
+      run('UPDATE drive_import_clipweave_exports SET next_check_at=? WHERE owner_id=? AND root_folder_id=? AND config_revision=? AND next_check_at>?',now,ownerId,settings.folder_id,settings.revision,now);
+      recordDriveImportEvent('scan.requested',null,{},ownerId);
+    });
     await scheduleMediaCleanup(1000);respond(req,res);
   });
   app.post(base+'/jobs/:id/cancel',rateLimit('drive-import-cancel',30,60_000),async(req,res)=>{

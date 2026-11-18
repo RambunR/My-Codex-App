@@ -81,6 +81,18 @@ test('pause and resume preserve the configuration revision and retained job chec
   await request('',{enabled:true},actors.owner,200,'PATCH');assert.equal(getDriveImportSettingsRow().revision,revision);assert.deepEqual(one('SELECT * FROM drive_import_jobs WHERE id=?',id),before);
   await request('/scan',{});assert.equal(getDriveImportSettingsRow().scan_requested,1);
 });
+test('Check now brings idle sources forward and preserves active transfers and other folders',async()=>{
+  await enable();
+  const settings=getDriveImportSettingsRow(),waiting=job(),complete=job('complete',actors.owner,'draft-id'),active=job('downloading'),other=job();
+  const tomorrow=clock+24*60*60_000;
+  run('UPDATE drive_import_jobs SET next_check_at=?,lease_until=0',tomorrow);
+  run("UPDATE drive_import_jobs SET root_folder_id='other-folder' WHERE id=?",other);
+  run('INSERT INTO drive_import_clipweave_exports (id,root_folder_id,export_folder_id,owner_id,config_revision,next_check_at) VALUES (?,?,?,?,?,?)',waiting,settings.folder_id,'export-fixture',actors.owner,settings.revision,tomorrow);
+  await request('/scan',{});
+  const due=(id:string)=>one('SELECT next_check_at FROM drive_import_jobs WHERE id=?',id)!.next_check_at;
+  assert.deepEqual([due(waiting),due(complete),due(active),due(other)],[clock,clock,tomorrow,tomorrow]);
+  assert.equal(one('SELECT next_check_at FROM drive_import_clipweave_exports WHERE id=?',waiting)!.next_check_at,clock);
+});
 test('an enabled watcher keeps a valid stable connection after 24 hours, while a new activation requires fresh verification',async()=>{
   await enable();run('UPDATE drive_import_settings SET verified_at=?',clock-25*60*60*1000);
   assert.notEqual((await request()).data.settings.verifiedAt,null);await request('/scan',{});await request('',{enabled:true},actors.owner,200,'PATCH');
