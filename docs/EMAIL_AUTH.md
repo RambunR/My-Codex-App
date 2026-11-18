@@ -25,11 +25,11 @@ Stripe handles these payment receipts separately from account verification, pass
 
 ## Connect Cloudflare Email Sending
 
-The main Worker uses the sender **LingYing <accounts@lingyingdrama.com>**. Its `ACCOUNT_EMAIL` binding is restricted to that sender address and can send to registered users on Workers Paid. [Cloudflare Email Service pricing](https://developers.cloudflare.com/email-service/platform/pricing/) includes 3,000 outbound emails per account per month on this plan.
+The main Worker uses the sender **LingYing <accounts@contact.lingyingdrama.com>**. Its `ACCOUNT_EMAIL` binding is restricted to that sender address and can send to registered users on Workers Paid. [Cloudflare Email Service pricing](https://developers.cloudflare.com/email-service/platform/pricing/) includes 3,000 outbound emails per account per month on this plan.
 
-1. In [Cloudflare Email Service → Email Sending](https://dash.cloudflare.com/?to=/:account/email-service/sending), choose **Onboard Domain** and select **lingyingdrama.com**. Review the outbound verification and bounce DNS records Cloudflare adds. Existing inbound mail uses its own DNS records.
+1. In [Cloudflare Email Service → Email Sending](https://dash.cloudflare.com/?to=/:account/email-service/sending), choose **Onboard Domain** and select **contact.lingyingdrama.com**. Review the outbound verification and bounce DNS records Cloudflare adds. Existing inbound mail uses its own DNS records.
 2. Confirm the exact domain shows as enabled for sending and its DNS checks pass. While onboarding is pending, keep the main Worker's tracked `EMAIL_PROVIDER=disabled`. Resend is not selected for production.
-3. Set the tracked `EMAIL_PROVIDER=cloudflare-binding` and deploy the existing Worker. Keep `MAIL_FROM=LingYing <accounts@lingyingdrama.com>` and the sender restriction in `wrangler.jsonc` in sync. The binding accepts messages only when Cloudflare returns a message ID. A real inbox check may still be needed to verify delivery.
+3. Set the tracked `EMAIL_PROVIDER=cloudflare-binding` and deploy the existing Worker. Keep `MAIL_FROM=LingYing <accounts@contact.lingyingdrama.com>` and the sender restriction in `wrangler.jsonc` in sync. The binding accepts messages only when Cloudflare returns a message ID. A real inbox check may still be needed to verify delivery.
 
 A separate installation that uses Cloudflare's REST transport can select `EMAIL_PROVIDER=cloudflare` and provide its account ID in `CF_EMAIL_ACCOUNT_ID` and an encrypted `CF_EMAIL_API_TOKEN` scoped to Email Sending. LingYing's main Worker uses the binding.
 

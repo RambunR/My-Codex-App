@@ -17,7 +17,7 @@ The Worker serves the complete frontend and API. The production database starts 
 
 Google OAuth code is deployed, both Google credentials are configured as Worker Secrets, and the public configuration reports `auth.google: true`. The Google button is available alongside email/password; its start endpoint returns a valid Google authorization redirect. The live Google account service and the cancellation return were checked without creating a real user or entering Google passwords. Complete an interactive registration/sign-in using your own Google account to verify consent; see [GOOGLE_SIGN_IN.md](GOOGLE_SIGN_IN.md).
 
-Apple registration and sign-in use the configured provider credentials. Account verification and password recovery on the main Worker use Cloudflare Email Sending after `lingyingdrama.com` is onboarded. See [the current sender and verification steps](EMAIL_AUTH.md). Email verification does not gate existing password sign-ins.
+Apple registration and sign-in use the configured provider credentials. Account verification and password recovery on the main Worker use Cloudflare Email Sending from `accounts@contact.lingyingdrama.com`. See [the current sender and verification steps](EMAIL_AUTH.md). Email verification does not gate existing password sign-ins.
 
 ## Update this application
 

@@ -40,7 +40,7 @@
   "send_email": [
     {
       "name": "ACCOUNT_EMAIL",
-      "allowed_sender_addresses": ["accounts@lingyingdrama.com"]
+      "allowed_sender_addresses": ["accounts@contact.lingyingdrama.com"]
     }
   ],
   "vars": {
@@ -62,7 +62,7 @@
     "SEED_CATALOG": "false",
     "EMAIL_PROVIDER": "cloudflare-binding",
     "CF_EMAIL_ACCOUNT_ID": "95040c4f244233138195b80657887486",
-    "MAIL_FROM": "LingYing <accounts@lingyingdrama.com>",
+    "MAIL_FROM": "LingYing <accounts@contact.lingyingdrama.com>",
     "PUBLIC_APP_URL": "https://lingyingdrama.com",
     "STRIPE_SITE_ORIGIN": "https://aidramio.jimmy-tsoi2001.workers.dev"
   },
