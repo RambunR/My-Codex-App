@@ -63,7 +63,9 @@ before(async()=>{
     return realFetch(input,init);
   };
   console.warn=(...values)=>warnings.push(values.map(String).join(' '));
-  const {createApp,errorHandler}=await import('../server/app');const app=createApp();app.use(errorHandler);
+  const {createApp,errorHandler}=await import('../server/app');const app=createApp();
+  app.set('trust proxy','loopback');
+  app.use(errorHandler);
   server=app.listen(0,'127.0.0.1');await new Promise<void>(resolve=>server.once('listening',resolve));base=`http://127.0.0.1:${(server.address() as any).port}`;config.appUrl=base;
 });
 after(async()=>{await settle();globalThis.fetch=realFetch;console.warn=realWarn;if(server)await new Promise<void>(resolve=>server.close(()=>resolve()));db.close();await rm(dir,{recursive:true,force:true});});
@@ -94,6 +96,50 @@ test('password requests acknowledge existing, unknown, provider-only and cooldow
   assert.equal(proof.token_hash,hash(token));assert.notEqual(proof.token_hash,token);assert.equal(proof.kind,'reset');assert.equal(proof.email,user.email);
   assert.ok(proof.expires_at>Date.now()+29*60_000);assert.ok(proof.expires_at<=Date.now()+30*60_000);
   assert.equal(one('SELECT * FROM account_email_tokens WHERE user_id=?',providerId),undefined);
+});
+
+test('the Cloudflare Worker binding sends and completes password recovery without calling a REST provider',async()=>{
+  const user=await register(),previous=config.mailProvider;
+  const sent:Array<{to:unknown;from:unknown;subject?:string;text?:string;html?:string}>=[];
+  const httpCounts=[messages.length,cloudflareMessages.length];
+  config.mailProvider='cloudflare-binding';
+  try{
+    assert.equal((await request('/api/config')).data.auth.email,false);
+    config.cloudflareEmailBinding={async send(message){
+      if(!('subject' in message))throw new Error('Expected a structured email');
+      sent.push(message as (typeof sent)[number]);
+      return{messageId:'local-binding-message'};
+    }};
+    assert.equal((await request('/api/config')).data.auth.email,true);
+    assert.deepEqual((await request('/api/auth/forgot-password',{email:user.email},'',200,{'X-Forwarded-For':'192.0.2.10'})).data,{ok:true});
+    await settle();
+    assert.equal(sent.length,1);
+    assert.equal(sent[0].to,user.email);
+    assert.deepEqual(sent[0].from,{name:'AIDramio',email:'accounts@verified.example'});
+    assert.equal(sent[0].subject,'Reset your LingYing password');
+    const {token,url}=tokenFrom(sent[0]);
+    assert.equal(url.searchParams.get('mode'),'reset');
+    assert.ok(sent[0].html?.includes(url.href));
+    const newPassword='BindingRecoveryPassword456!';
+    await request('/api/auth/reset-password',{token,password:newPassword});
+    await request('/api/auth/login',{email:user.email,password},'',401);
+    assert.equal((await request('/api/auth/login',{email:user.email,password:newPassword})).data.user.id,user.id);
+    assert.deepEqual([messages.length,cloudflareMessages.length],httpCounts);
+  }finally{config.mailProvider=previous;config.cloudflareEmailBinding=undefined;}
+});
+
+test('a native send error clears the recovery proof without falling back to Resend',async()=>{
+  const user=await register(),previous=config.mailProvider;
+  const httpCounts=[messages.length,cloudflareMessages.length];
+  config.mailProvider='cloudflare-binding';
+  config.cloudflareEmailBinding={async send(){throw new Error('Private provider error for '+user.email);}};
+  try{
+    assert.deepEqual((await request('/api/auth/forgot-password',{email:user.email},'',200,{'X-Forwarded-For':'192.0.2.11'})).data,{ok:true});
+    await settle();
+    assert.equal(one('SELECT * FROM account_email_tokens WHERE user_id=?',user.id),undefined);
+    assert.deepEqual([messages.length,cloudflareMessages.length],httpCounts);
+    assert.ok(warnings.every(value=>!value.includes(user.email)));
+  }finally{config.mailProvider=previous;config.cloudflareEmailBinding=undefined;}
 });
 
 test('single-use concurrent password recovery changes only the password, revokes sessions and preserves account assets',async()=>{

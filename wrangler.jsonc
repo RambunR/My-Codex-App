@@ -37,6 +37,12 @@
       "bucket_name": "aidramio-media-887486"
     }
   ],
+  "send_email": [
+    {
+      "name": "ACCOUNT_EMAIL",
+      "allowed_sender_addresses": ["accounts@lingyingdrama.com"]
+    }
+  ],
   "vars": {
     "ENVIRONMENT": "production",
     "PLATFORM_OWNER_USER_ID": "000ca929-30da-4e8b-a2a6-2135d184fe9b",
@@ -54,7 +60,7 @@
     "USD_TO_HKD": "7.8",
     "STRIPE_WECHAT_PAY_ENABLED": "true",
     "SEED_CATALOG": "false",
-    "EMAIL_PROVIDER": "resend",
+    "EMAIL_PROVIDER": "disabled",
     "CF_EMAIL_ACCOUNT_ID": "95040c4f244233138195b80657887486",
     "MAIL_FROM": "LingYing <accounts@lingyingdrama.com>",
     "PUBLIC_APP_URL": "https://lingyingdrama.com",

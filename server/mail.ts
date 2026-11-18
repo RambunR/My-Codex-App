@@ -3,7 +3,7 @@ import {publicAppUrl} from './origins.js';
 import {z} from 'zod';
 
 type MailKind='reset'|'verify';
-type MailProvider='cloudflare'|'resend';
+type MailProvider='cloudflare-binding'|'cloudflare'|'resend';
 const escapeHtml=(value:string)=>value.replace(/[&<>"']/g,character=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]!));
 
 function sender(){
@@ -18,7 +18,7 @@ function sender(){
 
 function provider():MailProvider|null{
   const selected=config.mailProvider||'auto';
-  if(selected==='cloudflare'||selected==='resend')return selected;
+  if(selected==='cloudflare-binding'||selected==='cloudflare'||selected==='resend')return selected;
   if(selected!=='auto')return null;
   return config.cloudflareEmailAccountId&&config.cloudflareEmailApiToken?'cloudflare':'resend';
 }
@@ -26,6 +26,7 @@ function provider():MailProvider|null{
 export function mailEnabled(){
   if(!sender())return false;
   switch(provider()){
+    case'cloudflare-binding':return typeof config.cloudflareEmailBinding?.send==='function';
     case'cloudflare':return /^[a-f\d]{32}$/i.test(config.cloudflareEmailAccountId)&&!!config.cloudflareEmailApiToken&&!/[\r\n]/.test(config.cloudflareEmailApiToken);
     case'resend':return Boolean(config.resendApiKey&&!/[\r\n]/.test(config.resendApiKey));
     default:return false;
@@ -61,6 +62,19 @@ export async function sendWechatRegistrationCode(email:string,code:string,reques
 async function deliverAccountMessage(email:string,title:string,text:string,html:string,requestId:string){
   if(!mailEnabled())throw new Error('Account email delivery is unavailable.');
   const selected=provider();
+  if(selected==='cloudflare-binding'){
+    const from=sender()!,binding=config.cloudflareEmailBinding!;
+    try{
+      const result=await binding.send({
+        from:from.name?{email:from.address,name:from.name}:from.address,
+        to:email,subject:title,text,html,
+      });
+      if(typeof result?.messageId==='string'&&result.messageId.trim())return;
+    }catch{
+      // Binding errors can contain addresses or provider details.
+    }
+    throw new Error('Account email delivery failed.');
+  }
   const cloudflare=selected==='cloudflare';
   const endpoint=cloudflare?`https://api.cloudflare.com/client/v4/accounts/${config.cloudflareEmailAccountId}/email/sending/send`:'https://api.resend.com/emails';
   const headers:Record<string,string>={Authorization:`Bearer ${cloudflare?config.cloudflareEmailApiToken:config.resendApiKey}`,'Content-Type':'application/json'};

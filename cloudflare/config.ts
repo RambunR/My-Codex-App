@@ -1,6 +1,6 @@
 import type {Env} from './runtime';
 import {selectStripeSettings} from '../shared/stripe-settings';
-export const config={wechatAppId:'',wechatAppSecret:'',wechatPayEnabled:false,testPayoutsEnabled:false,testPayoutAccount:'',testConnectWebhook:'',port:8080,production:true,sandbox:false,stripeTestMode:false,payoutsEnabled:false,stripeAutoConfigureWebhook:false,passPromotionEnabled:false,publicUrl:'',stripeSiteOrigin:'',platformOwnerUserId:'',platformAdminEmailHash:'',officialCreatorName:'LingYingDrama Offical',appUrl:'https://aidramio.example',dataDir:'/tmp',payments:'disabled',usdToHkd:7.8,...selectStripeSettings({},false),driveImportCredentials:'',googleClientId:'',googleClientSecret:'',appleClientId:'',appleTeamId:'',appleKeyId:'',applePrivateKey:'',resendApiKey:'',mailFrom:'',mailProvider:'auto',cloudflareEmailAccountId:'',cloudflareEmailApiToken:'',seed:false,ffmpeg:'',ffprobe:'',runtime:'cloudflare',videoFormats:['mp4','mov','m4v']};
+export const config={wechatAppId:'',wechatAppSecret:'',wechatPayEnabled:false,testPayoutsEnabled:false,testPayoutAccount:'',testConnectWebhook:'',port:8080,production:true,sandbox:false,stripeTestMode:false,payoutsEnabled:false,stripeAutoConfigureWebhook:false,passPromotionEnabled:false,publicUrl:'',stripeSiteOrigin:'',platformOwnerUserId:'',platformAdminEmailHash:'',officialCreatorName:'LingYingDrama Offical',appUrl:'https://aidramio.example',dataDir:'/tmp',payments:'disabled',usdToHkd:7.8,...selectStripeSettings({},false),driveImportCredentials:'',googleClientId:'',googleClientSecret:'',appleClientId:'',appleTeamId:'',appleKeyId:'',applePrivateKey:'',resendApiKey:'',mailFrom:'',mailProvider:'auto',cloudflareEmailAccountId:'',cloudflareEmailApiToken:'',cloudflareEmailBinding:undefined as Env['ACCOUNT_EMAIL'],seed:false,ffmpeg:'',ffprobe:'',runtime:'cloudflare',videoFormats:['mp4','mov','m4v']};
 export function configure(env:Env){
   config.testPayoutsEnabled=env.STRIPE_TEST_PAYOUTS_ENABLED==='true';
   config.testPayoutAccount=env.STRIPE_TEST_PAYOUT_ACCOUNT_ID||'';
@@ -21,6 +21,7 @@ export function configure(env:Env){
   config.appleClientId=env.APPLE_CLIENT_ID||'';config.appleTeamId=env.APPLE_TEAM_ID||'';config.appleKeyId=env.APPLE_KEY_ID||'';config.applePrivateKey=env.APPLE_PRIVATE_KEY||'';
   config.resendApiKey=env.RESEND_API_KEY||'';config.mailFrom=env.MAIL_FROM||'';
   config.mailProvider=env.EMAIL_PROVIDER||'auto';config.cloudflareEmailAccountId=env.CF_EMAIL_ACCOUNT_ID||'';config.cloudflareEmailApiToken=env.CF_EMAIL_API_TOKEN||'';
+  config.cloudflareEmailBinding=env.ACCOUNT_EMAIL;
   config.wechatPayEnabled=env.STRIPE_WECHAT_PAY_ENABLED==='true';
   config.usdToHkd=Number(env.USD_TO_HKD||7.8);if(!(config.usdToHkd>0))throw new Error('USD_TO_HKD must be positive.');
   config.seed=env.SEED_CATALOG==='true';if(env.APP_URL)config.appUrl=new URL(env.APP_URL).origin;

@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
+import type {SendEmail} from '@cloudflare/workers-types';
 import {selectStripeSettings} from '../shared/stripe-settings.js';
 
 if (existsSync('.env')) process.loadEnvFile('.env');
@@ -39,6 +40,7 @@ export const config = {
   mailProvider: process.env.EMAIL_PROVIDER || 'auto',
   cloudflareEmailAccountId: process.env.CF_EMAIL_ACCOUNT_ID || '',
   cloudflareEmailApiToken: process.env.CF_EMAIL_API_TOKEN || '',
+  cloudflareEmailBinding: undefined as SendEmail | undefined,
   seed: process.env.SEED_DEMO === 'true' || (process.env.NODE_ENV !== 'production' && process.env.SEED_DEMO !== 'false'),
   ffmpeg: process.env.FFMPEG_PATH || 'ffmpeg',
   ffprobe: process.env.FFPROBE_PATH || 'ffprobe',

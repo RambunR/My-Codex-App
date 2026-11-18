@@ -2,13 +2,13 @@
 
 The main LingYing application at **https://lingyingdrama.com** includes **Forgot password**, **Reset password**, **Resend verification email**, and **Verify email**. A new password registration queues a verification message when email delivery is configured. Account displays whether its current email is verified. These controls do not force existing accounts to verify before they can sign in or remove their wallets, purchases, uploads or Dramio Pass.
 
-The delivery integration supports [Cloudflare Email Service Sending](https://developers.cloudflare.com/email-service/api/send-emails/rest-api/) and [Resend](https://resend.com/docs/api-reference/emails/send-email) from the existing Worker over HTTPS. It does not require another website or database. Delivery remains unavailable until a supported service has a real API token and verified sender configured; a visible button alone does not mean public emails can be delivered.
+Account mail on the main LingYing Worker uses the [Cloudflare Email Sending binding](https://developers.cloudflare.com/email-service/api/send-emails/workers-api/) once its sender domain is verified. The application also supports Cloudflare REST and Resend for other deployments. The Worker binding sends without an API key and uses the existing website and database.
 
 ## Which email is being set up?
 
 | Message | Implementation and setup |
 |---|---|
-| Registration verification and password recovery | Implemented in LingYing. Configure Cloudflare Email Sending or Resend below. The last inspected production configuration has no delivery token, so actual sending remains unavailable. |
+| Registration verification and password recovery | Implemented in LingYing. Enable the Cloudflare binding after the sending domain is verified. |
 | Dramio Pass payment receipt | Sent by Stripe after a successful payment when its **Successful payments** customer-email setting is enabled. Checkout is supplied with the authenticated account's email. This does not require the application's Cloudflare/Resend sending credential. |
 | Branded “Your Dramio Pass is activated” welcome email | Not implemented. Enabling verification email or a Stripe receipt does not create this separate application message. |
 
@@ -25,25 +25,13 @@ Stripe handles these payment receipts separately from account verification, pass
 
 ## Connect Cloudflare Email Sending
 
-Cloudflare can send the application's recovery and verification emails. Its **Email Sending** service is different from inbound Email Routing forwarding and the earlier restricted `send_email` capability. Confirm the account's current Sending entitlement, plan and recipient restrictions in the Cloudflare dashboard and [Email Service documentation](https://developers.cloudflare.com/email-service/). Historical beta allowances and pricing have not been reverified for this setup; restricted verified-recipient sending alone does not establish support for arbitrary public users.
+The main Worker uses the sender **LingYing <accounts@lingyingdrama.com>**. Its `ACCOUNT_EMAIL` binding is restricted to that sender address and can send to registered users on Workers Paid. [Cloudflare Email Service pricing](https://developers.cloudflare.com/email-service/platform/pricing/) includes 3,000 outbound emails per account per month on this plan.
 
-The operator selected **`hknovaxrproduction.com`**, with sender **`LingYing <accounts@hknovaxrproduction.com>`**. The tracked main configuration selects Cloudflare Email Sending and this sender. The application stays at **https://lingyingdrama.com** on the existing **`lingying`** Worker. Buying another domain or creating a mailbox is unnecessary for sending.
+1. In [Cloudflare Email Service → Email Sending](https://dash.cloudflare.com/?to=/:account/email-service/sending), choose **Onboard Domain** and select **lingyingdrama.com**. Review the outbound verification and bounce DNS records Cloudflare adds. Existing inbound mail uses its own DNS records.
+2. Confirm the exact domain shows as enabled for sending and its DNS checks pass. While onboarding is pending, keep the main Worker's tracked `EMAIL_PROVIDER=disabled`. Resend is not selected for production.
+3. Set the tracked `EMAIL_PROVIDER=cloudflare-binding` and deploy the existing Worker. Keep `MAIL_FROM=LingYing <accounts@lingyingdrama.com>` and the sender restriction in `wrangler.jsonc` in sync. The binding accepts messages only when Cloudflare returns a message ID. A real inbox check may still be needed to verify delivery.
 
-Domain selection is not delivery activation. Earlier deployment-credential reads of this zone's DNS, Email Sending onboarding and API-token management returned HTTP 403. The last inspected production secret-name list contains neither `CF_EMAIL_API_TOKEN` nor `RESEND_API_KEY`. Sender-domain onboarding and the scoped delivery credential must be completed before `auth.email` can become true. Existing DNS/mail records have not been changed, and no subscription has been upgraded. Previously observed Google mail MX records and DMARC settings must be preserved while onboarding outbound sending.
-
-1. In **Email Service → Sending**, complete onboarding and the sender-domain verification/DNS steps for **hknovaxrproduction.com**. Add only the records requested for outbound verification; do not replace existing Google MX or unrelated mail records. A dedicated sending subdomain is an alternative, but `MAIL_FROM` must then use that verified subdomain.
-2. Confirm the account has the required current plan and Sending entitlement, including sending to arbitrary registered users. Review the provider's current pricing and limits before accepting a paid plan. This implementation does not upgrade a subscription or verify this account's entitlement merely from a deployment token.
-3. Create a narrowly scoped Cloudflare API token with **Account → Email Sending → Edit** for the intended account. This token is a separate delivery credential; do not reuse a broad deployment token merely because one is available.
-4. In **Workers & Pages → lingying → Settings → Variables and Secrets**, add or confirm:
-
-   | Setting | Type | Value |
-   |---|---|---|
-   | `EMAIL_PROVIDER` | Variable | `cloudflare` |
-   | `CF_EMAIL_ACCOUNT_ID` | Variable | `95040c4f244233138195b80657887486` for the existing Jimmy account |
-   | `CF_EMAIL_API_TOKEN` | Secret | The token with Email Sending Edit permission |
-   | `MAIL_FROM` | Variable or Secret | `LingYing <accounts@hknovaxrproduction.com>` after onboarding that domain |
-
-5. Save/deploy the configuration and follow the testing steps below. If Cloudflare reports that the account is not entitled or the sender is not verified, complete provider onboarding before expecting messages to arrive. A HTTP 200 response alone does not establish delivery: the app also requires Cloudflare's successful result to list the requested recipient as delivered or queued, and rejects permanent bounces.
+A separate installation that uses Cloudflare's REST transport can select `EMAIL_PROVIDER=cloudflare` and provide its account ID in `CF_EMAIL_ACCOUNT_ID` and an encrypted `CF_EMAIL_API_TOKEN` scoped to Email Sending. LingYing's main Worker uses the binding.
 
 ## Connect Resend instead
 
@@ -61,7 +49,7 @@ Domain selection is not delivery activation. Earlier deployment-credential reads
 
 ## Select and test delivery
 
-`EMAIL_PROVIDER=cloudflare` or `resend` explicitly selects one service and requires its complete configuration. `auto` (the default) selects Cloudflare when both Cloudflare email credentials are present, otherwise Resend. An invalid Cloudflare account ID keeps that selection unavailable; it is never interpolated into an unsafe API URL. `disabled` makes account-email sending unavailable. An attempted provider send is never automatically retried through the other provider, preventing duplicate messages and misleading acknowledgements.
+`EMAIL_PROVIDER=cloudflare-binding`, `cloudflare` or `resend` selects the Worker binding, Cloudflare REST or Resend respectively and requires its complete configuration. `auto` (the default) selects Cloudflare when both Cloudflare email credentials are present, otherwise Resend. An invalid Cloudflare account ID keeps that selection unavailable; it is never interpolated into an unsafe API URL. `disabled` makes account-email sending unavailable. An attempted provider send is never automatically retried through the other provider, preventing duplicate messages and misleading acknowledgements.
 
 Keep both **`APP_URL=https://lingyingdrama.com`** and **`PUBLIC_APP_URL=https://lingyingdrama.com`**. The sender domain and application domain do not need to match; changing email providers must not move the website to a `workers.dev` address. After configuring the chosen service:
 
@@ -77,7 +65,7 @@ Do not paste API keys into chat, Git, the browser frontend, or tracked Wrangler 
 ## Behavior and limits
 
 - Public email-request endpoints return the same acknowledgement for an eligible account, unknown email, provider-only account, already-verified account, request cooldown and a later delivery failure. The acknowledgement means the request was accepted, rather than proving that an account exists or a message was delivered. Email is queued outside the HTTP response path, with Cloudflare `waitUntil` keeping the provider request alive.
-- Without the key and sender, requests return `MAIL_UNAVAILABLE` and the public configuration keeps the sending controls unavailable. Provider rejection produces a sanitized operational warning without logging the email, API key, token or provider response body. Failed delivery leaves no usable newly issued proof.
+- Without the selected transport and sender, requests return `MAIL_UNAVAILABLE` and the public configuration keeps the sending controls unavailable. Provider rejection produces a sanitized operational warning without logging the email, API key, token or provider response body. Failed delivery leaves no usable newly issued proof.
 - Requests have a one-minute cooldown per normalized email and purpose and a maximum of five sends per hour for that target. These limits are stored durably, including unknown email requests. The normal API/IP rate limits also apply. A new resend replaces the earlier verification proof for that account.
 - Reset links expire in **30 minutes**. Verification links expire in **24 hours**. Only random proof hashes are stored. Links place the proof in a URL fragment, such as `/auth?mode=reset#token=…`, so it does not reach HTTP access logs. The browser removes it promptly and submits it only when the user explicitly confirms; opening a link does not consume it through a GET request.
 - Successful reset consumes its proof atomically, hashes the new password, verifies the proven account email, and invalidates all sessions and outstanding Google/Apple browser-bound attempts for that account. Concurrent/replayed proofs cannot reset twice. A changed email or password invalidates an older reset proof.
@@ -87,6 +75,6 @@ Do not paste API keys into chat, Git, the browser frontend, or tracked Wrangler 
 
 ## Validation
 
-`tests/email-auth.test.ts` uses mocked Cloudflare/Resend HTTPS transports and a temporary SQLite database. It checks unavailable configuration, explicit/automatic provider selection without post-attempt fallback, Cloudflare queued/delivered results and rejected/bounced/mismatched results, generic acknowledgements and cooldowns, hashed proofs and fragment links, atomic concurrent reset, expiry, wrong-purpose and changed-email rejection, session invalidation, preserved account assets, provider-only safeguards, failed delivery, persistent target budgets, matching Google verification and registration resilience. No real email is sent by these tests.
+`tests/email-auth.test.ts` uses a mocked Cloudflare Worker binding and REST transports with a temporary SQLite database. It checks unavailable configuration, explicit/automatic provider selection without post-attempt fallback, Cloudflare queued/delivered results and rejected/bounced/mismatched results, generic acknowledgements and cooldowns, hashed proofs and fragment links, atomic concurrent reset, expiry, wrong-purpose and changed-email rejection, session invalidation, preserved account assets, provider-only safeguards, failed delivery, persistent target budgets, matching Google verification and registration resilience. No real email is sent by these tests.
 
 WeChat website registration also uses this configured sending service for a six-digit inbox code before user/identity creation. It does not fall back to an unverified contact email when delivery is unavailable. Existing WeChat-linked sign-in remains independent of email delivery. See [WeChat sign-in](WECHAT_SIGN_IN.md).
