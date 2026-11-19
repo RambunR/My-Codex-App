@@ -5,7 +5,7 @@ import {createHash,randomUUID} from 'node:crypto';
 import {one,all,run,transaction} from './db.js';
 import {config} from './config.js';
 import {AppError,assert} from './errors.js';
-import {getDriveImportSettingsRow,requireDriveImportOwner,notifyDriveImport,notifyDriveImportRoot,recordDriveImportEvent} from './drive-import-store.js';
+import {getDriveImportSettingsRow,requireDriveImportOwner,notifyDriveImport,notifyDriveImportRoot,recordDriveImportEvent,importDestinationNotDeleted} from './drive-import-store.js';
 import {parseDriveManifest,matchDriveManifestFiles,isDriveSeriesFolderName,driveFileRevision} from '../shared/drive-import-manifest.js';
 import {DRIVE_IMPORT_MANIFEST_NAME,type DriveReader,type DriveFile,type DriveSeriesManifest} from '../shared/drive-import-types.js';
 import {MAX_EPISODE_BYTES} from '../shared/config.js';
@@ -50,6 +50,9 @@ const sha256=(value:string)=>createHash('sha256').update(value).digest('hex');
 const jobRow=(id:string)=>one<Row>('SELECT * FROM drive_import_jobs WHERE id=?',id);
 const filesFor=(id:string)=>all<Row>('SELECT * FROM drive_import_files WHERE job_id=? ORDER BY kind DESC,number,id',id);
 const activeStatus=(status:string)=>['waiting','downloading','validating'].includes(status);
+function hasImportedFolder(ownerId:string,folderId:string){
+  return !!one('SELECT 1 FROM drive_import_jobs WHERE owner_id=? AND folder_id=? AND series_id IS NOT NULL LIMIT 1',ownerId,folderId);
+}
 function objectKey(job:Row,file:Row){
   return file.kind==='video'?`videos/${encodeURIComponent(job.owner_id)}/drive-${job.id}-${file.id}.mp4`:`covers/drive-${job.id}-${file.id}`;
 }
@@ -82,7 +85,7 @@ function failed(job:Row,lease:string,error:unknown,now:number){
   if(transient&&current.retry_count<5){
     checkpoint(job,lease,"UPDATE drive_import_jobs SET retry_count=retry_count+1,next_check_at=?,message='Drive is temporarily unavailable. The importer will retry.',updated_at=datetime('now')",now+Math.min(TRANSFER_RETRY_MAX_MS,15_000*2**current.retry_count));return;
   }
-  const message=code==='SERIES_TITLE_EXISTS'?'A drama already uses this title. Rename the source manifest and retry after cleanup.':code==='PAYMENT_REVIEW_REQUIRED'?'The administrator payment account needs review before this import can continue.':code==='DRIVE_SOURCE_CHANGED'?'The source folder changed during import. Complete the folder and retry after cleanup.':code==='DRIVE_CHECKSUM_MISMATCH'?'A source file did not match its manifest checksum. Check the completed upload and retry.':code==='INVALID_VIDEO'||code==='VIDEO_TOO_LONG'?'A video failed the normal website media checks. Check its codec and duration before retrying.':'This folder could not be imported safely. Review its manifest and source files, then retry after cleanup.';
+  const message=code==='DRIVE_SOURCE_ALREADY_IMPORTED'?'This Drive folder was already imported. Its original import record has been kept.':code==='SERIES_TITLE_EXISTS'?'A drama already uses this title. Rename the source manifest and retry after cleanup.':code==='PAYMENT_REVIEW_REQUIRED'?'The administrator payment account needs review before this import can continue.':code==='DRIVE_SOURCE_CHANGED'?'The source folder changed during import. Complete the folder and retry after cleanup.':code==='DRIVE_CHECKSUM_MISMATCH'?'A source file did not match its manifest checksum. Check the completed upload and retry.':code==='INVALID_VIDEO'||code==='VIDEO_TOO_LONG'?'A video failed the normal website media checks. Check its codec and duration before retrying.':'This folder could not be imported safely. Review its manifest and source files, then retry after cleanup.';
   transaction(()=>{
     checkpoint(job,lease,"UPDATE drive_import_jobs SET status='error',error_code=?,message=?,cleanup_needed=1,updated_at=datetime('now')",code,message);
     notifyDriveImport(job.id,`error:${lease}`,'error','Drive import needs attention',`${job.folder_name}: ${message}`);
@@ -121,8 +124,11 @@ async function discoverClipWeave(options:DriveImportEngineOptions,now:number){
     transaction(()=>{
       assertBinding(options,undefined,undefined,true);
       for(const source of ready){
-        const existing=one<Row>('SELECT c.*,j.root_folder_id,j.config_revision,j.status,j.series_id FROM drive_import_clipweave_jobs c JOIN drive_import_jobs j ON j.id=c.job_id WHERE c.owner_id=? AND c.export_id=? AND c.source_id=?',owner,loaded.seal.export_id,source.source_id);
+        const existing=one<Row>(`SELECT c.*,j.root_folder_id,j.config_revision,j.status,j.series_id,
+          EXISTS(SELECT 1 FROM series_deletions d WHERE d.series_id=j.series_id) AS destination_deleted
+          FROM drive_import_clipweave_jobs c JOIN drive_import_jobs j ON j.id=c.job_id WHERE c.owner_id=? AND c.export_id=? AND c.source_id=?`,owner,loaded.seal.export_id,source.source_id);
         if(existing){
+          if(existing.destination_deleted)continue;
           if(existing.export_folder_id!==pending.export_folder_id){
             if(!existing.series_id&&activeStatus(existing.status))run("UPDATE drive_import_jobs SET status='review',cleanup_needed=1,lease_token='',lease_until=0,message='Duplicate sealed export identity found in different Drive folders. Review the source mapping.' WHERE id=?",existing.job_id);
             notifyDriveImport(existing.job_id,`duplicate-physical-source:${pending.export_folder_id}`,'attention','Duplicate ClipWeave source identity','The same export/source identity appears in another Drive folder. No new series or silent folder reassignment was performed.',existing.series_id);
@@ -223,6 +229,7 @@ async function discover(options:DriveImportEngineOptions){
       if(sealedRoot)continue;
       if(file.mimeType!==FOLDER||!isDriveSeriesFolderName(file.name))continue;
       sourceFolder(file,settings.folder_id);
+      if(hasImportedFolder(owner,file.id))continue;
       run('INSERT OR IGNORE INTO drive_import_jobs (id,root_folder_id,folder_id,folder_name,owner_id,config_revision) VALUES (?,?,?,?,?,?)',randomUUID(),settings.folder_id,file.id,file.name,owner,settings.revision);
       run("UPDATE drive_import_jobs SET folder_name=? WHERE root_folder_id=? AND folder_id=? AND owner_id=?",file.name,settings.folder_id,file.id,owner);
     }
@@ -232,6 +239,7 @@ async function discover(options:DriveImportEngineOptions){
 async function inspect(options:DriveImportEngineOptions,job:Row,lease:string,now:number){
   const drive=options.drive!;
   if(clipWeaveJob(job.id)){await inspectClipWeave(options,job,lease,now);return;}
+  assert(!hasImportedFolder(job.owner_id,job.folder_id),409,'DRIVE_SOURCE_ALREADY_IMPORTED','This Drive folder was already imported.');
   sourceFolder(await drive.getFile(job.folder_id),job.root_folder_id);
   const files=await listSeries(drive,job.folder_id);assertBinding(options,job,lease);
   const manifests=files.filter(file=>file.name===DRIVE_IMPORT_MANIFEST_NAME);
@@ -355,7 +363,9 @@ async function commit(options:DriveImportEngineOptions,job:Row,lease:string,now:
   // limits for a large series without adding an independent integrity proof.
   for(const file of files)assert(file.object_key===objectKey(job,file)&&file.bytes>0&&file.bytes<=(file.kind==='cover'?COVER_BYTES:MAX_EPISODE_BYTES),409,'INVALID_IMPORT_STATE','Invalid validated media checkpoint.');
   transaction(()=>{
-    assertBinding(options,job,lease,true);assertSeriesTitleAvailable(manifest.series.title);
+    assertBinding(options,job,lease,true);
+    if(!clipWeaveJob(job.id))assert(!hasImportedFolder(job.owner_id,job.folder_id),409,'DRIVE_SOURCE_ALREADY_IMPORTED','This Drive folder was already imported.');
+    assertSeriesTitleAvailable(manifest.series.title);
     const total=files.reduce((sum,file)=>sum+file.bytes,0),owner=getOwnerStorage(job.owner_id);
     assert(Number.isSafeInteger(total+owner.used_bytes)&&withinStorageQuota(owner,owner.used_bytes+total),413,'STORAGE_QUOTA_EXCEEDED','There is not enough media storage for this series.');
     const id=randomUUID(),cover=files.find(file=>file.kind==='cover');
@@ -381,7 +391,10 @@ async function checkCompleted(options:DriveImportEngineOptions,job:Row,now:numbe
     try{await revalidateClipWeaveSnapshot(options.drive!,JSON.parse(sealed.snapshot_json));assertBinding(options);run('UPDATE drive_import_jobs SET next_check_at=? WHERE id=?',now+DAILY_RECHECK_MS,job.id);}
     catch(error){
       if(error instanceof Interrupted)throw error;
-      if((error as any)?.state==='REJECT'||(error as any)?.state==='WAIT')transaction(()=>{run("UPDATE drive_import_jobs SET status='review',message='The sealed ClipWeave source changed. Existing website content was preserved.',updated_at=datetime('now') WHERE id=? AND status='complete'",job.id);notifyDriveImport(job.id,'clipweave-source-changed','attention','ClipWeave source needs review','The verified export changed after import. No website edits were overwritten.',job.series_id);});
+      if((error as any)?.state==='REJECT'||(error as any)?.state==='WAIT')transaction(()=>{
+        const changed=run(`UPDATE drive_import_jobs SET status='review',message='The sealed ClipWeave source changed. Existing website content was preserved.',updated_at=datetime('now') WHERE id=? AND status='complete' AND ${importDestinationNotDeleted}`,job.id);
+        if(changed.changes)notifyDriveImport(job.id,'clipweave-source-changed','attention','ClipWeave source needs review','The verified export changed after import. No website edits were overwritten.',job.series_id);
+      });
       else run('UPDATE drive_import_jobs SET next_check_at=? WHERE id=?',now+DAILY_RECHECK_MS,job.id);
     }return;
   }
@@ -390,7 +403,8 @@ async function checkCompleted(options:DriveImportEngineOptions,job:Row,now:numbe
   const snapshot=JSON.parse(job.source_snapshot_json) as Snapshot;
   if(!snapshot.manifest){run('UPDATE drive_import_jobs SET next_check_at=? WHERE id=?',now+DAILY_RECHECK_MS,job.id);return;}
   const changed=()=>transaction(()=>{
-      run("UPDATE drive_import_jobs SET status='review',message='The Drive source changed after import. The website draft was kept unchanged.',updated_at=datetime('now') WHERE id=? AND series_id IS NOT NULL AND status='complete'",job.id);
+      const updated=run(`UPDATE drive_import_jobs SET status='review',message='The Drive source changed after import. The website draft was kept unchanged.',updated_at=datetime('now') WHERE id=? AND series_id IS NOT NULL AND status='complete' AND ${importDestinationNotDeleted}`,job.id);
+      if(!updated.changes)return;
       notifyDriveImport(job.id,'source-changed','attention','Imported Drive source changed',`${job.folder_name}: review the changed source manually. Existing website content was kept unchanged.`,job.series_id);
       recordDriveImportEvent('source-changed-after-import',job.id);
     });
@@ -443,7 +457,7 @@ function nextWake(now:number,enabled:boolean){
   if(one('SELECT 1 FROM drive_import_jobs WHERE cleanup_needed=1 AND series_id IS NULL LIMIT 1'))return{wakeInMs:5_000};
   if(!enabled)return{};
   const settings=getDriveImportSettingsRow();
-  const next=one<{due:number}>("SELECT MIN(MAX(next_check_at,lease_until)) AS due FROM drive_import_jobs WHERE owner_id=? AND root_folder_id=? AND config_revision=? AND status IN('waiting','downloading','validating','complete')",config.platformOwnerUserId,settings.folder_id,settings.revision)?.due;
+  const next=one<{due:number}>(`SELECT MIN(MAX(next_check_at,lease_until)) AS due FROM drive_import_jobs WHERE owner_id=? AND root_folder_id=? AND config_revision=? AND status IN('waiting','downloading','validating','complete') AND ${importDestinationNotDeleted}`,config.platformOwnerUserId,settings.folder_id,settings.revision)?.due;
   if(settings.scan_requested)return{wakeInMs:1_000};
   const exportDue=one<{next_check_at:number}>('SELECT next_check_at FROM drive_import_clipweave_exports WHERE root_folder_id=? AND owner_id=? AND config_revision=? ORDER BY next_check_at,id LIMIT 1',settings.folder_id,config.platformOwnerUserId,settings.revision)?.next_check_at;
   const due=Math.min(next??Infinity,exportDue??Infinity);
@@ -485,7 +499,7 @@ export async function runDriveImportEngine(options:DriveImportEngineOptions):Pro
     }
     const {owner,settings:current}=assertBinding(options);
     if(current.scan_requested)return nextWake(now,true);
-    const job=one<Row>("SELECT * FROM drive_import_jobs WHERE owner_id=? AND root_folder_id=? AND config_revision=? AND cleanup_needed=0 AND status IN('waiting','downloading','validating','complete') AND next_check_at<=? AND lease_until<=? ORDER BY next_check_at,created_at,id LIMIT 1",owner,current.folder_id,current.revision,now,now);
+    const job=one<Row>(`SELECT * FROM drive_import_jobs WHERE owner_id=? AND root_folder_id=? AND config_revision=? AND cleanup_needed=0 AND status IN('waiting','downloading','validating','complete') AND next_check_at<=? AND lease_until<=? AND ${importDestinationNotDeleted} ORDER BY next_check_at,created_at,id LIMIT 1`,owner,current.folder_id,current.revision,now,now);
     const nextDiscovery=one<{next_discovery_at:number}>('SELECT next_discovery_at FROM drive_import_clipweave_schedule WHERE id=1')?.next_discovery_at||0;
     // One discovery step may use a bounded folder-list budget. Interleave it
     // with transfer ticks so a large queue of exports cannot starve media.

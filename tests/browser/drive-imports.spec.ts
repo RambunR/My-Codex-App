@@ -96,6 +96,19 @@ test('retry and cancel are explicit actions and completed destinations cannot be
   await panel.locator('.drive-import-job').filter({hasText:'failed-source-clips'}).getByRole('button',{name:copy.driveImportRetry!,exact:true}).click();
   expect(check.writes.map(item=>item.path)).toEqual([endpoint+'/jobs/active-job/cancel',endpoint+'/jobs/failed-job/retry']);check.assertClean();
 });
+test('deleted import history shows Imported without opening or retrying a deleted draft',async({page})=>{
+  const status=initialStatus();
+  status.jobs=[job({status:'complete',destinationDeleted:true,seriesId:null,message:'',folderName:'Removed drama'})];
+  status.notifications=[{id:'past-import',jobId:'job-ready',kind:'complete',title:'Imported drama',message:'Imported successfully.',seriesId:null,createdAt:fixedTime,readAt:fixedTime}];
+  const check=await fixture(page,{status}),panel=await openPanel(page),copy=localeMessages.en;
+  const entry=panel.locator('.drive-import-job').filter({hasText:'Removed drama'});
+  await expect(entry.getByText(copy.driveImportStatusComplete!,{exact:true})).toBeVisible();
+  await expect(entry.getByText(copy.driveImportDestinationDeleted!,{exact:true})).toBeVisible();
+  await expect(entry.getByRole('progressbar')).toHaveCount(0);
+  await expect(panel.getByRole('link',{name:copy.driveImportOpenDraft!,exact:true})).toHaveCount(0);
+  await expect(entry.getByRole('button')).toHaveCount(0);
+  expect(check.writes).toEqual([]);check.assertClean();
+});
 
 test('ordinary administrators cannot discover the import controls or call their private API',async({page})=>{
   const check=await fixture(page,{actor:otherAdmin});await page.goto('/admin?tab=drive-imports');await expect(page.getByRole('heading',{name:localeMessages.en.admin!,exact:true})).toBeVisible();

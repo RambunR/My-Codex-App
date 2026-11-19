@@ -93,6 +93,34 @@ test('Check now brings idle sources forward and preserves active transfers and o
   assert.deepEqual([due(waiting),due(complete),due(active),due(other)],[clock,clock,tomorrow,tomorrow]);
   assert.equal(one('SELECT next_check_at FROM drive_import_clipweave_exports WHERE id=?',waiting)!.next_check_at,clock);
 });
+test('deleted destinations stay completed in the private import list without draft links',async()=>{
+  await enable();
+  const destination=randomUUID();
+  run("INSERT INTO series (id,creator_id,title,description,language,genres) VALUES (?,?,?,?,'en','[]')",destination,actors.owner,'Imported drama','An existing imported draft.');
+  try{
+    const imported=job('review',actors.owner,destination);
+    notifyDriveImport(imported,'complete','complete','Imported drama','Open the draft.',destination);
+    const before=(await request()).data;
+    assert.equal(before.jobs[0].status,'review');
+    assert.equal(before.jobs[0].seriesId,destination);
+    assert.equal(before.notifications[0].seriesId,destination);
+    run('INSERT INTO series_deletions (series_id,creator_id,actor_id,summary_json) VALUES (?,?,?,?)',destination,actors.owner,actors.owner,'{}');
+    const after=(await request()).data;
+    assert.equal(after.jobs[0].status,'complete');
+    assert.equal(after.jobs[0].destinationDeleted,true);
+    assert.equal(after.jobs[0].seriesId,null);
+    assert.equal(after.notifications[0].seriesId,null);
+    assert.equal(one('SELECT series_id FROM drive_import_jobs WHERE id=?',imported)!.series_id,destination);
+    const tomorrow=clock+86_400_000;
+    run("UPDATE drive_import_jobs SET status='complete',next_check_at=?,lease_until=0 WHERE id=?",tomorrow,imported);
+    await request('/scan',{});
+    assert.equal(one('SELECT next_check_at FROM drive_import_jobs WHERE id=?',imported)!.next_check_at,tomorrow);
+    await request('/jobs/'+imported+'/retry',{},actors.owner,409);
+  }finally{
+    run('DELETE FROM series_deletions WHERE series_id=?',destination);
+    run('DELETE FROM series WHERE id=?',destination);
+  }
+});
 test('an enabled watcher keeps a valid stable connection after 24 hours, while a new activation requires fresh verification',async()=>{
   await enable();run('UPDATE drive_import_settings SET verified_at=?',clock-25*60*60*1000);
   assert.notEqual((await request()).data.settings.verifiedAt,null);await request('/scan',{});await request('',{enabled:true},actors.owner,200,'PATCH');

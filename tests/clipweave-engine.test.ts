@@ -170,13 +170,15 @@ test('duplicate physical folders carrying one export/source identity stop an unf
   assert.ok(one("SELECT 1 FROM drive_import_notifications WHERE job_id=? AND title='Duplicate ClipWeave source identity'",fixture.job()!.id));
 });
 test('completed and deleted destination provenance survives moving the export beneath a newly configured root',async()=>{
-  const result=await finish(),before=seriesCount();
+  const result=await finish(),before=seriesCount(),parts=fixture.storage.partCalls;
   run('INSERT INTO series_deletions (series_id,creator_id,actor_id,summary_json) VALUES (?,?,?,?)',result!.series_id,OWNER,OWNER,'{}');run("UPDATE series SET status='archived' WHERE id=?",result!.series_id);
   const nextRoot='root-after-move-'+randomUUID();fixture.drive.add(nextRoot,'Other uploads',FOLDER,undefined);fixture.drive.metadata.get(fixture.folder)!.parents=[nextRoot];
   run("UPDATE drive_import_settings SET folder_id=?,verified_folder_id=?,revision=revision+1,scan_token='',scan_requested=0",nextRoot,nextRoot);
   clock+=WAIT;await fixture.tick(true);await fixture.tick();
   assert.equal(seriesCount(),before);assert.equal(one('SELECT COUNT(*) AS n FROM drive_import_clipweave_jobs WHERE owner_id=? AND export_id=?',OWNER,fixture.manifest.export_id)!.n,1);
-  assert.ok(one("SELECT 1 FROM drive_import_notifications WHERE job_id=? AND title='ClipWeave source mapping needs review'",result!.id));
+  assert.equal(one("SELECT 1 FROM drive_import_notifications WHERE job_id=? AND title='ClipWeave source mapping needs review'",result!.id),undefined);
+  assert.equal(one('SELECT status,series_id FROM drive_import_jobs WHERE id=?',result!.id)!.status,'complete');
+  assert.equal(fixture.storage.partCalls,parts);
 });
 
 

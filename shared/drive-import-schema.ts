@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS drive_import_jobs (
  UNIQUE(root_folder_id,folder_id)
 );
 CREATE INDEX IF NOT EXISTS drive_import_jobs_due ON drive_import_jobs(status,next_check_at,lease_until);
+CREATE INDEX IF NOT EXISTS drive_import_jobs_imported_source ON drive_import_jobs(owner_id,folder_id) WHERE series_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS drive_import_jobs_cleanup_pending ON drive_import_jobs(id) WHERE cleanup_needed=1 AND series_id IS NULL;
 CREATE TABLE IF NOT EXISTS drive_import_files (
  id TEXT PRIMARY KEY,job_id TEXT NOT NULL REFERENCES drive_import_jobs(id) ON DELETE CASCADE,

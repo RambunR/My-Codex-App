@@ -15,7 +15,7 @@ export interface DriveReader {
 }
 export type DriveJobStatus='waiting'|'downloading'|'validating'|'complete'|'error'|'cancelled'|'review';
 export interface DriveImportSettings {enabled:boolean;folderId:string;revision:number;verifiedAt:number|null}
-export interface DriveImportJob {id:string;folderId:string;folderName:string;status:DriveJobStatus;seriesId:string|null;episodeCount:number;finishedFiles:number;totalFiles:number;message:string;createdAt:string;updatedAt:string}
+export interface DriveImportJob {id:string;folderId:string;folderName:string;status:DriveJobStatus;seriesId:string|null;destinationDeleted?:boolean;episodeCount:number;finishedFiles:number;totalFiles:number;message:string;createdAt:string;updatedAt:string}
 export interface DriveImportNotification {id:string;jobId:string|null;kind:'complete'|'error'|'attention';title:string;message:string;seriesId:string|null;createdAt:string;readAt:string|null}
 export interface DriveImportStatus {settings:DriveImportSettings;connection:{configured:boolean;serviceAccountEmail:string|null;runtimeAvailable:boolean};jobs:DriveImportJob[];notifications:DriveImportNotification[];unread:number}
 export interface DriveImportRuntime {

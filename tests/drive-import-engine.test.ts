@@ -171,6 +171,25 @@ test('completed provenance detects a changed video and never recreates a manuall
   clock+=24*60*60_000;await fixture.tick(true);await fixture.tick();assert.equal(one('SELECT COUNT(*) AS n FROM series')!.n,count);assert.equal(fixture.job()!.series_id,job.series_id);assert(one('SELECT 1 FROM series_deletions WHERE series_id=?',job.series_id));
   assert.equal(one("SELECT COUNT(*) AS n FROM drive_import_notifications WHERE job_id=? AND kind='attention'",job.id)!.n,1);
 });
+test('a deleted flat Drive import stays mapped and skips source rechecks even after moving the folder',async()=>{
+  const imported=await finish(),parts=fixture.storage.partCalls;
+  run('INSERT INTO series_deletions (series_id,creator_id,actor_id,summary_json) VALUES (?,?,?,?)',imported.series_id,OWNER,OWNER,'{}');
+  run("UPDATE series SET status='archived',title='Deleted series' WHERE id=?",imported.series_id);
+  fixture.drive.bump('video-1');
+  clock+=86_400_000;const calls=fixture.drive.calls;
+  await fixture.tick(true);await fixture.tick();
+  assert.equal(fixture.drive.calls-calls,2,'only the root metadata and listing are read');
+  assert.equal(fixture.job()!.status,'complete');
+  const root='moved-root-'+randomUUID();
+  fixture.drive.add(root,'Moved source root',FOLDER,undefined);
+  fixture.drive.metadata.get(fixture.folder)!.parents=[root];
+  run('UPDATE drive_import_settings SET folder_id=?,verified_folder_id=?,revision=revision+1',root,root);
+  const result=await runDriveImportEngine({drive:fixture.drive,storage:fixture.storage,credentialFingerprint:'fixture-fingerprint',scanRoot:true,now:()=>clock});
+  assert.deepEqual(result,{});
+  assert.equal(one('SELECT COUNT(*) AS n FROM drive_import_jobs WHERE folder_id=?',fixture.folder)!.n,1);
+  assert.equal(fixture.job()!.series_id,imported.series_id);
+  assert.equal(fixture.storage.partCalls,parts);
+});
 test('root connection failures give one safe administrator notice across repeated scans',async()=>{
   fixture.drive.failRoot=true;assert.deepEqual(await fixture.tick(true),{});
   const calls=fixture.drive.calls;await fixture.tick();assert.equal(fixture.drive.calls,calls);

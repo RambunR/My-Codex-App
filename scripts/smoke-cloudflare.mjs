@@ -26,6 +26,8 @@ async function start(production=false,testStripe=false,publicOrigin=base,missing
     else args.push('--var','STRIPE_TEST_SECRET_KEY:','--var','STRIPE_TEST_WEBHOOK_SECRET:');
   }
   if(wechatLogin)args.push('--var','WECHAT_APP_ID:wx1111111111111111','--var','WECHAT_APP_SECRET:11111111111111111111111111111111');
+  // Exercise the unavailable-email case even when production sending is enabled.
+  args.push('--var','EMAIL_PROVIDER:disabled');
   args.push('--var',`PAYOUTS_ENABLED:${!production}`);
   args.push('--var',`PLATFORM_OWNER_USER_ID:${durationOwnerId}`);
   // These disposable local fixtures exercise the catalogue and playback paths.

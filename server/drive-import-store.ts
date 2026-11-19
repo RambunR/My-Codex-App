@@ -20,6 +20,8 @@ export function getDriveImportSettings():DriveImportSettings{
   const row=getDriveImportSettingsRow();
   return{enabled:!!row.enabled,folderId:row.folder_id,revision:row.revision,verifiedAt:row.verified_at};
 }
+// Permanent website deletion leaves the source mapping in place.
+export const importDestinationNotDeleted="NOT EXISTS (SELECT 1 FROM series_deletions d WHERE d.series_id=drive_import_jobs.series_id)";
 /** Identity only: read, stop and notification controls must still work during
  * an account review. Transfers separately call assertPaymentAccountClear. */
 export function requireDriveImportOwner():string{
@@ -70,15 +72,23 @@ export function recordDriveImportEvent(action:string,jobId:string|null=null,summ
   run('INSERT INTO drive_import_events (id,actor_id,actor_type,action,job_id,summary_json) VALUES (?,?,?,?,?,?)',id,actorId,actorId===null?'SYSTEM':'owner',safeText(action,80),jobId,json.length<=12_000?json:'{"truncated":true}');
   return id;
 }
-type JobRow={id:string;folder_id:string;folder_name:string;status:DriveJobStatus;series_id:string|null;message:string;created_at:string;updated_at:string;episode_count:number;finished_files:number;total_files:number};
+type JobRow={id:string;folder_id:string;folder_name:string;status:DriveJobStatus;series_id:string|null;destination_deleted:number;message:string;created_at:string;updated_at:string;episode_count:number;finished_files:number;total_files:number};
 type NotificationRow={id:string;job_id:string|null;kind:DriveImportNotification['kind'];title:string;message:string;series_id:string|null;created_at:string;read_at:string|null};
 export function driveImportStatus(ownerId:string,connection:DriveImportStatus['connection']):DriveImportStatus{
   assert(ownerId===requireDriveImportOwner(),403,'DRIVE_IMPORT_OWNER_REQUIRED','Only the configured platform owner can manage Drive imports.');
   const jobs=all<JobRow>(`SELECT j.id,j.folder_id,j.folder_name,j.status,j.series_id,j.message,j.created_at,j.updated_at,
+    EXISTS(SELECT 1 FROM series_deletions d WHERE d.series_id=j.series_id) AS destination_deleted,
     (SELECT COUNT(*) FROM drive_import_files f WHERE f.job_id=j.id AND f.kind='video') AS episode_count,
     CASE WHEN EXISTS(SELECT 1 FROM drive_import_clipweave_jobs c WHERE c.job_id=j.id) THEN (SELECT COUNT(*) FROM drive_import_clipweave_assets a WHERE a.job_id=j.id AND a.verified=1) ELSE (SELECT COUNT(*) FROM drive_import_files f WHERE f.job_id=j.id AND f.status='validated') END AS finished_files,
     CASE WHEN EXISTS(SELECT 1 FROM drive_import_clipweave_jobs c WHERE c.job_id=j.id) THEN (SELECT COUNT(*) FROM drive_import_clipweave_assets a WHERE a.job_id=j.id) ELSE (SELECT COUNT(*) FROM drive_import_files f WHERE f.job_id=j.id) END AS total_files
-    FROM drive_import_jobs j WHERE j.owner_id=? ORDER BY j.updated_at DESC,j.rowid DESC LIMIT 100`,ownerId).map((row):DriveImportJob=>({id:row.id,folderId:row.folder_id,folderName:safeText(row.folder_name,255),status:row.status,seriesId:row.series_id,episodeCount:Number(row.episode_count),finishedFiles:Number(row.finished_files),totalFiles:Number(row.total_files),message:safeText(row.message,1200),createdAt:row.created_at,updatedAt:row.updated_at}));
-  const notifications=all<NotificationRow>('SELECT id,job_id,kind,title,message,series_id,created_at,read_at FROM drive_import_notifications WHERE owner_id=? ORDER BY created_at DESC,rowid DESC LIMIT 100',ownerId).map((row):DriveImportNotification=>({id:row.id,jobId:row.job_id,kind:row.kind,title:safeText(row.title,160),message:safeText(row.message,1200),seriesId:row.series_id,createdAt:row.created_at,readAt:row.read_at}));
+    FROM drive_import_jobs j WHERE j.owner_id=? ORDER BY j.updated_at DESC,j.rowid DESC LIMIT 100`,ownerId).map((row):DriveImportJob=>({
+    id:row.id,folderId:row.folder_id,folderName:safeText(row.folder_name,255),
+    ...(row.destination_deleted?{status:'complete',seriesId:null,destinationDeleted:true,message:''}:{status:row.status,seriesId:row.series_id,message:safeText(row.message,1200)}),
+    episodeCount:Number(row.episode_count),finishedFiles:Number(row.finished_files),totalFiles:Number(row.total_files),
+    createdAt:row.created_at,updatedAt:row.updated_at,
+  }));
+  const notifications=all<NotificationRow>(`SELECT n.id,n.job_id,n.kind,n.title,n.message,
+    CASE WHEN EXISTS(SELECT 1 FROM series_deletions d WHERE d.series_id=n.series_id) THEN NULL ELSE n.series_id END AS series_id,n.created_at,n.read_at
+    FROM drive_import_notifications n WHERE n.owner_id=? ORDER BY n.created_at DESC,n.rowid DESC LIMIT 100`,ownerId).map((row):DriveImportNotification=>({id:row.id,jobId:row.job_id,kind:row.kind,title:safeText(row.title,160),message:safeText(row.message,1200),seriesId:row.series_id,createdAt:row.created_at,readAt:row.read_at}));
   return{settings:getDriveImportSettings(),connection,jobs,notifications,unread:unreadDriveImportNotifications(ownerId)};
 }

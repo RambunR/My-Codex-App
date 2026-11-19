@@ -7,7 +7,7 @@ import {one,all,run,transaction} from './db.js';
 import {assertPaymentAccountClear} from './payment-risk.js';
 import {scheduleMediaCleanup} from './background.js';
 import {driveImportRuntime} from './drive-import-runtime.js';
-import {getDriveImportSettingsRow,requireDriveImportOwner,notifyDriveImport,recordDriveImportEvent,driveImportStatus,type DriveImportSettingsRow} from './drive-import-store.js';
+import {getDriveImportSettingsRow,requireDriveImportOwner,notifyDriveImport,recordDriveImportEvent,driveImportStatus,importDestinationNotDeleted,type DriveImportSettingsRow} from './drive-import-store.js';
 
 const base='/api/admin/drive-imports';
 const folderId=z.string().regex(/^[A-Za-z0-9_-]{10,200}$/u,'Enter a Google Drive folder ID.');
@@ -120,7 +120,7 @@ export function registerDriveImportApi(app:Express){
       run("UPDATE drive_import_settings SET scan_requested=1,updated_at=datetime('now') WHERE id=1");
       // Let an operator recheck material that has just finished syncing.
       // Leave active transfer checkpoints and their retry timing alone.
-      run("UPDATE drive_import_jobs SET next_check_at=? WHERE owner_id=? AND root_folder_id=? AND config_revision=? AND status IN('waiting','complete') AND lease_until<=? AND next_check_at>?",now,ownerId,settings.folder_id,settings.revision,now,now);
+      run(`UPDATE drive_import_jobs SET next_check_at=? WHERE owner_id=? AND root_folder_id=? AND config_revision=? AND status IN('waiting','complete') AND lease_until<=? AND next_check_at>? AND ${importDestinationNotDeleted}`,now,ownerId,settings.folder_id,settings.revision,now,now);
       run('UPDATE drive_import_clipweave_exports SET next_check_at=? WHERE owner_id=? AND root_folder_id=? AND config_revision=? AND next_check_at>?',now,ownerId,settings.folder_id,settings.revision,now);
       recordDriveImportEvent('scan.requested',null,{},ownerId);
     });
