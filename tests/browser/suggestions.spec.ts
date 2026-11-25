@@ -96,15 +96,34 @@ test('a pointer resting on artwork or panel background does not stop automatic f
   await page.clock.runFor(8400);await activeRelease(hero,first);await noPagination(hero);state.clean();
 });
 
-test('hovering actions or the synopsis, keyboard reading and hidden tabs pause changes until interaction ends',async({page})=>{
+test('hovering actions, keyboard reading and hidden tabs pause changes until interaction ends',async({page})=>{
   await frozenClock(page);const state=await publicFixture(page);await page.goto('/');const hero=page.locator('section.hero');await titleIs(hero,first.title);
-  for(const selector of ['h2 a','.hero-play','.hero-details','.hero-synopsis']){
+  for(const selector of ['h2 a','.hero-play','.hero-details']){
     await hero.locator(selector).hover();await expect(hero).toHaveAttribute('data-autoplay','paused');await page.clock.runFor(20000);await activeRelease(hero,first);await page.mouse.move(0,0);
   }
   await hero.locator('h2 a').focus();await expect(hero).toHaveAttribute('data-autoplay','paused');await page.clock.runFor(20000);await activeRelease(hero,first);await page.evaluate(()=>(document.activeElement as HTMLElement)?.blur());
   await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));});await expect(hero).toHaveAttribute('data-autoplay','paused');await page.clock.runFor(20000);await activeRelease(hero,first);
   await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:false});document.dispatchEvent(new Event('visibilitychange'));});
   await expect(hero).toHaveAttribute('data-autoplay','running');await page.clock.runFor(8400);await activeRelease(hero,second);await noPagination(hero);state.clean();
+});
+
+test('a stationary cursor in the synopsis does not stall rotation and scrolling restarts its reading time',async({page})=>{
+  await frozenClock(page);const state=await publicFixture(page);await page.goto('/');
+  const hero=page.locator('section.hero');await activeRelease(hero,first);
+  const synopsis=hero.locator('.hero-synopsis');
+  const box=(await synopsis.boundingBox())!;
+  const text=(await synopsis.locator('p').boundingBox())!;
+  expect(text.y+text.height).toBeLessThan(box.y+box.height-5);
+  await page.mouse.move(box.x+10,box.y+box.height-5);
+  await expect(hero).toHaveAttribute('data-autoplay','running');
+  await page.clock.runFor(8400);await activeRelease(hero,second);
+
+  await synopsis.locator('p').hover();
+  await page.clock.runFor(7500);
+  await synopsis.dispatchEvent('wheel',{deltaY:60,bubbles:true});
+  await page.clock.runFor(1000);await activeRelease(hero,second);
+  await page.clock.runFor(7400);await activeRelease(hero,first);
+  state.clean();
 });
 
 test('interaction during fade cancels the swap before artwork or action links can change under the reader',async({page})=>{

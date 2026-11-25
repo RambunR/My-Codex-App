@@ -25,9 +25,10 @@ export function SuggestedHero({suggestions,fallback}:{suggestions:Series[];fallb
   const{t,locale}=useI18n();
   const[openingId]=useState(()=>openingSuggestion(suggestions));
   const[activeId,setActiveId]=useState<string|null>(null),[phase,setPhase]=useState<Phase>('idle');
-  const[touchPaused,setTouchPaused]=useState(false),[hoverPaused,setHoverPaused]=useState(false),[focusPaused,setFocusPaused]=useState(false);
+  const[pointerPaused,setPointerPaused]=useState(false),[hoverPaused,setHoverPaused]=useState(false),[focusPaused,setFocusPaused]=useState(false);
+  const[dwellRevision,setDwellRevision]=useState(0);
   const[hidden,setHidden]=useState(()=>document.hidden);
-  const touchPointers=useRef(new Set<number>());
+  const heldPointers=useRef(new Set<number>());
   const[reducedMotion,setReducedMotion]=useState(()=>window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const hero=suggestions.find(series=>series.id===(activeId??openingId))||suggestions[0]||fallback;
   const index=Math.max(0,suggestions.findIndex(series=>series.id===hero?.id));
@@ -71,20 +72,20 @@ export function SuggestedHero({suggestions,fallback}:{suggestions:Series[];fallb
     media.addEventListener('change',change);return()=>media.removeEventListener('change',change);
   },[settleTransition]);
   useEffect(()=>{
-    const visibility=()=>{setHidden(document.hidden);if(document.hidden){touchPointers.current.clear();setTouchPaused(false);setHoverPaused(false);settleTransition();}};
+    const visibility=()=>{setHidden(document.hidden);if(document.hidden){heldPointers.current.clear();setPointerPaused(false);setHoverPaused(false);settleTransition();}};
     document.addEventListener('visibilitychange',visibility);return()=>document.removeEventListener('visibilitychange',visibility);
   },[settleTransition]);
   useEffect(()=>{
-    const finishTouch=(event:PointerEvent)=>{if(touchPointers.current.delete(event.pointerId))setTouchPaused(touchPointers.current.size>0);};
-    const loseFocus=()=>{touchPointers.current.clear();setTouchPaused(false);setHoverPaused(false);};
-    window.addEventListener('pointerup',finishTouch);window.addEventListener('pointercancel',finishTouch);window.addEventListener('blur',loseFocus);
-    return()=>{window.removeEventListener('pointerup',finishTouch);window.removeEventListener('pointercancel',finishTouch);window.removeEventListener('blur',loseFocus);};
+    const releasePointer=(event:PointerEvent)=>{if(heldPointers.current.delete(event.pointerId))setPointerPaused(heldPointers.current.size>0);};
+    const loseFocus=()=>{heldPointers.current.clear();setPointerPaused(false);setHoverPaused(false);};
+    window.addEventListener('pointerup',releasePointer);window.addEventListener('pointercancel',releasePointer);window.addEventListener('blur',loseFocus);
+    return()=>{window.removeEventListener('pointerup',releasePointer);window.removeEventListener('pointercancel',releasePointer);window.removeEventListener('blur',loseFocus);};
   },[]);
-  const rotating=suggestions.length>1&&!touchPaused&&!hoverPaused&&!focusPaused&&!hidden&&!reducedMotion;
+  const rotating=suggestions.length>1&&!pointerPaused&&!hoverPaused&&!focusPaused&&!hidden&&!reducedMotion;
   useEffect(()=>{
     if(!rotating||phase!=='idle')return;
     const timer=setTimeout(()=>goTo(index+1),DWELL_MS);return()=>clearTimeout(timer);
-  },[rotating,phase,hero?.id,index,slideKey,goTo]);
+  },[rotating,phase,hero?.id,index,slideKey,goTo,dwellRevision]);
   // Warm only the next artwork; the active image itself is remounted at a swap
   // so a slow connection cannot show the previous cover with the new title.
   useEffect(()=>{
@@ -98,7 +99,7 @@ export function SuggestedHero({suggestions,fallback}:{suggestions:Series[];fallb
   };
   const updatePointerPause=(event:ReactPointerEvent<HTMLElement>)=>{
     if(event.pointerType==='touch')return;
-    const selector='a,button,.hero-synopsis';
+    const selector='a,button';
     let paused=event.target instanceof Element&&!!event.target.closest(selector);
     // Fading layers are inert, so hit testing targets the section instead of
     // its links. Preserve the link under an approaching pointer before a swap.
@@ -106,6 +107,19 @@ export function SuggestedHero({suggestions,fallback}:{suggestions:Series[];fallb
       const box=element.getBoundingClientRect();return event.clientX>=box.left&&event.clientX<box.right&&event.clientY>=box.top&&event.clientY<box.bottom;
     });
     setHoverPaused(paused);if(paused)settleTransition();
+  };
+  const holdPointer=(event:ReactPointerEvent<HTMLElement>)=>{
+    if(suggestions.length<2)return;
+    const selectingSynopsis=event.target instanceof Element&&event.target.closest('.hero-synopsis');
+    if(event.pointerType!=='touch'&&!selectingSynopsis)return;
+    heldPointers.current.add(event.pointerId);
+    setPointerPaused(true);
+    settleTransition();
+  };
+  const restartDwell=()=>{
+    if(suggestions.length<2||reducedMotion)return;
+    settleTransition();
+    setDwellRevision(revision=>revision+1);
   };
   useEffect(()=>{
     const synopsis=synopsisRef.current,copy=heroCopyRef.current;if(!synopsis||!copy)return;
@@ -116,9 +130,10 @@ export function SuggestedHero({suggestions,fallback}:{suggestions:Series[];fallb
   if(!hero)return null;
   const suggested=suggestions.some(series=>series.id===hero.id);
   return <section className={`hero hero-bounded hero-${hero.genres[0]} ${hero.demo===1?'':'hero-user-artwork'}`} aria-label={hero.title} data-suggested-carousel={suggestions.length>1?'true':'false'} data-carousel-phase={phase} data-autoplay={rotating?'running':'paused'}
-    onPointerOver={updatePointerPause} onPointerMove={updatePointerPause}
+    onPointerMove={updatePointerPause}
     onPointerLeave={event=>{if(event.pointerType!=='touch')setHoverPaused(false);}}
-    onPointerDownCapture={event=>{if(event.pointerType==='touch'&&suggestions.length>1){touchPointers.current.add(event.pointerId);setTouchPaused(true);settleTransition();}}}
+    onPointerDownCapture={holdPointer}
+    onWheelCapture={restartDwell}
     onFocusCapture={event=>{const keyboardFocus=event.target.matches(':focus-visible');setFocusPaused(keyboardFocus);if(keyboardFocus)settleTransition();}}
     onKeyDownCapture={()=>{setFocusPaused(true);settleTransition();}}
     onBlurCapture={event=>{if(!(event.relatedTarget instanceof Node)||!event.currentTarget.contains(event.relatedTarget))setFocusPaused(false);}}>
