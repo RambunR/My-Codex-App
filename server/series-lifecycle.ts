@@ -94,6 +94,7 @@ export async function deleteSeriesPermanently(actorId:string,seriesId:string,inp
     run('DELETE FROM playback_sessions WHERE episode_id IN (SELECT id FROM episodes WHERE series_id=?)',seriesId);
     run('DELETE FROM progress WHERE episode_id IN (SELECT id FROM episodes WHERE series_id=?)',seriesId);
     run('DELETE FROM saves WHERE series_id=?',seriesId);run('DELETE FROM series_likes WHERE series_id=?',seriesId);
+    run('DELETE FROM series_comments WHERE series_id=?',seriesId);
     run('DELETE FROM series_classifications WHERE series_id=?',seriesId);run('DELETE FROM series_publications WHERE series_id=?',seriesId);
     run('DELETE FROM episode_durations WHERE episode_id IN (SELECT id FROM episodes WHERE series_id=?)',seriesId);
     run('DELETE FROM episode_durations_extended WHERE episode_id IN (SELECT id FROM episodes WHERE series_id=?)',seriesId);

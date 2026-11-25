@@ -56,6 +56,7 @@ import {subtitleLanguagesSchema,seriesSubtitleLanguages,writeSeriesSubtitleLangu
 import {applyEpisodePriceCap,episodePriceCents} from './episode-pricing.js';
 import {SPOKEN_LANGUAGES,SPOKEN_LANGUAGE_CODES} from '../shared/spoken-languages.js';
 import {seriesTitleAvailable,assertSeriesTitleAvailable} from './series-titles.js';
+import {registerSeriesComments} from './series-comments.js';
 
 const language = z.enum(LANGUAGES.map(x => x.code) as [string, ...string[]]);
 const spokenLanguage=z.enum(SPOKEN_LANGUAGE_CODES as [string,...string[]]);
@@ -181,7 +182,7 @@ export function createApp() {
     res.setHeader('Cache-Control','private, no-store');
     // Crawlers may fetch public JSON to render the page, while the HTML page
     // remains the search result. Cover images retain their own image policy.
-    if(['GET','HEAD'].includes(req.method)&&/^\/(?:config|series(?:\/[^/]+)?|publishers\/[^/]+)\/?$/u.test(req.path))res.setHeader('X-Robots-Tag','noindex');
+    if(['GET','HEAD'].includes(req.method)&&/^\/(?:config|series(?:\/[^/]+(?:\/comments)?)?|publishers\/[^/]+)\/?$/u.test(req.path))res.setHeader('X-Robots-Tag','noindex');
     // Apple's cross-site form_post is authenticated by its one-use state,
     // browser binding and verified identity token in the dedicated handler.
     if (!['GET','HEAD','OPTIONS'].includes(req.method)&&!(req.method==='POST'&&req.path==='/auth/apple/callback')) {
@@ -251,6 +252,7 @@ export function createApp() {
     const s=assertSeriesAvailable(id(req),{viewerId:req.user?.id,allowOwnerPreview:true});assert(s.cover_key,404,'NOT_FOUND','Cover not found.');
     if (s.cover_key.startsWith('public:')) { res.redirect(s.cover_key.slice(7)); return; } await serveObject(s.cover_key,req,res,'image/webp');
   });
+  registerSeriesComments(app);
   app.post('/api/series/:id/save', requireAuth, (req,res) => {
     assertSeriesAvailable(id(req));
     const saved = one('SELECT 1 FROM saves WHERE user_id=? AND series_id=?',req.user!.id,id(req));

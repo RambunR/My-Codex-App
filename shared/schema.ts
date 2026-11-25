@@ -16,6 +16,7 @@ import {CREATOR_PASS_CONSENT_SCHEMA} from './creator-pass-consent-schema.js';
 import {DEFAULT_QUOTA_BYTES} from './config.js';
 import {EPISODE_LIMITS_SCHEMA} from './episode-limits-schema.js';
 import {DRIVE_IMPORT_SCHEMA} from './drive-import-schema.js';
+import {SERIES_COMMENTS_SCHEMA} from './series-comments-schema.js';
 
 export const DATABASE_SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -294,4 +295,5 @@ ${CREATOR_PASS_CONSENT_SCHEMA}
 ${WECHAT_PAY_SCHEMA}
 ${EPISODE_LIMITS_SCHEMA}
 ${DRIVE_IMPORT_SCHEMA}
+${SERIES_COMMENTS_SCHEMA}
 `;

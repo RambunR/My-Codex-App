@@ -29,6 +29,7 @@ async function fixture(page:Page,locale:Locale,mode:ShareMode='native'){
     if(url.pathname==='/api/auth/me')return route.fulfill({json:{user:null}});
     if(url.pathname==='/api/config')return route.fulfill({json:{brand:'LingYing',paymentsMode:'disabled',paymentsReady:false,payoutsEnabled:false,uploadsEnabled:true,usdToHkd:7.8,demo:false,limits:{},auth:{google:false,apple:false,email:false}}});
     if(url.pathname===cleanPath.replace('/series/','/api/series/'))return route.fulfill({json:{series,episodes:[episode]}});
+    if(url.pathname===cleanPath.replace('/series/','/api/series/')+'/comments')return route.fulfill({json:{comments:[],nextBefore:null}});
     if(url.pathname==='/api/series')return route.fulfill({json:{series:[]}});
     return route.fulfill({status:404,json:{error:{message:'Unexpected sharing fixture read.'}}});
   });

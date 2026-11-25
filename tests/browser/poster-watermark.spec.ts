@@ -17,6 +17,7 @@ async function covers(page:Page,locale='en'){
     if(path==='/api/display-currency')return route.fulfill({json:{quote:{country:null,currency:'HKD',ratePerHkd:1,asOf:null}}});
     if(path==='/api/studio/title-availability')return route.fulfill({json:{available:true}});
     if(path==='/api/series')return route.fulfill({json:{series:[series]}});
+    if(path==='/api/series/'+series.id+'/comments')return route.fulfill({json:{comments:[],nextBefore:null}});
     if(path==='/api/series/'+series.id||path==='/api/studio/series/'+series.id)return route.fulfill({json:{series,episodes:[episode],episodes_revision:'poster-fixture',owner_storage:{used_bytes:0,quota_bytes:5*1024**3,storage_unlimited:true}}});
     if(path==='/api/history')return route.fulfill({json:{history:[{...series,episode_id:episode.id,episode_number:1,seconds:10,duration:60}]}});
     if(path==='/api/studio')return route.fulfill({json:{user:account,series:[series],stats:{sales:0,lifetime_micros:0},withdrawals:[],storageRequests:[]}});
@@ -51,5 +52,5 @@ test('hero, rankings, history, publisher cards and private studio covers use the
 });
 
 test('a paid episode cover and unlock preview stay branded without creating a payment',async({page})=>{
-  const clean=await covers(page);await page.goto(`/watch/${series.id}/${episode.id}`);await expect(page.locator('.player-lock')).toBeVisible();const mark=page.locator('.video-player>.cover-watermark');await expect(mark).toBeVisible();await expect(mark).toHaveCSS('opacity','0.6');await expect(mark).toHaveCSS('pointer-events','none');await page.locator('.player-lock').getByRole('button').click();await wholeMarkedFrame(page.locator('.unlock-preview>.cover-thumbnail'),{thumbnail:true});await noOverflow(page);clean();
+  const clean=await covers(page);await page.goto(`/watch/${series.id}/${episode.id}`);await expect(page.locator('.player-lock')).toBeVisible();const mark=page.locator('.video-player .branded-video-icon');await expect(mark).toBeVisible();await expect(mark).toHaveCSS('opacity','0.6');await expect(mark).toHaveCSS('pointer-events','none');await page.locator('.player-lock').getByRole('button',{name:/^Unlock episode/}).click();await wholeMarkedFrame(page.locator('.unlock-preview>.cover-thumbnail'),{thumbnail:true});await noOverflow(page);clean();
 });

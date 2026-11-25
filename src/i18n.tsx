@@ -22,6 +22,7 @@ import {publisherProfileEnglish,publisherProfileMessages} from './publisher-prof
 import {coverArtworkEnglish,coverArtworkMessages} from './cover-artwork-locales';
 import {subtitleLanguageEnglish,subtitleLanguageMessages} from './subtitle-language-locales';
 import {seriesAccessEnglish,seriesAccessMessages} from './series-access-locales';
+import {seriesCommentsEnglish,seriesCommentsMessages} from './series-comments-locales';
 import {storageUnlimitedEnglish,storageUnlimitedMessages} from './storage-unlimited-locales';
 import {lastEpisodeFreeEnglish,lastEpisodeFreeMessages} from './last-episode-free-locales';
 import {videoBrandEnglish,videoBrandMessages} from './video-brand-locales';
@@ -130,6 +131,7 @@ const en = {
   ...coverArtworkEnglish,
   ...subtitleLanguageEnglish,
   ...seriesAccessEnglish,
+  ...seriesCommentsEnglish,
   ...suggestionsEnglish,
 } as const;
 export type Key = keyof typeof en;
@@ -216,6 +218,7 @@ for(const language of LANGUAGES){if(!publisherProfileMessages[language.code])thr
 for(const language of LANGUAGES){if(!coverArtworkMessages[language.code])throw new Error(`Cover artwork translations missing: ${language.code}`);Object.assign(dictionaries[language.code],coverArtworkMessages[language.code]);}
 for(const language of LANGUAGES){if(!subtitleLanguageMessages[language.code])throw new Error(`Subtitle language translations missing: ${language.code}`);Object.assign(dictionaries[language.code],subtitleLanguageMessages[language.code]);}
 for(const language of LANGUAGES){if(!seriesAccessMessages[language.code])throw new Error(`Series access translations missing: ${language.code}`);Object.assign(dictionaries[language.code],seriesAccessMessages[language.code]);}
+for(const language of LANGUAGES)Object.assign(dictionaries[language.code],seriesCommentsMessages[language.code]);
 for(const language of LANGUAGES){if(!suggestionsMessages[language.code])throw new Error(`Suggestion translations missing: ${language.code}`);Object.assign(dictionaries[language.code],suggestionsMessages[language.code]);}
 for(const language of LANGUAGES)Object.assign(dictionaries[language.code],withdrawalMessages[language.code]);
 for(const language of LANGUAGES)Object.assign(dictionaries[language.code],testPayoutMessages[language.code]);

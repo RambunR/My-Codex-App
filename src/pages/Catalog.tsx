@@ -14,6 +14,7 @@ import { STANDARD_GENRES,STORY_THEMES,SERIES_FORMATS,CREATION_TYPES } from '../.
 import {CoverArtwork,CoverThumbnail,coverFrameStyle,CoverWatermark} from '../components/CoverArtwork';
 import {SuggestedHero} from '../components/SuggestedHero';
 import {SeriesUnlockDialog} from '../components/SeriesUnlockDialog';
+import {SeriesComments} from '../components/SeriesComments';
 import {SERIES_ACCESS_FILTERS} from '../../shared/catalog-access';
 import {InlineSubtitleMetadata,SubtitleMetadata} from '../components/SubtitleMetadata';
 import '../catalog-mobile.css';
@@ -104,6 +105,7 @@ export function SeriesDetail(){
       <SubtitleMetadata languages={series.subtitle_languages}/>
     </dl>{series.publisher_id?<Link className="creator-byline creator-profile-link" to={`/publishers/${encodeURIComponent(series.publisher_id)}`} aria-label={`${t('publisherViewProfile')}: ${series.creator_name}`}><Avatar name={series.creator_name} size="small"/><span>{t('by')} <strong>{series.creator_name}</strong></span></Link>:<div className="creator-byline"><Avatar name={series.creator_name} size="small"/><span>{t('by')} <strong>{series.creator_name}</strong></span></div>}</div></section>
     <section className="episodes-section" id="episodes"><SectionHeading title={t('episodes')}><span className="muted">{series.episode_count} {t('episodes')} · {usd(series.price_cents*10000)} / {t('episode')}</span></SectionHeading><div className="episode-grid">{data.episodes.map(e=><Link className={`episode-tile ${e.free||e.unlocked?'available':''}`} key={e.id} to={`/watch/${id}/${e.id}`}><span className="episode-tile-num">{String(e.number).padStart(2,'0')}</span><div><strong>{e.title}</strong><small>{Math.floor(e.duration/60)}:{String(Math.round(e.duration%60)).padStart(2,'0')} <i/> {e.free?t('free'):e.unlocked?t('watch'):usd(series.price_cents*10000)}</small><small className="episode-view-count" title={`${engagementCount(e.views,locale,false)} ${t('views')}`}><Eye size={11} aria-hidden="true"/>{engagementCount(e.views,locale)} {t('views')}</small></div>{e.free||e.unlocked?<Play size={17}/>:<LockKeyhole size={17}/>}</Link>)}</div>{!data.episodes.length&&<Empty title={t('noEpisodes')}/>}</section>
+    {series.status==='published'&&data.episodes.length>0&&<SeriesComments seriesId={series.id}/>}
     {related.data&&related.data.series.filter(s=>s.id!==id).length>0&&<section className="catalog-section"><SectionHeading title={t('moreLikeThis')}/><div className="poster-grid">{related.data.series.filter(s=>s.id!==id).slice(0,6).map(s=><SeriesCard key={s.id} series={s}/>)}</div></section>}
     <SeriesUnlockDialog open={unlockSeries===series.id} onClose={()=>setUnlockSeries(null)} series={series} returnTo={`/series/${series.id}?unlock=all`} onUnlocked={()=>{setUnlockSeries(null);refresh();}}/>
   </div>;

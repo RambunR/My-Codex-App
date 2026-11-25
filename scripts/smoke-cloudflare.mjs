@@ -508,6 +508,17 @@ try{
   assert.match(uploadedAt,/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
   assert.deepEqual(publicSeries.series.subtitle_languages,selectedSubtitles);
   assert.equal(publicSeries.series.views,0,'Metadata and byte ranges must not count as views.');
+  const commentsPath=`/api/series/${sid}/comments`;
+  const posted=(await request(commentsPath,{body:'Looking forward to the next episode.'},publisher,201)).data.comment;
+  assert.equal(posted.isOwn,true);
+  const discussion=await request(commentsPath);
+  assert.equal(discussion.headers.get('cache-control'),'private, no-store');
+  assert.deepEqual(discussion.data.comments,[{...posted,isOwn:false}]);
+  const likePath=`${commentsPath}/${posted.id}/like`;
+  assert.deepEqual((await request(likePath,{liked:true},viewer,200,'PUT')).data,{likeCount:1,likedByViewer:true});
+  const deletedComment=await fetch(base+`${commentsPath}/${posted.id}`,{method:'DELETE',headers:{Cookie:publisher}});
+  assert.equal(deletedComment.status,204);
+  assert.deepEqual((await request(commentsPath)).data.comments,[]);
   const guestPlayback=await request(`/api/episodes/${first.id}/playback`,{});assert.match(guestPlayback.cookie,/^drama_viewer=/);
   assert.equal(guestPlayback.data.viewCounted,true,'A playback start must count immediately, without waiting for a heartbeat.');assert.equal(guestPlayback.data.watchedMs,0);
   const immediatePublic=(await request(`/api/series/${sid}`)).data;

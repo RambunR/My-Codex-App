@@ -19,6 +19,7 @@ async function readOnlyCatalogue(page:Page,locale:string){
       if(path==='/api/auth/me')return route.fulfill({json:{user:null}});
       if(path==='/api/config')return route.fulfill({json:{brand:'LingYing',paymentsMode:'disabled',paymentsReady:false,payoutsEnabled:false,usdToHkd:7.8,demo:false,limits:{}}});
       if(path==='/api/series/'+seriesId)return route.fulfill({json:{series,episodes:[episode]}});
+      if(path==='/api/series/'+seriesId+'/comments')return route.fulfill({json:{comments:[],nextBefore:null}});
       if(path==='/api/series')return route.fulfill({json:{series:[series]}});
     }
     unexpected.push(request.method()+' '+path);

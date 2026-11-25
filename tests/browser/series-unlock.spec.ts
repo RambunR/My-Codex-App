@@ -33,6 +33,7 @@ async function fixture(page:Page,options:FixtureOptions={}){
       const id=path.split('/')[3];
       if(unavailable.has(id)&&path===`/api/series/${id}`)return route.fulfill({status:404,json:{error:{code:'NOT_FOUND',message:'This series is unavailable.'}}});
       if(releases.has(id)&&path===`/api/series/${id}`)return route.fulfill({json:{series:releases.get(id),episodes:rows.get(id)}});
+      if(releases.has(id)&&path===`/api/series/${id}/comments`)return route.fulfill({json:{comments:[],nextBefore:null}});
       if(releases.has(id)&&path===`/api/series/${id}/unlock-quote`){const snapshot=quote(id);quoteReads.push(snapshot);const gate=quoteGates.get(id);if(gate)await gate;return route.fulfill({json:snapshot});}
       unexpected.push('GET '+path);return route.fulfill({status:404,json:{error:{message:'Unexpected series-unlock fixture read'}}});
     }

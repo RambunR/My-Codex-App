@@ -28,6 +28,7 @@ async function fixture(page:Page,{signedIn=false}:{signedIn?:boolean}={}){
     if(pathname==='/api/studio/title-availability')return route.fulfill({json:{available:true}});
     if(pathname==='/api/series')return route.fulfill({json:{series:[series]}});
     if(pathname===`/api/series/${series.id}`)return route.fulfill({json:{series,episodes}});
+    if(pathname===`/api/series/${series.id}/comments`)return route.fulfill({json:{comments:[],nextBefore:null}});
     if(pathname===`/api/studio/series/${series.id}`)return route.fulfill({json:{series,episodes,episodes_revision:'a'.repeat(64),owner_storage:{used_bytes:0,quota_bytes:creator.quota_bytes}}});
     if(/^\/api\/(?:studio\/)?episodes\/media-save-episode-[12]\/stream$/.test(pathname)){
       // Match the real stream's byte-range transport. A plain 200 mock can
