@@ -8,24 +8,37 @@ import {spokenLanguageName} from '../spoken-language-locales';
 import {CoverArtwork,CoverWatermark} from './CoverArtwork';
 
 const DWELL_MS=8000,FADE_MS=280;
+const OPENING_SUGGESTION_KEY='lingying-opening-suggestion';
 type Phase='idle'|'out'|'in';
+
+function openingSuggestion(suggestions:Series[]){
+  if(suggestions.length<2)return suggestions[0]?.id??null;
+  let previous:string|null=null;
+  try{previous=sessionStorage.getItem(OPENING_SUGGESTION_KEY);}catch{}
+  const index=suggestions.findIndex(series=>series.id===previous);
+  return suggestions[index<0?Math.floor(Math.random()*suggestions.length):(index+1)%suggestions.length].id;
+}
 
 /** One active slide keeps links, artwork and metadata together. Rotation stops
  * while a visitor is reading or interacting, and never runs in reduced motion. */
 export function SuggestedHero({suggestions,fallback}:{suggestions:Series[];fallback?:Series}){
   const{t,locale}=useI18n();
+  const[openingId]=useState(()=>openingSuggestion(suggestions));
   const[activeId,setActiveId]=useState<string|null>(null),[phase,setPhase]=useState<Phase>('idle');
   const[touchPaused,setTouchPaused]=useState(false),[hoverPaused,setHoverPaused]=useState(false),[focusPaused,setFocusPaused]=useState(false);
   const[hidden,setHidden]=useState(()=>document.hidden);
   const touchPointers=useRef(new Set<number>());
   const[reducedMotion,setReducedMotion]=useState(()=>window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-  const hero=suggestions.find(series=>series.id===activeId)||suggestions[0]||fallback;
+  const hero=suggestions.find(series=>series.id===(activeId??openingId))||suggestions[0]||fallback;
   const index=Math.max(0,suggestions.findIndex(series=>series.id===hero?.id));
   const slideKey=suggestions.map(series=>series.id).join('|');
   const slidesRef=useRef(suggestions),activeRef=useRef(hero?.id);slidesRef.current=suggestions;activeRef.current=hero?.id;
   const swapTimer=useRef<ReturnType<typeof setTimeout>|null>(null),firstFrame=useRef<number|null>(null),secondFrame=useRef<number|null>(null);
   const synopsisRef=useRef<HTMLDivElement>(null),heroCopyRef=useRef<HTMLDivElement>(null);
   const[heroScroll,setHeroScroll]=useState({synopsisMore:false,copyOverflow:false});
+  useEffect(()=>{
+    if(openingId)try{sessionStorage.setItem(OPENING_SUGGESTION_KEY,openingId);}catch{}
+  },[openingId]);
   const cancelTransition=useCallback(()=>{
     if(swapTimer.current!==null)clearTimeout(swapTimer.current);
     if(firstFrame.current!==null)cancelAnimationFrame(firstFrame.current);
@@ -58,12 +71,12 @@ export function SuggestedHero({suggestions,fallback}:{suggestions:Series[];fallb
     media.addEventListener('change',change);return()=>media.removeEventListener('change',change);
   },[settleTransition]);
   useEffect(()=>{
-    const visibility=()=>{setHidden(document.hidden);if(document.hidden){touchPointers.current.clear();setTouchPaused(false);settleTransition();}};
+    const visibility=()=>{setHidden(document.hidden);if(document.hidden){touchPointers.current.clear();setTouchPaused(false);setHoverPaused(false);settleTransition();}};
     document.addEventListener('visibilitychange',visibility);return()=>document.removeEventListener('visibilitychange',visibility);
   },[settleTransition]);
   useEffect(()=>{
     const finishTouch=(event:PointerEvent)=>{if(touchPointers.current.delete(event.pointerId))setTouchPaused(touchPointers.current.size>0);};
-    const loseFocus=()=>{touchPointers.current.clear();setTouchPaused(false);};
+    const loseFocus=()=>{touchPointers.current.clear();setTouchPaused(false);setHoverPaused(false);};
     window.addEventListener('pointerup',finishTouch);window.addEventListener('pointercancel',finishTouch);window.addEventListener('blur',loseFocus);
     return()=>{window.removeEventListener('pointerup',finishTouch);window.removeEventListener('pointercancel',finishTouch);window.removeEventListener('blur',loseFocus);};
   },[]);
@@ -106,7 +119,8 @@ export function SuggestedHero({suggestions,fallback}:{suggestions:Series[];fallb
     onPointerOver={updatePointerPause} onPointerMove={updatePointerPause}
     onPointerLeave={event=>{if(event.pointerType!=='touch')setHoverPaused(false);}}
     onPointerDownCapture={event=>{if(event.pointerType==='touch'&&suggestions.length>1){touchPointers.current.add(event.pointerId);setTouchPaused(true);settleTransition();}}}
-    onFocusCapture={()=>{setFocusPaused(true);settleTransition();}}
+    onFocusCapture={event=>{const keyboardFocus=event.target.matches(':focus-visible');setFocusPaused(keyboardFocus);if(keyboardFocus)settleTransition();}}
+    onKeyDownCapture={()=>{setFocusPaused(true);settleTransition();}}
     onBlurCapture={event=>{if(!(event.relatedTarget instanceof Node)||!event.currentTarget.contains(event.relatedTarget))setFocusPaused(false);}}>
     <div className="hero-art cover-artwork-frame" inert={phase!=='idle'} aria-hidden={phase!=='idle'?true:undefined}><CoverArtwork key={hero.id} src={hero.cover} alt="" fetchPriority="high" decoding="async"/><CoverWatermark/></div>
     <div ref={heroCopyRef} className={`hero-copy${heroScroll.copyOverflow?' is-scrollable':''}`} tabIndex={heroScroll.copyOverflow?0:undefined} role="group" aria-label={t('aboutSeries')} inert={phase!=='idle'} aria-hidden={phase!=='idle'?true:undefined}>

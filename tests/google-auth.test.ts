@@ -38,8 +38,8 @@ function attempt(response:Response,url:string,session=''):Attempt{
   const browser=cookie(response,'drama_google');assert.ok(browser,'OAuth requires an independent browser-binding cookie');
   return{url:parsed,state,nonce,challenge,cookie:browser,session};
 }
-async function start(next='/wallet',session='',language='en'){
-  const r=await request('/api/auth/google/start?'+new URLSearchParams({next,language}),undefined,session);assert.equal(r.status,302);return attempt(r,r.headers.get('location')!,session);
+async function start(next='/wallet',session='',language='en',headers:Record<string,string>={}){
+  const r=await request('/api/auth/google/start?'+new URLSearchParams({next,language}),undefined,session,headers);assert.equal(r.status,302);return attempt(r,r.headers.get('location')!,session);
 }
 async function startLink(session:string,next='/account'){
   const r=await json('/api/auth/google/link',{password,next,language:'en'},session);return attempt(r.response,r.data.url,session);
@@ -76,7 +76,10 @@ before(async()=>{
     }
     return originalFetch(input,init);
   };
-  const {createApp,errorHandler}=await import('../server/app');const app=createApp();app.use(errorHandler);server=app.listen(0,'127.0.0.1');await new Promise<void>(resolve=>server.once('listening',resolve));base=`http://127.0.0.1:${(server.address() as any).port}`;config.appUrl=base;
+  const {createApp,errorHandler}=await import('../server/app');
+  const app=createApp();
+  app.set('trust proxy','loopback');
+  app.use(errorHandler);server=app.listen(0,'127.0.0.1');await new Promise<void>(resolve=>server.once('listening',resolve));base=`http://127.0.0.1:${(server.address() as any).port}`;config.appUrl=base;
 });
 after(async()=>{globalThis.fetch=originalFetch;if(server)await new Promise<void>(resolve=>server.close(()=>resolve()));db.close();await rm(dir,{recursive:true,force:true});});
 
@@ -104,6 +107,56 @@ test('a verified signed Google identity registers an ordinary viewer and a persi
   const identities=(await json('/api/account/identities',undefined,session)).data;assert.equal(identities.google.linked,true);assert.equal(identities.google.email,email);assert.equal(identities.password,false);assert.ok(certificates>0,'ID-token validation must retrieve a trusted Google signing key');
   await json('/api/auth/login',{email,password},'',401);
   assert.equal((await json('/api/auth/me',undefined,session)).data.user.id,me.id);
+});
+
+test('a returning Google sign-in matches an additional configured administrator email',async()=>{
+  const email='additional-admin@example.test';
+  const primaryEmail='primary-admin@example.test';
+  const claims={email,sub:'additional-admin-google-subject'};
+  const previous={
+    platformOwnerUserId:config.platformOwnerUserId,
+    platformAdminEmailHash:config.platformAdminEmailHash,
+    platformAdditionalAdminEmailHash:config.platformAdditionalAdminEmailHash,
+  };
+  const emailHash=(address:string)=>createHash('sha256').update(address).digest('hex');
+  const startAdmin=()=>start('/admin','','en',{'X-Forwarded-For':'192.0.2.10'});
+  try{
+    config.platformAdminEmailHash=emailHash(primaryEmail);
+    config.platformAdditionalAdminEmailHash='';
+    const owner=await register('immutable-owner@example.test');
+    config.platformOwnerUserId=owner.id;
+    assert.equal((await json('/api/auth/me',undefined,owner.session)).data.user.role,'admin');
+
+    const initial=await callback(await startAdmin(),{claims});
+    const initialSession=cookie(initial,'drama_session');
+    assert.ok(initialSession);
+    const before=(await json('/api/auth/me',undefined,initialSession)).data.user;
+    assert.equal(before.role,'viewer');
+    await json('/api/admin',undefined,initialSession,403);
+
+    config.platformAdditionalAdminEmailHash=emailHash(email);
+    const signedIn=await callback(await startAdmin(),{claims});
+    assert.equal(location(signedIn).pathname,'/admin');
+    const session=cookie(signedIn,'drama_session');
+    assert.ok(session);
+    const current=(await json('/api/auth/me',undefined,session)).data.user;
+    assert.equal(current.id,before.id);
+    assert.equal(current.role,'admin');
+    assert.equal(current.email_verified,true);
+    assert.equal(current.dramio_pass.active,false);
+    assert.equal(current.creator_display_name,before.creator_display_name);
+    await json('/api/admin',undefined,session);
+    const ownerOnly=await json('/api/admin/drive-imports',undefined,session,403);
+    assert.equal(ownerOnly.data.error.code,'DRIVE_IMPORT_OWNER_REQUIRED');
+    assert.equal(one('SELECT COUNT(*) AS n FROM platform_owner_access_events WHERE user_id=?',current.id)!.n,1);
+
+    const primarySignIn=await callback(await startAdmin(),{claims:{email:primaryEmail}});
+    const primarySession=cookie(primarySignIn,'drama_session');
+    assert.ok(primarySession);
+    await json('/api/admin',undefined,primarySession);
+  }finally{
+    Object.assign(config,previous);
+  }
 });
 
 test('returning Google sign-in uses stable subject and preserves the original wallet when Google email changes',async()=>{

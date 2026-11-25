@@ -19,11 +19,11 @@ export function ensurePlatformOwnerAccess(){
 }
 
 interface AdminCandidate {id:string;email:string;role:string}
-function configuredAdminCandidate(userId:string,expectedHash:string){
+function configuredAdminCandidate(userId:string,expectedHashes:readonly Buffer[]){
   const user=one<AdminCandidate>('SELECT id,email,role FROM users WHERE id=?',userId);
   if(!user||user.role==='admin')return undefined;
   const actual=crypto.createHash('sha256').update(user.email.trim().toLowerCase()).digest();
-  if(!crypto.timingSafeEqual(actual,Buffer.from(expectedHash,'hex')))return undefined;
+  if(!expectedHashes.some(hash=>crypto.timingSafeEqual(actual,hash)))return undefined;
   const verified=one(`SELECT 1 FROM users u WHERE u.id=? AND (
     EXISTS(SELECT 1 FROM account_email_verifications v WHERE v.user_id=u.id AND v.verified_email=u.email COLLATE NOCASE)
     OR EXISTS(SELECT 1 FROM oauth_identities i WHERE i.user_id=u.id AND i.provider='google' AND i.email=u.email COLLATE NOCASE)
@@ -33,12 +33,15 @@ function configuredAdminCandidate(userId:string,expectedHash:string){
 
 /** A trusted email selector is effective only after server-verified identity proof. */
 export function ensureConfiguredAdminAccess(userId:string){
-  const expectedHash=config.platformAdminEmailHash.trim();
-  if(!/^[a-f\d]{64}$/i.test(expectedHash)||!configuredAdminCandidate(userId,expectedHash))return false;
+  const expectedHashes=[config.platformAdminEmailHash,config.platformAdditionalAdminEmailHash]
+    .map(value=>value.trim())
+    .filter(value=>/^[a-f\d]{64}$/i.test(value))
+    .map(value=>Buffer.from(value,'hex'));
+  if(!expectedHashes.length||!configuredAdminCandidate(userId,expectedHashes))return false;
   return transaction(()=>{
     // Repeat both checks inside the role/audit transaction; no profile field can
     // substitute for the current verified email or signed Google identity.
-    const current=configuredAdminCandidate(userId,expectedHash);
+    const current=configuredAdminCandidate(userId,expectedHashes);
     if(!current)return false;
     run("UPDATE users SET role='admin' WHERE id=?",userId);
     run('INSERT INTO platform_owner_access_events (id,user_id,previous_role) VALUES (?,?,?)',crypto.randomUUID(),userId,current.role);

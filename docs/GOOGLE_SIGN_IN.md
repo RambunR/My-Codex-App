@@ -64,7 +64,7 @@ Production `APP_URL` is pinned to `https://aidramio.jimmy-tsoi2001.workers.dev`.
 2. Select a Google account you added as a test user and complete Google's consent screen.
 3. A new Google identity creates an ordinary viewer account and returns to the requested page, such as the wallet. Sign out and use Google again to verify that the same account returns.
 
-Google registration creates no wallet credit, administrator access, or publisher activation. The HK$88 publisher activation and all other payment rules remain unchanged; live payments require their separate Stripe configuration.
+Google sign-in establishes the account identity. A verified Google email can grant audited administrator access when it matches the LingYing account email and one of the operator-configured selectors, `PLATFORM_ADMIN_EMAIL_SHA256` or `PLATFORM_ADDITIONAL_ADMIN_EMAIL_SHA256`. The platform owner is configured separately by account ID.
 
 If the Google email already belongs to an AIDramio password account, the site will ask you to sign in with that existing password first. Then open **Account → Connect Google**, confirm your current AIDramio password, and choose your Google account. This explicitly links the identities while retaining the same wallet, purchases, publisher status, and account ID. Matching email addresses never automatically merge accounts or grant access to another wallet.
 

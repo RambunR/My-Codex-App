@@ -11,10 +11,10 @@ const admin={id:'suggestion-admin',name:'Editorial administrator',email:'editor@
 const stats={stats:{users:2,publishers:1,sales:{gross_micros:0,platform_micros:0,n:0},activation_hkd:0},storageRequests:[],withdrawals:[],users:[]};
 const config={brand:'LingYing',paymentsMode:'disabled',paymentsReady:false,paymentsTestMode:false,payoutsEnabled:false,uploadsEnabled:true,usdToHkd:7.8,demo:false,limits:{}};
 
-async function publicFixture(page:Page,selected=[first,second],locale='en'){
+async function publicFixture(page:Page,selected=[first,second],locale='en',randomSample=0){
   const writes:string[]=[],errors:string[]=[],queries:string[]=[];
   page.on('pageerror',error=>errors.push(error.message));
-  await page.addInitScript(value=>localStorage.setItem('drama-language',value),locale);
+  await page.addInitScript(({locale,randomSample})=>{localStorage.setItem('drama-language',locale);Math.random=()=>randomSample;},{locale,randomSample});
   await page.route('**/api/**',route=>{
     const request=route.request(),url=new URL(request.url());
     if(request.method()!=='GET'){writes.push(request.method()+' '+url.pathname);return route.abort();}
@@ -59,6 +59,21 @@ async function noPagination(hero:Locator){
 async function activeRelease(hero:Locator,release:typeof first){
   await titleIs(hero,release.title);await expect(hero).toHaveAttribute('aria-label',release.title);await expect(hero.locator('.hero-art img')).toHaveAttribute('src',release.cover);await expect(hero.locator('.hero-synopsis p')).toHaveText(release.description);for(const selector of ['h2 a','.hero-details'])await expect(hero.locator(selector)).toHaveAttribute('href',`/series/${release.id}`);await expect(hero.locator('.hero-play')).toHaveAttribute('href',`/watch/${release.id}/${release.first_episode_id}`);
 }
+
+test('homepage waits for selected releases and varies the opening release across reloads',async({page})=>{
+  await page.emulateMedia({reducedMotion:'reduce'});await frozenClock(page);const state=await publicFixture(page,[first,second],'en',.75);
+  let finish!:()=>void;const gate=new Promise<void>(resolve=>{finish=resolve;});
+  const featuredUrl='**/api/series?featured=true';
+  await page.route(featuredUrl,async route=>{await gate;await route.fulfill({json:{series:[first,second]}});});
+  const hero=page.locator('section.hero');
+  try{
+    await page.goto('/');await expect(page.locator('.series-card h3').first()).toHaveText(popular.title);
+    await expect(hero).toHaveCount(0);
+  }finally{finish();}
+  await activeRelease(hero,second);await expect(hero).toHaveAttribute('data-autoplay','paused');
+  await page.reload();await activeRelease(hero,first);
+  await page.reload();await activeRelease(hero,second);await noPagination(hero);state.clean();
+});
 
 test('selected releases automatically fade artwork and copy together with matching title, synopsis and links and no navigation bar',async({page})=>{
   await page.setViewportSize({width:1440,height:900});await frozenClock(page);const state=await publicFixture(page);await page.goto('/');const hero=page.locator('section.hero');
@@ -111,7 +126,7 @@ for(const size of [{name:'desktop',width:1440,height:900,portrait:false,locale:'
   const bounds=await hero.evaluate(element=>{const hero=element.getBoundingClientRect(),art=element.querySelector('.hero-art')!.getBoundingClientRect(),copy=element.querySelector('.hero-copy')!.getBoundingClientRect();return{hero:{top:hero.top,bottom:hero.bottom,height:hero.height},art:{top:art.top,bottom:art.bottom},copy:{top:copy.top,bottom:copy.bottom},rows:getComputedStyle(element).gridTemplateRows.split(' ').filter(Boolean).length};});
   expect(bounds.hero.height).toBeLessThanOrEqual(size.height*.7+1);expect(bounds.rows).toBe(size.portrait?2:1);expect(Math.abs((size.portrait?bounds.copy.bottom:bounds.art.bottom)-bounds.hero.bottom)).toBeLessThanOrEqual(2);await expect(hero.locator('.hero-art img')).toHaveCSS('object-fit','contain');await expect(hero.locator('.hero-art img')).toHaveCSS('transform','none');await noOverflow(page);state.clean();
   if(size.portrait)await phoneActions(hero,true);
-  if(size.name!=='short landscape'){await page.route('**/api/series?featured=true',route=>route.fulfill({json:{series:[{...first,cover:'/images/hero.jpg'},second]}}));await page.reload();await expect(hero.locator('.hero-art img')).toHaveAttribute('src','/images/hero.jpg');await hero.locator('.hero-art img').evaluate((image:HTMLImageElement)=>image.decode());await mkdir('/workspace/exports',{recursive:true});await hero.screenshot({path:`/workspace/exports/lingying-hero-fade-${size.portrait?'mobile':'desktop'}.png`});state.clean();}
+  if(size.name!=='short landscape'){await page.route('**/api/series?featured=true',route=>route.fulfill({json:{series:[first,{...second,cover:'/images/hero.jpg'}]}}));await page.reload();await expect(hero.locator('.hero-art img')).toHaveAttribute('src','/images/hero.jpg');await hero.locator('.hero-art img').evaluate((image:HTMLImageElement)=>image.decode());await mkdir('/workspace/exports',{recursive:true});await hero.screenshot({path:`/workspace/exports/lingying-hero-fade-${size.portrait?'mobile':'desktop'}.png`});state.clean();}
 });
 
 test.describe('Traditional Chinese touch layout',()=>{
@@ -124,7 +139,8 @@ test.describe('Traditional Chinese touch layout',()=>{
         const box=(await hero.locator('.hero-art').boundingBox())!;await input.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:box.x+box.width/2,y:box.y+box.height/2}]});await expect(hero).toHaveAttribute('data-autoplay','paused');await page.clock.runFor(20000);await activeRelease(hero,active);
         await input.send('Input.dispatchTouchEvent',{type:release,touchPoints:[]});await expect(hero).toHaveAttribute('data-autoplay','running');await page.clock.runFor(8400);active=active.id===first.id?second:first;await activeRelease(hero,active);
       }
-      await hero.locator('.hero-synopsis').tap();await expect(hero.locator('.hero-synopsis')).toBeFocused();await expect(hero).toHaveAttribute('data-autoplay','paused');await page.clock.runFor(20000);await activeRelease(hero,active);await page.locator('.header-language').focus();await expect(hero).toHaveAttribute('data-autoplay','running');await page.clock.runFor(8400);await activeRelease(hero,second);
+      const synopsis=hero.locator('.hero-synopsis');await synopsis.tap();await expect(synopsis).toBeFocused();await expect(hero).toHaveAttribute('data-autoplay','running');await page.clock.runFor(8400);await activeRelease(hero,second);
+      await synopsis.focus();await synopsis.press('End');await expect(hero).toHaveAttribute('data-autoplay','paused');await page.clock.runFor(20000);await activeRelease(hero,second);await page.locator('.header-language').focus();await expect(hero).toHaveAttribute('data-autoplay','running');
       await noPagination(hero);await expect(hero.locator('.hero-art img')).toHaveCSS('object-fit','contain');expect((await hero.boundingBox())!.height).toBeLessThanOrEqual(844*.7+1);await noOverflow(page);state.clean();
       await phoneActions(hero,true);await hero.locator('.hero-details').tap();await expect(page).toHaveURL('/series/'+second.id);await expect(page.getByRole('heading',{level:1,name:second.title,exact:true})).toBeVisible();state.clean();
     }finally{await input.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]}).catch(()=>{});await input.detach();}

@@ -20,6 +20,7 @@ export const config = {
   stripeSiteOrigin: process.env.STRIPE_SITE_ORIGIN || '',
   platformOwnerUserId: process.env.PLATFORM_OWNER_USER_ID || '',
   platformAdminEmailHash: process.env.PLATFORM_ADMIN_EMAIL_SHA256 || '',
+  platformAdditionalAdminEmailHash: process.env.PLATFORM_ADDITIONAL_ADMIN_EMAIL_SHA256 || '',
   officialCreatorName: process.env.OFFICIAL_CREATOR_NAME || 'LingYingDrama Offical',
   dataDir: path.resolve(process.env.DATA_DIR || './data'),
   payments: process.env.PAYMENTS_MODE || (process.env.NODE_ENV === 'production' ? 'disabled' : 'demo'),
