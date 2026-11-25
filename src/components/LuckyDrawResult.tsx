@@ -22,7 +22,7 @@ export function LuckyDrawResult({prize,onClose}:{prize:DrawPrize|null;onClose:()
             {!!series.genres.length&&<div className="lucky-result-genres"><dt>{t('genre')}</dt><dd>{series.genres.map(genre=><span key={genre}>{t((genre==='animation'?'animation':`genre_${genre}`) as Key)}</span>)}</dd></div>}
             <div><dt>{t('episodes')}</dt><dd>{series.episode_count.toLocaleString(locale)}</dd></div>
             <div><dt>{t('spokenLanguage')}</dt><dd>{spokenLanguageName(series.language,locale)}</dd></div>
-            {uploaded&&<div><dt>{t('luckyUploadDate')}</dt><dd><time dateTime={series.uploaded_at!} title={series.uploaded_at!}>{uploaded}</time></dd></div>}
+            {uploaded&&<div><dt>{t('uploadDate')}</dt><dd><time dateTime={series.uploaded_at!} title={series.uploaded_at!}>{uploaded}</time></dd></div>}
             {published&&<div><dt>{t('luckyPublishedOn')}</dt><dd><time dateTime={series.published_at} title={series.published_at}>{published}</time></dd></div>}
             <div className="lucky-result-creator"><dt>{t('by')}</dt><dd>{series.creator_name}</dd></div>
           </dl>{series.description&&<p className="lucky-result-synopsis">{series.description}</p>}</>:<p className="muted lucky-result-unavailable"><LockKeyhole size={16}/>{t('luckyUnavailable')}</p>}

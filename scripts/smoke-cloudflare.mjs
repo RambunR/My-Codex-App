@@ -290,6 +290,7 @@ try{
   const body={title:'Cloudflare Published Drama',description:'A real upload used to validate durable financial and media storage.',language:'cmn',genres:['romance'],themes:['revenge','hidden-identity','entrepreneurship'],format:'animation',creation_type:'human',price_cents:51,free_episodes:1};
   await request('/api/studio/series',{...body,price_cents:101},publisher,400);
   const sid=(await request('/api/studio/series',body,publisher,201)).data.id;
+  assert.equal((await request('/api/studio',undefined,publisher)).data.series.find(series=>series.id===sid).uploaded_at,null);
   const duplicateName='  '+body.title.toUpperCase().replaceAll(' ','   ')+'  ';
   const availability=title=>'/api/studio/title-availability?'+new URLSearchParams({title});
   await request(availability(body.title),undefined,'',401);
@@ -502,6 +503,9 @@ try{
   const duplicateLike=(await request(`/api/series/${sid}/like`,{liked:true},viewer,200,'PUT')).data;assert.equal(duplicateLike.likes,1);
   const publicSeries=(await request(`/api/series/${sid}`,undefined,viewer)).data;
   assert.equal(publicSeries.series.likes,1);assert.equal(publicSeries.series.liked,true);assert.equal(publicSeries.series.saved,false);
+  assert.equal(Object.hasOwn(publicSeries.series,'uploaded_at'),false);
+  const uploadedAt=(await request('/api/studio',undefined,publisher)).data.series.find(series=>series.id===sid).uploaded_at;
+  assert.match(uploadedAt,/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
   assert.deepEqual(publicSeries.series.subtitle_languages,selectedSubtitles);
   assert.equal(publicSeries.series.views,0,'Metadata and byte ranges must not count as views.');
   const guestPlayback=await request(`/api/episodes/${first.id}/playback`,{});assert.match(guestPlayback.cookie,/^drama_viewer=/);

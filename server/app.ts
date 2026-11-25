@@ -74,13 +74,17 @@ function writableSeries(req:Request,seriesId=id(req)){
   const s=ownSeries(req,seriesId);if(req.user!.role!=='admin')assertSeriesWritable(seriesId);return s;
 }
 function ownerStorage(series:Record<string,any>){return getOwnerStorage(series.creator_id);}
-const catalogSelect = `SELECT s.*,u.name AS creator_name,COALESCE(sp.published_at,s.created_at) AS published_at,
+const catalogFields = `s.*,u.name AS creator_name,COALESCE(sp.published_at,s.created_at) AS published_at,
  (${seriesAccessTypeSql()}) AS access_type,
  (SELECT id FROM episodes e WHERE e.series_id=s.id ORDER BY number LIMIT 1) AS first_episode_id,
  (SELECT COUNT(*) FROM episodes e WHERE e.series_id=s.id) AS episode_count,
  (SELECT COUNT(*) FROM saves sv WHERE sv.series_id=s.id) AS saves,
- (SELECT COUNT(*) FROM series_likes sl WHERE sl.series_id=s.id) AS likes
- FROM series s JOIN users u ON u.id=s.creator_id LEFT JOIN series_publications sp ON sp.series_id=s.id`;
+ (SELECT COUNT(*) FROM series_likes sl WHERE sl.series_id=s.id) AS likes`;
+const catalogFrom = 'FROM series s JOIN users u ON u.id=s.creator_id LEFT JOIN series_publications sp ON sp.series_id=s.id';
+const catalogSelect = `SELECT ${catalogFields} ${catalogFrom}`;
+const studioCatalogSelect = `SELECT ${catalogFields},
+ (SELECT strftime('%Y-%m-%dT%H:%M:%fZ',MIN(julianday(e.created_at))) FROM episodes e WHERE e.series_id=s.id) AS uploaded_at
+ ${catalogFrom}`;
 function serializeSeries(s: Record<string, any>, userId?: string, privateView=false) {
   const { cover_key, cover_bytes,creator_id,...safe } = s;
   const {publisher,publisher_profile_id}=seriesPublisher(s);
@@ -342,7 +346,7 @@ export function createApp() {
     res.json({ paid:session.payment_status==='paid',user:getUser(req.user!.id) });
   });
   app.get('/api/studio', requireAuth, (req,res) => {
-    const user=req.user!;void finishInBackground(cleanupSeriesMedia(undefined,20)).catch(()=>{});void finishInBackground(cleanupExpiredEpisodeUploads(5)).catch(()=>{});res.json({ user:getUser(user.id),series:all(`${catalogSelect} WHERE s.creator_id=? AND NOT EXISTS (SELECT 1 FROM series_deletions d WHERE d.series_id=s.id) AND NOT EXISTS (SELECT 1 FROM retired_catalog_series r WHERE r.series_id=s.id) ORDER BY s.created_at DESC`,user.id).map(s=>serializeSeries(s,user.id,true)),
+    const user=req.user!;void finishInBackground(cleanupSeriesMedia(undefined,20)).catch(()=>{});void finishInBackground(cleanupExpiredEpisodeUploads(5)).catch(()=>{});res.json({ user:getUser(user.id),series:all(`${studioCatalogSelect} WHERE s.creator_id=? AND NOT EXISTS (SELECT 1 FROM series_deletions d WHERE d.series_id=s.id) AND NOT EXISTS (SELECT 1 FROM retired_catalog_series r WHERE r.series_id=s.id) ORDER BY s.created_at DESC`,user.id).map(s=>serializeSeries(s,user.id,true)),
       stats:one(`SELECT COUNT(*) AS sales,COALESCE(SUM(p.creator_micros),0) AS lifetime_micros FROM ${purchaseTable()} p JOIN episodes e ON e.id=p.episode_id JOIN series s ON s.id=e.series_id WHERE s.creator_id=?`,user.id),
       withdrawals:stripeTestPayments()?[]:all(`SELECT w.*,${WITHDRAWAL_TERMS_SQL} FROM withdrawals w LEFT JOIN withdrawal_terms wt ON wt.withdrawal_id=w.id WHERE w.user_id=? ORDER BY w.created_at DESC`,user.id), storageRequests:all('SELECT * FROM storage_requests WHERE user_id=? ORDER BY created_at DESC',user.id) });
   });

@@ -78,6 +78,8 @@ test('series metadata validates price and language and enforces ownership',async
   assert.equal((await request('/api/studio/series',{...body,price_cents:9},publisher)).status,400);
   assert.equal((await request('/api/studio/series',{...body,language:'not-a-language'},publisher)).status,400);
   const created=await request('/api/studio/series',body,publisher);assert.equal(created.status,201);seriesId=created.data.id;
+  const studio=await request('/api/studio',undefined,publisher);
+  assert.equal(studio.data.series.find((series:any)=>series.id===seriesId).uploaded_at,null,'A draft has no upload time until an episode is saved.');
   assert.equal((await request(`/api/series/${seriesId}`,undefined,viewer)).status,404);
   assert.equal((await request(`/api/studio/series/${seriesId}`,body,other,'PATCH')).status,403);
   assert.equal((await request(`/api/studio/series/${seriesId}/status`,{status:'published'},publisher)).status,400);
@@ -132,6 +134,22 @@ test('quota, real video processing, cover upload, publishing and episode edits w
   assert.equal((await request(`/api/studio/series/${seriesId}/status`,{status:'published'},publisher)).status,200);
   const detail=await request(`/api/series/${seriesId}`);assert.equal(detail.data.series.language,'zh-TW');assert.equal(detail.data.episodes[0].title,'Opening');
   assert.equal((await request(`/api/studio/episodes/${uploadedId}`,{title:'A New Opening',number:1},publisher,'PATCH')).status,200);
+});
+test('Studio shows the earliest saved episode upload even when it is numbered later',async()=>{
+  const earlierId='studio-upload-date-fixture';
+  run(`INSERT INTO episodes (id,series_id,title,number,duration,bytes,storage_key,created_at)
+    SELECT ?,series_id,'Earlier upload',2,duration,bytes,storage_key,? FROM episodes WHERE id=?`,earlierId,'2025-01-09T00:35:00+08:00',uploadedId);
+  try{
+    const studio=await request('/api/studio',undefined,publisher);
+    const ownSeries=studio.data.series.find((series:any)=>series.id===seriesId);
+    assert.equal(ownSeries.uploaded_at,'2025-01-08T16:35:00.000Z');
+    assert.notEqual(ownSeries.uploaded_at,ownSeries.created_at);
+    assert.notEqual(ownSeries.uploaded_at,ownSeries.published_at);
+    const publicSeries=await request(`/api/series/${seriesId}`);
+    assert.equal(Object.hasOwn(publicSeries.data.series,'uploaded_at'),false);
+  }finally{
+    run('DELETE FROM episodes WHERE id=?',earlierId);
+  }
 });
 test('first publication brings an older draft to Newest and later edits preserve its release date',async()=>{
   const detail=await request(`/api/series/${seriesId}`);assert.equal(detail.status,200);

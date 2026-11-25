@@ -1,5 +1,5 @@
 import type {Locale} from '../shared/config';
-export const luckyRevealEnglish={luckyViewNow:'View it now',luckyWatchLater:'Close and watch later',luckySavedHint:'Saved in Your unlocked series. Come back here to watch later.',luckyUploadDate:'Upload date',luckyPublishedOn:'First published',luckyViewDetails:'View prize details',luckyUnlocked:'Unlocked'};
+export const luckyRevealEnglish={luckyViewNow:'View it now',luckyWatchLater:'Close and watch later',luckySavedHint:'Saved in Your unlocked series. Come back here to watch later.',uploadDate:'Upload date',luckyPublishedOn:'First published',luckyViewDetails:'View prize details',luckyUnlocked:'Unlocked'};
 type Copy=Record<keyof typeof luckyRevealEnglish,string>;
 const rows:Record<Exclude<Locale,'en'>,string[]>={
  'zh-TW':['立即觀看','關閉，稍後觀看','已儲存在「你已解鎖的劇集」，可稍後回來觀看。','上傳日期','首次發布','查看中獎詳情','已解鎖'],
